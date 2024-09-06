@@ -3,7 +3,7 @@
 Ensinnäkin, tehdään graafinen käyttis esim. PyGameä käyttäen, jotta nähdään mitä botti tekee. Ennen kutakin siirtoa, 
 
 1. merkataan "turvalliset ruudut" (eli ruudut joista voidaan päätellä että niissä varmasti ei ole miinaa) vihreällä, 
-2. merkataan miinat lipulla kuten oikeassakin miinaharavassa voidaan tehdä. (Jos lähdetään saivartelemaan, voidaan todeta, että optimaalisessa pelityylissä miinaharavassa merkataan vain osa lipuista ja chordataan; kaikkien
+2. merkataan miinat lipulla kuten oikeassakin miinaharavassa *voidaan* tehdä. (pilkunviilaajia varten todetaan tässä, että optimaalisessa pelityylissä miinaharavassa merkataan vain osa lipuista ja chordataan; kaikkien miinojen liputtaminen ei ole optimaalista nopeuden ja/tai 'eficciencyn' (kokonaisklikkausten minimoimisen) kannalta, koska chordaus on olemassa ja mahdollistaa yli 100% tehokkuuden verrattuna minimiklikkausmäärään liputta pelatessa kristallipallon kanssa)
 3. avataan turvalliset ruudut RIIPPUMATTA SIITÄ, olisiko tämä oikeassa pelissä chordaus vai ei (pelityylin tehokkuudesta voidaan ruveta murehtimaan, jos saadaan varsinainen logiikka ensin toimimaan todistetusti eli hyvin testatusti kaikissa tapauksissa )
 4. siirrytään seuraavaan ruutuun, jossa ei ole oltu vielä
 5. jos on käyty läpi ruudut, eikä pelkillä ruudun itsensä näyttämällä numerolla voida päätellä viereisistä ruuduista mitään, siirrytään monimutkaisempaan logiikkaan, jossa merkataan, montako miinaa kussakin ympäröivässä blokissa on (esim. 3 ruutua, joista tiedetään, että niistä kahdessa on pakko olla, jne). TÄMÄ ON VAIKEIN OSUUS KOKO BOTISSA.
