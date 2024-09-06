@@ -1,9 +1,11 @@
 - [ ] to-do: Ohjelman yleisrakenne
 <h2> Ohjelman yleisrakenne </h2>
-Ensinnäkin, tehdään graafinen käyttis esim. PyGameä käyttäen, jotta nähdään mitä botti tekee. Ennen kutakin siirtoa, 
+Ensinnäkin, tehdään graafinen käyttis esim. PyGameä käyttäen, jotta nähdään mitä botti tekee. 
 
-1. merkataan "turvalliset ruudut" (eli ruudut joista voidaan päätellä että niissä varmasti ei ole miinaa) vihreällä, 
-2. merkataan miinat lipulla kuten oikeassakin miinaharavassa *voidaan* tehdä. (pilkunviilaajia varten todetaan tässä, että optimaalisessa pelityylissä miinaharavassa merkataan vain osa lipuista ja chordataan; kaikkien miinojen liputtaminen ei ole optimaalista nopeuden ja/tai 'eficciencyn' (kokonaisklikkausten minimoimisen) kannalta, koska chordaus on olemassa ja mahdollistaa yli 100% tehokkuuden verrattuna minimiklikkausmäärään liputta pelatessa kristallipallon kanssa)
+Botti etenee mappia ruutu kerrallaan. Botin ollessa kussakin ruudussa, jos ei ole osuttu miinaan (pakkoarvauksen tapauksessa, JOS päästään siihen vaiheeseen tässä algoritmissa, jossa voidaan tehdä myös fiksuja arvauksia pakon osuessa,)
+
+1. merkataan nykyistä ruutua ympäröivistä kahdeksasta ruudusta "turvalliset ruudut" (eli ruudut joista voidaan päätellä että niissä varmasti ei ole miinaa) vihreällä visualisoinnin vuoksi, 
+2. merkataan miinat (ne ympäröivät ruudut joissa voidaan päätellä olevan miina) lipulla kuten oikeassakin miinaharavassa *voidaan* tehdä. (pilkunviilaajia varten todetaan tässä, että optimaalisessa pelityylissä miinaharavassa merkataan vain osa lipuista ja chordataan; kaikkien miinojen liputtaminen ei ole optimaalista nopeuden ja/tai 'eficciencyn' (kokonaisklikkausten minimoimisen) kannalta, koska chordaus on olemassa ja mahdollistaa yli 100% tehokkuuden verrattuna minimiklikkausmäärään liputta pelatessa kristallipallon kanssa)
 3. avataan turvalliset ruudut RIIPPUMATTA SIITÄ, olisiko tämä oikeassa pelissä chordaus vai ei (pelityylin tehokkuudesta voidaan ruveta murehtimaan, jos saadaan varsinainen logiikka ensin toimimaan todistetusti eli hyvin testatusti kaikissa tapauksissa )
 4. siirrytään seuraavaan ruutuun, jossa ei ole oltu vielä
 5. jos on käyty läpi ruudut, eikä pelkillä ruudun itsensä näyttämällä numerolla voida päätellä viereisistä ruuduista mitään, siirrytään monimutkaisempaan logiikkaan, jossa merkataan, montako miinaa kussakin ympäröivässä blokissa on (esim. 3 ruutua, joista tiedetään, että niistä kahdessa on pakko olla, jne). TÄMÄ ON VAIKEIN OSUUS KOKO BOTISSA.
