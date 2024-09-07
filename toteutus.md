@@ -1,14 +1,17 @@
 - [ ] to-do: Ohjelman yleisrakenne
 <h2> Ohjelman yleisrakenne </h2>
-Ensinnäkin, tehdään graafinen käyttis esim. PyGameä käyttäen, jotta nähdään mitä botti tekee. 
+Ensinnäkin, tehdään graafinen käyttis esim. PyGameä käyttäen, jotta nähdään mitä botti kussakin ratkaisuvaiheessa tekee. 
 
-Botti etenee mappia ruutu kerrallaan. Botin ollessa kussakin ruudussa, jos ei ole osuttu miinaan (pakkoarvauksen tapauksessa, JOS päästään siihen vaiheeseen tässä algoritmissa, jossa voidaan tehdä myös fiksuja arvauksia pakon osuessa,)
+Visuaaleissa, kuten itse koodissakin, botti etenee mappia ruutu kerrallaan ja katsoo kulloinkin ympärillä olevaa kahdeksaa (8) ruutua (*alahuomautus 0). 
+
+Botin ollessa kussakin ruudussa (*alahuomautus 1) 
 
 1. merkataan nykyistä ruutua ympäröivistä kahdeksasta ruudusta "turvalliset ruudut" (eli ruudut joista voidaan päätellä että niissä varmasti ei ole miinaa) vihreällä visualisoinnin vuoksi, 
-2. merkataan miinat (ne ympäröivät ruudut joissa voidaan päätellä olevan miina) lipulla kuten oikeassakin miinaharavassa *voidaan* tehdä. (pilkunviilaajia varten todetaan tässä, että optimaalisessa pelityylissä miinaharavassa merkataan vain osa lipuista ja chordataan; kaikkien miinojen liputtaminen ei ole optimaalista nopeuden ja/tai 'eficciencyn' (kokonaisklikkausten minimoimisen) kannalta, koska chordaus on olemassa ja mahdollistaa yli 100% tehokkuuden verrattuna minimiklikkausmäärään liputta pelatessa kristallipallon kanssa)
-3. avataan turvalliset ruudut RIIPPUMATTA SIITÄ, olisiko tämä oikeassa pelissä chordaus vai ei (pelityylin tehokkuudesta voidaan ruveta murehtimaan, jos saadaan varsinainen logiikka ensin toimimaan todistetusti eli hyvin testatusti kaikissa tapauksissa )
-4. siirrytään seuraavaan ruutuun, jossa ei ole oltu vielä
-5. jos on käyty läpi ruudut, eikä pelkillä ruudun itsensä näyttämällä numerolla voida päätellä viereisistä ruuduista mitään, siirrytään monimutkaisempaan logiikkaan, jossa merkataan, montako miinaa kussakin ympäröivässä blokissa on (esim. 3 ruutua, joista tiedetään, että niistä kahdessa on pakko olla, jne). TÄMÄ ON VAIKEIN OSUUS KOKO BOTISSA.
+2. merkataan miinat (ne ympäröivät ruudut joissa voidaan päätellä olevan miina) lipulla kuten oikeassakin miinaharavassa *voidaan* tehdä. (*alahuomautus 2) 
+3. avataan turvalliset ruudut, eli ne vihreäksi merkatut (pelityylin tehokkuudesta tässä vaiheessa voidaan ruveta murehtimaan, jos saadaan varsinainen logiikka ensin toimimaan todistetusti eli hyvin testatusti kaikissa tapauksissa). Tässä vaiheessa 0-putki aukeaa automaattisesti kuten oikeassakin miinaharavassa, eli jos klikataan 0-ruutua, niin ympäröivät 0t aukeavat automaattisesti.
+4.
+  - a) siirrytään seuraavaan ruutuun, jossa ei ole oltu vielä TAI
+  - b) jos on käyty läpi ruudut pelkällä yhden ruudun logiikalla eikä tämä riittänyt ratkaisemaan tietä eteenpäin, käydään seuraavaksi etulinjan ruutuja läpi monimutkaisemmalla logiikalla käyttäen tietoa viereisten etulinjan ruutujen lukuarvoista (0-8): mm. merkataan, montako miinaa kussakin ympäröivässä blokissa on (esim. 3 ruutua, joista tiedetään, että niistä kahdessa on pakko olla, jne). TÄMÄ ON YLIVOIMAISESTI VAIKEIN OSUUS KOKO ALGORITMISSA, ja vaatii oman osuutensa.
 
 <ol> 
   <li>
@@ -33,3 +36,6 @@ Botti etenee mappia ruutu kerrallaan. Botin ollessa kussakin ruudussa, jos ei ol
 - [ ] to-do: Laajojen kielimallien (ChatGPT yms.) käyttö. Mainitse mitä mallia on käytetty ja miten. Mainitse myös mikäli et ole käyttänyt. Tämä on tärkeää!
 - [ ] to-do: Viitteet
 
+huom.0: monesti riittää pelkkä ympäröivän 8 ruudun tarkastelu, mutta joskus taas ei - tällöin otetaan käyttöön tietoa ympäröivien ruutujen miinaluvuista, ja tämä voi mennä hyvinkin monimutkaiseksi, kuten voi itselleen todistaa täällä https://minesweeper.online/game/3720717509 (no guessing mode, mappi 'evil')
+huom.1: jos botti ei ole siis osunut miinaan, JOS päästään siihen vaiheeseen tämän algoritmin kehittämisessä, että kaikki mahdollinen logiikka on ratkaistu ja voidaan seuraavaksi alkaa tehdä myös fiksuja arvauksia pakon osuessa (mieluiten käyttäen ehdollisia todennäköisyyksiä), eli JOS ehditään siihen vaiheeseen tässä projektissa, että ollaan jo tehokkaasti ratkaistu kaikki 'pelkällä logiikalla' ratkaistavissa olevat tilanteet, mukaan lukien käyttäen tietoa jäljelläolevien miinojen lukumääristä ja viereisten ruutujen lukuarvoista.
+huom.2: pilkunviilaajien kunniaksi todetaan tässä, että optimaalisessa pelityylissä miinaharavassa merkataan vain osa lipuista ja chordataan (useiten 1:tä klikkaamalla, joskus myös 2:ta, ja hyvin harvoin isompia); kaikkien miinojen liputtaminen ei ole optimaalista nopeuden ja/tai 'eficciencyn' (kokonaisklikkausten minimoimisen) kannalta, koska chordaus on olemassa ja mahdollistaa yli "100%" tehokkuuden verrattuna minimiklikkausmäärään (jolloin efficiency on 100%) liputta pelatessa JOS tiedetään etukäteen, missä miinat ovat (100%:n tehokkuuden saavuttaminen ilman etukäteistietoa joka ikisen lipun tarkasta sijainnista on hyvin epätodennäköistä etenkin isommilla mapeilla))
