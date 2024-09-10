@@ -13,9 +13,10 @@ Samassa järjestyksessä kuin täällä https://algolabra-hy.github.io/dokumenta
   - <b>JavaScriptiä</b> hyvin, ja
   - Haskellia melko vähän (ei kiitos Haskellille - tein _Functional Programming_ -kurssin arvosanalla 3/5)
   - kävin Data Analysis with Python -kurssin, 4/5, ja _Building AI_ -kurssit, MUTTA en ole käynyt _Lineaarialgebra ja matriisilaskenta_ -kursseja vielä
-- [ ] to-do: mitä algoritmeja käytän
+- [ ] to-do: mitä algoritmeja käytän: coupled subsets CSP todennäköisesti
 - teen miinaharavabotin
 - [ ] to-do: syötteet
 - [ ] to-do: O-aikavaativuusanalyysit
 - [ ] to-do: vertailu tunnettuihin miinaharava-algoritmeihin
-- [ ] to-do: viitteet
+- [ ] to-do: viitteet: Becerra, David J. 2015. Algorithmic Approaches to Playing Minesweeper. Bachelor's thesis,
+Harvard College (permalink: http://nrs.harvard.edu/urn-3:HUL.InstRepos:14398552).

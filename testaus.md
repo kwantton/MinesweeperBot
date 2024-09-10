@@ -1,0 +1,5 @@
+- [ ] to-do: Yksikkötestauksen kattavuusraportti.
+- [ ] to-do: Mitä on testattu, miten tämä tehtiin?
+- [ ] to-do: Minkälaisilla syötteillä testaus tehtiin?
+- [ ] to-do: Miten testit voidaan toistaa?
+- [ ] to-do: Ohjelman toiminnan mahdollisen empiirisen testauksen tulosten esittäminen graafisessa muodossa. (Mikäli sopii aiheeseen)

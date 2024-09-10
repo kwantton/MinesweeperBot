@@ -56,7 +56,7 @@ class Minesweeper:
             print(f'inspect_event(); MOUSEBUTTONDOWN;')
             mouse_x, mouse_y = pygame.mouse.get_pos()                               # to-do: make a check if it's on a cell, if needed!
             mouse_x //= self.scale
-            mouse_y = (mouse_y - self.infobar)//self.scale                          # adjust for the infobar ('raise' the click by infobar height), then get the row number by division by self.scale.
+            mouse_y = (mouse_y - self.infobar)//self.scale                          # adjust for the infobar ('raise' the click by infobar height), then get the row number by division by self.scale. Asked from ChatGPT when trying to find the problem
             if mouse_y < 0:
                 self.new_game()                                                     # if you click the top bar, it starts a new game
             elif event.button == 1:                                                   # left click == 2!

@@ -1,1 +1,2 @@
 pygame==2.6.0
+python-constraint==1.4.0
