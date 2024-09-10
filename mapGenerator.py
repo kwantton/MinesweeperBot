@@ -6,10 +6,14 @@ from random import sample
 class Minesweeper:
     def __init__(self, width, height, mines):
         pygame.init()
+        pygame.display.set_caption('MINESWEEPER')
         self.mouse_pos = (0,0)
-        self.opened = set()      # all seen zero-cells are gathered here {(x0,y0), (x1,y1),...}
+        self.opened = set()     # all seen zero-cells are gathered here {(x0,y0), (x1,y1),...}
+        self.to_open = width*height - mines
 
-        self.scale = 50         # how many px in height and width should each cell (image) be?
+        self.scale = 50         # how many px in height and width should each cell be?
+        self.infobar = 100      # pixels above the actual map
+        self.font = pygame.font.Font(None, 36)
         self.height = height    # map height measured in in rows
         self.width = width
 
@@ -20,7 +24,7 @@ class Minesweeper:
         self.images = {}        # {name : loaded image}
         self.load_images()
 
-        self.screen = pygame.display.set_mode((self.scale*width, self.scale*height)) # each .png is 100 px, which is large.
+        self.screen = pygame.display.set_mode((self.scale*width, self.scale*height + self.infobar)) # each .png is 100 px, which is large. Extra height for info bar above the actual map
         self.clock = pygame.time.Clock()
         self.new_game()
         self.loop()
@@ -34,23 +38,34 @@ class Minesweeper:
     def new_game(self):
         print("\nnew_game")
         self.started = False                                                        # the mines will be placed AFTER the first click, as in real minesweeper. Otherwise you could lose on the first click. For that, we need to keep track on if the first click has already commenced or not.
-        self.map = [['images/unclicked.png' for x in range(self.width)] for y in range(self.height)]   # the visuals; names of the images!
+        self.victory = False
+        self.hit_a_mine = False
+        self.minecount = self.mines
+        self.opened = set()
+        self.start_time = None
+        self.timer_active = False
+        self.elapsed_time = 0
+        self.map = [['images/unclicked.png' for x in range(self.width)] for y in range(self.infobar, self.height+self.infobar)]   # the visuals; names of the images!
 
     def inspect_event(self, event):
         #self.mouse_tracker()
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_SPACE:                                         # event.key, not event.type, sigh. I was looking for this with cats and dogs
+                self.new_game()
         if event.type == pygame.MOUSEBUTTONDOWN:
             print(f'inspect_event(); MOUSEBUTTONDOWN;')
             mouse_x, mouse_y = pygame.mouse.get_pos()                               # to-do: make a check if it's on a cell, if needed!
             mouse_x //= self.scale
-            mouse_y //= self.scale
-            if event.button == 1:                                                   # left click == 2!
+            mouse_y = (mouse_y - self.infobar)//self.scale                          # adjust for the infobar ('raise' the click by infobar height), then get the row number by division by self.scale.
+            if mouse_y < 0:
+                self.new_game()                                                     # if you click the top bar, it starts a new game
+            elif event.button == 1:                                                   # left click == 2!
                 print(f'- mouse_x//scale, mouse_y//scale: {mouse_x, mouse_y}')      # if each cell width is e.g. 100 px, then if you click e.g. on x-coord 540, it's the 6th column (40 would be 1st)
                 if not self.started:
                     self.handle_first_left_click(mouse_x, mouse_y)
                 else:
                     self.handle_left_click(mouse_x, mouse_y)
             elif event.button == 3:                                                 # right click == 3!
-                print('- event.button == 2!')
                 self.handle_right_click(mouse_x, mouse_y)
         if event.type == pygame.QUIT:
             exit()
@@ -64,8 +79,10 @@ class Minesweeper:
             self.mouse_pos = mouse_pos
     
     def handle_first_left_click(self, mouse_x, mouse_y):
-        print("\nhandle_first_click();")
+        print("\nhandle_first_left_click();")
         self.started = True
+        self.start_time = pygame.time.get_ticks()
+        self.timer_active = True
 
         # based on which cell was clicked, place the mines (do not place a mine in the cell that was just clicked)
         self.available_coordinates = [(x,y) for y in range(self.height) for x in range(self.width) if (x,y) != (mouse_x, mouse_y)]
@@ -81,6 +98,9 @@ class Minesweeper:
         if (x, y) in self.mine_locations:
             print('- HIT A MINE AT COORDINATES:', (x, y))
             self.map[y][x] = 'images/mine.png'
+            self.hit_a_mine = True
+            self.timer_active = False
+            self.draw_display()
             return
         elif self.map[y][x] == 'images/flag.png':   # if you left click on a flag, it does nothing
             return
@@ -126,21 +146,43 @@ class Minesweeper:
     def handle_right_click(self, x, y):
         if self.map[y][x] == 'images/flag.png':
             self.map[y][x] = 'images/unclicked.png'
+            self.minecount += 1
         elif self.map[y][x] == 'images/unclicked.png':
             self.map[y][x] = 'images/flag.png'
-    
-    def draw_display(self):                     # for the matrix, draw the correct image for each cell
+            self.minecount -= 1
+
+    def draw_display(self):
         self.screen.fill((0,0,0))
+        minecount_surface = self.font.render(f'Mines left: {self.minecount}', True, (255,255,255))    # True is for antialias, white is 255
+        victory_surface = self.font.render(f'MAP CLEARED!', True, (0,255,0))
+        hit_a_mine_surface = self.font.render(f'HIT A MINE!', True, (255,0,0))
+        if self.timer_active:
+            current_time = pygame.time.get_ticks()
+            self.elapsed_time = (current_time - self.start_time) / 1000 
+        self.screen.blit(minecount_surface, (10,10))
+        if self.victory:
+            # self.screen.blit(victory_surface, (self.width-100, 10))
+            self.screen.blit(victory_surface, (self.scale*self.width-200, 10))
+        elif self.hit_a_mine:
+            self.screen.blit(hit_a_mine_surface, (self.scale*self.width-200, 10))
+        timer_surface = self.font.render(f'Time: {self.elapsed_time}', True, (255,255,255))
+        self.screen.blit(timer_surface, (10, 50)) 
         for x in range (self.width):
             for y in range(self.height):
                 cell_status = self.map[y][x]    # self.map is a list of lists; indices start from 0
-                self.screen.blit(source=self.images[cell_status], dest=(x*self.scale, y*self.scale))
-
+                self.screen.blit(source=self.images[cell_status], dest=(x*self.scale, y*self.scale+self.infobar))
+        
         pygame.display.flip()   # display.flip() will update the contents of the entire display. display.update() enables updating of just a part IF you specify which part
         self.clock.tick(30)
     
+    def map_cleared_check(self):
+        if len(self.opened) == self.to_open:
+            self.victory = True
+            self.timer_active = False
+    
     def loop(self):
         while True:
+            self.map_cleared_check()
             for event in pygame.event.get():
                 self.inspect_event(event)
             self.draw_display()                                 # (2) then draw the screen after handling them
