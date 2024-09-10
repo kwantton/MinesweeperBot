@@ -39,13 +39,19 @@ class Minesweeper:
     def inspect_event(self, event):
         #self.mouse_tracker()
         if event.type == pygame.MOUSEBUTTONDOWN:
+            print(f'inspect_event(); MOUSEBUTTONDOWN;')
             mouse_x, mouse_y = pygame.mouse.get_pos()                               # to-do: make a check if it's on a cell, if needed!
-            print(f'inspect_event(): MOUSEBUTTONDOWN;')
-            print(f'- mouse_x//scale, mouse_y//scale: {mouse_x//self.scale, mouse_y//self.scale}')  # if each cell width is e.g. 100 px, then if you click e.g. on x-coord 540, it's the 6th column (40 would be 1st)
-            if not self.started:
-                self.handle_first_click(mouse_x//self.scale, mouse_y//self.scale)
-            else:
-                self.handle_click(mouse_x//self.scale, mouse_y//self.scale)
+            mouse_x //= self.scale
+            mouse_y //= self.scale
+            if event.button == 1:                                                   # left click == 2!
+                print(f'- mouse_x//scale, mouse_y//scale: {mouse_x, mouse_y}')      # if each cell width is e.g. 100 px, then if you click e.g. on x-coord 540, it's the 6th column (40 would be 1st)
+                if not self.started:
+                    self.handle_first_left_click(mouse_x, mouse_y)
+                else:
+                    self.handle_left_click(mouse_x, mouse_y)
+            elif event.button == 3:                                                 # right click == 3!
+                print('- event.button == 2!')
+                self.handle_right_click(mouse_x, mouse_y)
         if event.type == pygame.QUIT:
             exit()
 
@@ -57,7 +63,7 @@ class Minesweeper:
             print('- x//self.scale, y//self.scale:', x//self.scale, y//self.scale)
             self.mouse_pos = mouse_pos
     
-    def handle_first_click(self, mouse_x, mouse_y):
+    def handle_first_left_click(self, mouse_x, mouse_y):
         print("\nhandle_first_click();")
         self.started = True
 
@@ -65,36 +71,64 @@ class Minesweeper:
         self.available_coordinates = [(x,y) for y in range(self.height) for x in range(self.width) if (x,y) != (mouse_x, mouse_y)]
         self.mine_locations = set(sample(self.available_coordinates,self.mines))
         print(f'- clicked coordinates {mouse_x, mouse_y} and placed the mines as follows:\n', self.mine_locations)
-        self.handle_click(mouse_x, mouse_y)
+        self.handle_left_click(mouse_x, mouse_y)
 
-    def handle_click(self, mouse_x, mouse_y):
+    def handle_left_click(self, x, y):
         print('\nhandle_click();')
-        if (mouse_x, mouse_y) in self.opened:
-            print('- WAS OPEN ALREADY')
+        print('- mouse_x, mouse_y:', (x, y))
+        neighbours = self.neighbours_coordinates(x, y)  # finds all the actual surrounding cells
+
+        if (x, y) in self.mine_locations:
+            print('- HIT A MINE AT COORDINATES:', (x, y))
+            self.map[y][x] = 'images/mine.png'
             return
-        self.opened.add((mouse_x, mouse_y))                 # why: in case a zero is clicked open, I'm using handle_click recursively to open up all the surrounding cells that are not mines. For that, this list is needed, so that an endless recursion doesn't occur.
-        print('- mouse_x, mouse_y:', (mouse_x, mouse_y))
-        if (mouse_x, mouse_y) in self.mine_locations:
-            print('- HIT A MINE AT COORDINATES:', (mouse_x, mouse_y))
-            self.map[mouse_y][mouse_x] = 'images/mine.png'
+        elif self.map[y][x] == 'images/flag.png':   # if you left click on a flag, it does nothing
+            return
+        elif (x, y) in self.opened:
+            print('- OPEN ALREADY')
+            
+            flag_count = self.count_surrounding_flags(neighbours)
+            label = self.map[y][x]
+            if f'images/{flag_count}.png' == label:
+                self.handle_chord(x, y)
+            return
         else:
-            neighbours = self.surrounding_cells_coordinates(mouse_x, mouse_y)  # finds all the actual surrounding cells
+            self.opened.add((x, y))                 # why: in case a zero is clicked open, I'm using handle_click recursively to open up all the surrounding cells that are not mines. For that, this list is needed, so that an endless recursion doesn't occur.
+            
             label = 0
             for neighbour in neighbours:
                 if neighbour in self.mine_locations:
                     label += 1
-            self.map[mouse_y][mouse_x] = f'images/{label}.png'
+            self.map[y][x] = f'images/{label}.png'
             if label == 0:
                 for neighbour in neighbours:
-                    self.handle_click(neighbour[0], neighbour[1])
+                    self.handle_left_click(neighbour[0], neighbour[1])
                 # TO-DO: POISTA? self.handle_adjacent_zeros(mouse_x, mouse_y, neighbours)        # So, this clicked cell was '0', therefore  in case an adjacent zero is found, all the zeros next to it should also be opened, and all the cells next to all the zeros as well!
-
-    def surrounding_cells_coordinates(self, x, y):
+        
+    def neighbours_coordinates(self, x, y):
         candidates = [(w,h) for h in range(y-1, y+1+1) for w in range(x-1,x+1+1) if 0<=w<self.width and 0<=h<self.height]
         candidates.remove((x,y))
         return candidates
         # print('\nsourrounding_cells_coordinates():', candidates)
 
+    def count_surrounding_flags(self, neighbours):
+        count = 0
+        for n in neighbours:
+            if self.map[n[1]][n[0]] == 'images/flag.png':
+                count += 1
+        return count
+    
+    def handle_chord(self, x, y):
+        for neighbour in self.neighbours_coordinates(x,y):
+            if self.map[neighbour[1]][neighbour[0]] == 'images/unclicked.png':  # without this, it would chord also flagged cells
+                self.handle_left_click(neighbour[0], neighbour[1])
+
+    def handle_right_click(self, x, y):
+        if self.map[y][x] == 'images/flag.png':
+            self.map[y][x] = 'images/unclicked.png'
+        elif self.map[y][x] == 'images/unclicked.png':
+            self.map[y][x] = 'images/flag.png'
+    
     def draw_display(self):                     # for the matrix, draw the correct image for each cell
         self.screen.fill((0,0,0))
         for x in range (self.width):
@@ -115,4 +149,4 @@ if __name__ == '__main__':
     beginner = 9,9,10
     intermediate = 16,16,40
     expert = 30,16,99           # width, height, mines
-    Minesweeper(3,3,1)
+    Minesweeper(expert[0], expert[1], expert[2])
