@@ -38,7 +38,8 @@ class Minesweeper:
         f : front highlighting
         l : bot start location
         spacebar : new game
-        m : show mine locations'''.split('\n        ')                              # used a lot on the 'Data analysis with Python' course, it's very handy for making lists quickly. This splits at each '\n        ' to form a list.
+        m : show mine locations
+        q: quit'''.split('\n        ')                              # used a lot on the 'Data analysis with Python' course, it's very handy for making lists quickly. This splits at each '\n        ' to form a list.
         self.instructions_height = 20 + len(self.instructions)*30                   # pixels for the instructions bar below the minesweeper map
 
     def load_images(self):
@@ -89,9 +90,10 @@ class Minesweeper:
         elif event.type == pygame.MOUSEBUTTONDOWN:
             print(f'MOUSEBUTTONDOWN;')
             mouse_x, mouse_y = pygame.mouse.get_pos()                               # to-do: make a check if it's on a cell, if needed!
-            cell_x = mouse_x // self.cell_size
-            cell_y = (mouse_y - self.infobar_height) // self.cell_size              # adjust for the infobar ('raise' the click by infobar height), then get the row number by division by self.scale. Asked from ChatGPT when trying to find the problem
-            if cell_y < 0 or cell_y > self.cell_size * self.height + self.infobar_height:
+
+            cell_x = mouse_x // self.cell_size                                      # cell_y = clicked minesweeper map cell y-coordinate, starting from 0, max at self.height-1 (where self.height = number of rows)
+            cell_y = (mouse_y - self.infobar_height) // self.cell_size              # Like explained in the above comment. Implementation here: adjust for the infobar by 'raising' the click by infobar height, then get the row number by division by self.scale. Asked from ChatGPT when trying to find the problem with the y-location
+            if (cell_y < 0) or (cell_y >= self.height) or (cell_x < 0) or (cell_x >= self.width):
                 pass                                                                # if you click the top bar, it starts a new game
             elif event.button == 1:                                                 # left click == 2!
                 print(f'- cell_x, cell_y: {cell_x, cell_y}')                        # if each cell width is e.g. 100 px, then if you click e.g. on x-coord 540, it's the 6th column (40 would be 1st)
