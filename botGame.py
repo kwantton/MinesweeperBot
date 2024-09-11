@@ -1,28 +1,28 @@
 import pygame
 from random import sample
 from constraint import Problem
-from label_names import flag, unclicked, mine, safe, name
+from cell_id_names import flag, unclicked, mine, safe, cell_id
 
-# cell = a clickable square of the minesweeper map, 'ruutu'
+# cell = a clickable square of the minesweeper map, 'ruutu'. 'Label' = the id of a cell, like '0' or 'flag'.
 class Minesweeper:
     def __init__(self, width, height, mines):
         pygame.init()
         pygame.display.set_caption('MINESWEEPER')
         self.mouse_pos = (0,0)
-        self.opened = set()         # all opened cells are gathered here {(x0,y0), (x1,y1),...}
+        self.opened = set()                             # all thus-far opened cells {(x0,y0), (x1,y1),...}, updated when new cells are opened
         self.cells_to_open = width*height - mines
 
-        self.scale = 50             # how many px in height and width should each cell be?
-        self.infobar = 100          # pixels above the actual map
+        self.scale = 50                                 # how many px in height and width should each cell be?
+        self.infobar = 100                              # pixels above the actual map
         self.font = pygame.font.Font(None, 36)
-        self.height = height        # map height measured in in rows
+        self.height = height                            # map height measured in in rows
         self.width = width
 
         self.mines = mines
         if mines >= width*height:
             raise ValueError(f'too many mines, max is {width*height-1} for this size')
 
-        self.images = {}        # {name : loaded image}
+        self.images = {}                                # {name : loaded image}
         self.load_images()
 
         self.screen = pygame.display.set_mode((self.scale*width, self.scale*height + self.infobar)) # each .png is 100 px, which is large. Extra height for info bar above the actual map
@@ -91,7 +91,7 @@ class Minesweeper:
     # based on the coordinates of the first clicked cell (mouse_x, mouse_y), place the mines elsewhere
     def generate_map(self, mouse_x, mouse_y):
         available_coordinates = [(x,y) for y in range(self.height) for x in range(self.width) if (x,y) != (mouse_x, mouse_y)]
-        self.mine_locations = set(sample(available_coordinates, self.mines))   # NB! This is the very line of code that actually generates the map by registering all mine locations!! This samples 'self.mines' number of mines (e.g. 99 in an expert game) from 'available_cordinates' which excludes the opening cell that was clicked.
+        self.mine_locations = set(sample(available_coordinates, self.mines))   # NB! This line of code 'generates' the map by deciding mine locations! This samples a 'self.mines' number of mines (e.g. 99 in an expert game) from 'available_cordinates' which excludes the opening cell that was clicked.
         print(f'- clicked coordinates {mouse_x, mouse_y} and placed the mines as follows:\n', self.mine_locations)
 
     def probe(self, x, y):
@@ -102,36 +102,41 @@ class Minesweeper:
             self.map[y][x] = mine
             self.game_over(x,y)
             return
-        elif self.map[y][x] == flag:           # if you left click on, i.e. 'probe', a red flag, it does nothing (like in real minesweeper)
+        elif self.map[y][x] == flag:                            # if you left click on a red flag (i.e. 'probe' a flagged cell), it does nothing (like in real minesweeper)
             pass
         elif (x, y) in self.opened:
-            print('- OPEN ALREADY')
-            neighbours = self.neighbours_coordinates(x, y)  # finds all the actual cells neighbouring (x,y)
-
-            flag_count = self.count_surrounding_flags(neighbours)
-            label = self.map[y][x]
-            if name(flag_count) == label:
-                self.handle_chord(x, y)
+            self.handle_probing_of_already_opened_cell(x,y)     # it's possible that this is a chording, but you can't know that unless you check the number of marked flags around the cell first
             return
-        else:
-            neighbours = self.neighbours_coordinates(x, y)
-            self.opened.add((x, y))                 # why: in case a zero is clicked open, I'm using handle_click recursively to open up all the surrounding cells that are not mines. For that, this list is needed, so that an endless recursion doesn't occur.
-            
-            label = 0
-            for neighbour in neighbours:
-                if neighbour in self.mine_locations:
-                    label += 1
-            self.map[y][x] = name(label)
-            if label == 0:
-                for neighbour in neighbours:
-                    self.probe(neighbour[0], neighbour[1]) # i.e., open up all the neighbours!
+        elif self.map[y][x] == unclicked:                       
+            self.handle_opening_a_new_cell(x, y)            
         
     def game_over(self, x, y):
         print('- HIT A MINE AT COORDINATES:', (x, y))
         self.hit_a_mine = True
         self.timer_active = False
-        self.draw_display()            
+        self.draw_display()       
+
+    def handle_probing_of_already_opened_cell(self, x, y):
+        print('- OPEN ALREADY')
+        neighbours = self.neighbours_coordinates(x, y)                          # finds all the actual cells neighbouring (x,y)
+        flag_count = self.count_surrounding_flags(neighbours)
+        label = self.map[y][x]
+        if label == cell_id(flag_count):
+            self.handle_chord(x, y)
     
+    def handle_opening_a_new_cell(self, x, y):
+        self.opened.add((x, y))                             # why: in case a zero is clicked open, I'm using handle_click recursively to open up all the surrounding cells that are not mines. For that, this list is needed, so that an endless recursion doesn't occur.
+        neighbours = self.neighbours_coordinates(x, y)
+        
+        label = 0
+        for neighbour in neighbours:
+            if neighbour in self.mine_locations:
+                label += 1
+        self.map[y][x] = cell_id(label)
+        if label == 0:
+            for neighbour in neighbours:
+                self.probe(neighbour[0], neighbour[1])
+
     def neighbours_coordinates(self, x, y):
         neighbours = [(w,h) for h in range(y-1, y+1+1) for w in range(x-1,x+1+1) if 0<=w<self.width and 0<=h<self.height and (w,h) != (x,y)]
         return neighbours
@@ -145,7 +150,7 @@ class Minesweeper:
     
     def handle_chord(self, x, y):
         for neighbour in self.neighbours_coordinates(x,y):
-            if self.map[neighbour[1]][neighbour[0]] == unclicked:  # without this, it would chord also flagged cells
+            if self.map[neighbour[1]][neighbour[0]] == unclicked:               # without this, it would chord also flagged cells
                 self.probe(neighbour[0], neighbour[1])
 
     def handle_right_click(self, x, y):
@@ -161,7 +166,7 @@ class Minesweeper:
         current_label = self.map[self.bot_y][self.bot_x]
         print('- current_label:', current_label)
         neighbours = self.neighbours_coordinates(self.bot_x, self.bot_y)        # self.bot_x and self.bot_y had been initially set in self.handle_first_left_click as the x (column number) and y (row number) of the first click
-        if name(len(neighbours)) == self.map[self.bot_y][self.bot_x]: # if the number of neighbours equals to the number of the current tile the flag all neighbours
+        if cell_id(len(neighbours)) == self.map[self.bot_y][self.bot_x]:             # if the number of neighbours equals to the number of the current tile the flag all neighbours
             for neighbour in neighbours:
                 self.map[neighbour[1]][neighbour[0]] = flag
     
@@ -183,10 +188,10 @@ class Minesweeper:
         self.screen.blit(timer_surface, (10, 50)) 
         for x in range (self.width):
             for y in range(self.height):
-                cell_status = self.map[y][x]    # self.map is a list of lists; indices start from 0
+                cell_status = self.map[y][x]                    # self.map is a list of lists; indices start from 0
                 self.screen.blit(source=self.images[cell_status], dest=(x*self.scale, y*self.scale+self.infobar))
         
-        pygame.display.flip()   # display.flip() will update the contents of the entire display. display.update() enables updating of just a part IF you specify which part
+        pygame.display.flip()                                   # display.flip() will update the contents of the entire display. display.update() enables updating of just a part IF you specify which part
         self.clock.tick(30)
     
     def map_cleared_check(self):
@@ -204,5 +209,5 @@ class Minesweeper:
 if __name__ == '__main__':
     beginner = 9,9,10
     intermediate = 16,16,40
-    expert = 30,16,99           # width, height, mines
-    Minesweeper(expert[0], expert[1], expert[2])
+    expert = 30,16,99           
+    Minesweeper(expert[0], expert[1], expert[2])                # width, height, mines
