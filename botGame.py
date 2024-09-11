@@ -225,14 +225,13 @@ class Minesweeper:
             print('\tbrain')
             print('\t- self.front size:', len(self.front))
             for x,y in self.front:
-                
                 label = self.map[y][x]
                 print('\t- label:', label)
                 neighbours = self.neighbours_coordinates(x,y)                                   # self.bot_x and self.bot_y had been initially set in self.handle_first_left_click as the x (column number) and y (row number) of the first click
                 unflagged_unclicked_neighbours = self.get_cells_of_type(unclicked, neighbours)  # this is indeed 'unclicked unflagged neighbours', since label 'unclicked' means exactly that; the picture for 'unclicked' is an unprobed cell. A big confusing perhaps, I know.
                 number_of_surrounding_flags = self.count_cells_of_type(flag, neighbours)
                 
-                if len(unflagged_unclicked_neighbours) + number_of_surrounding_flags == label:
+                if label == labellize(len(unflagged_unclicked_neighbours) + number_of_surrounding_flags):
                     print('\t\tflag_all()')
                     flag_all(unflagged_unclicked_neighbours)
                 if label == labellize(number_of_surrounding_flags):                     # If the number of flagged neighbours equals to the label of the current cell,
@@ -357,4 +356,4 @@ if __name__ == '__main__':
     beginner = 9,9,10
     intermediate = 16,16,40
     expert = 30,16,99           
-    Minesweeper(beginner[0], beginner[1], beginner[2])          # width, height, mines
+    Minesweeper(dense_beg[0], dense_beg[1], dense_beg[2])          # width, height, mines
