@@ -8,26 +8,24 @@ class Minesweeper:
     def __init__(self, width, height, mines):
         pygame.init()
         pygame.display.set_caption('MINESWEEPER')
-        self.mouse_pos = (0,0)
-        self.opened = set()                             # all thus-far opened cells {(x0,y0), (x1,y1),...}, updated when new cells are opened
         self.cells_to_open = width*height - mines
-
-        self.cell_size = 50                             # how many px in height and width should each cell be?
-        self.infobar_height = 100                       # pixels for the infobar above the minesweeper map
-        self.font = pygame.font.Font(None, 36)
-        self.height = height                            # map height measured in in rows
-        self.width = width
-
+        
         self.mines = mines
+        self.width = width
+        self.cell_size = 50                             # how many px in height and width should each cell be?
+        self.height = height                            # map height measured in in rows
+        self.infobar_height = 100                       # pixels for the infobar above the minesweeper map
+        self.clock = pygame.time.Clock()
+        self.initialize_debug_features()
+        self.font = pygame.font.Font(None, 36)
+        
         if mines >= width*height:
             raise ValueError(f'too many mines, max is {width*height-1} for this size')
         
-        self.initialize_debug_features()
         self.images = {}                                # {name : loaded image}
         self.load_images()
-
         self.screen = pygame.display.set_mode((self.cell_size*width, self.cell_size*height + self.infobar_height + self.instructions_height)) # each .png is 100 px, which is large. Extra height for info bar above the minesweeper map, and instructions bar below the minesweeper map
-        self.clock = pygame.time.Clock()
+        
         self.new_game()
         self.loop()
 
@@ -56,14 +54,18 @@ class Minesweeper:
         self.start_y = 0
         self.front = set()                  # cells that are not finished
         self.inner = set()                  # cells that are not finished and are not neighboured by any opened cells (i.e., are not 'seen' by any opened cells)
-        self.opened = set()
+        self.opened = set()                 # all thus-far opened cells {(x0,y0), (x1,y1),...}, updated when new cells are opened
+
         self.started = False                # the mines will be placed AFTER the first click, as in real minesweeper. Otherwise you could lose on the first click. For that, we need to keep track on if the first click has already commenced or not.
         self.victory = False
         self.finished = set()               # cells where label is 0 OR the number of surrounding mines = label
+        self.current_time = 0
         self.elapsed_time = 0
+        self.mouse_pos = (0,0)
         self.start_time = None
         self.hit_a_mine = False
         self.timer_active = False
+        
         self.minecount = self.mines
         self.map = [[unclicked for x in range(self.width)] for y in range(self.infobar_height, self.height + self.infobar_height)]   # map = all the mines. Since the infobar is on top, the '0' y for mines = infobar_height. This map records the names of the images of each cell on the map.
         # self.problem = Problem()    # 'constraint satisfaction problem' (CSP) solver class (https://pypi.org/project/python-constraint/). I'm using 'problem.addVariables(list_of_cells, [domain_member_1, domain_member_2,...])' where 'domain' = lähtöjoukko, i.e. the constraints, i.e. the list of accepted values for each variable, i.e. {0,1} in the case of minesweeper. This helps narrowing down the results (I do not know how it's implemented in the class, though!)
@@ -96,7 +98,7 @@ class Minesweeper:
                 if not self.started:
                     self.handle_first_left_click(cell_x, cell_y)
                 else:
-                    self.probe(cell_x, cell_y)
+                    self.probe(cell_x, cell_y, primary=True)
             elif event.button == 3:                                                 # right click == 3!
                 self.handle_right_click(cell_x, cell_y)
         elif event.type == pygame.QUIT:
@@ -110,7 +112,7 @@ class Minesweeper:
         self.start_time = pygame.time.get_ticks()
         self.timer_active = True
         self.generate_map(x, y)
-        self.probe(x, y)
+        self.probe(x, y, primary=True)
 
     # based on the coordinates of the first clicked cell (mouse_x, mouse_y), place the mines elsewhere
     def generate_map(self, mouse_x:int, mouse_y:int) -> None:
@@ -119,23 +121,22 @@ class Minesweeper:
         self.mine_locations = set(sample(available_coordinates, self.mines))   # NB! This line of code 'generates' the map by deciding mine locations! This samples a 'self.mines' number of mines (e.g. 99 in an expert game) from 'available_cordinates' which excludes the opening cell that was clicked.
         print(f'- clicked coordinates {mouse_x, mouse_y} and placed the mines as follows:\n', self.mine_locations)
 
-    def probe(self, x:int, y:int) -> None:
-        print('\nprobe();')
-        print('- entered cell (x,y):', (x, y))
+    def probe(self, x:int, y:int, primary=False) -> None:           # if primary = False, then don't go to 'handle_probing_of_already_opened_cell', otherwise it can loop and cause another chord! The chording is meant ONLY for actual chording
+        print(f'\nprobe({x,y}, from primary={primary});')
 
-        if self.map[y][x] == unclicked:
-            self.handle_opening_a_new_cell(x, y)
-        if y >= self.height:                                        # if the lower box is clicked (below the minesweeper map). This has to be written here, or the last elif (self.map[y][x]) will cause an error.
-            pass
-        elif self.map[y][x] == flag:                                # if you left click on a red flag (i.e. 'probe' a flagged cell), it does nothing (like in real minesweeper)
-            pass
-        elif (x, y) in self.mine_locations:
+        if self.map[y][x] == flag:                                  # NB! This has to come first, as this is most probably in 'self.mine_locations'; If you left click on a red flag (i.e. 'probe' a flagged cell), it does nothing (like in real minesweeper)
+            return
+        elif (x, y) in self.mine_locations:                         # NB! This has to come before the 'unclicked' check; otherwise the next would be true, as all mine-containing cells are 'unclicked' (the tile's name is 'unclicked'!) before clicking c:
             self.map[y][x] = mine
             self.game_over(x,y)
             return
-        elif (x, y) in self.opened:
+        elif self.map[y][x] == unclicked:
+            self.handle_opening_a_new_cell(x, y)
+        elif y >= self.height:                                      # if the lower box is clicked (below the minesweeper map). This has to be written here, or the last elif (self.map[y][x]) will cause an error.
+            pass
+        elif (x, y) in self.opened and primary:
+            # only if 'probe()' was not called from 'chord()'!
             self.handle_probing_of_already_opened_cell(x,y)         # it's possible that this is a chording, but you can't know that unless you check the number of marked flags around the cell first
-            return
         
     def game_over(self, x:int, y:int) -> None:
         print('game_over(): HIT A MINE AT COORDINATES:', (x, y))
@@ -151,7 +152,7 @@ class Minesweeper:
         if label == labellize(n_surrounding_flags):
             self.handle_chord(x, y)
     
-    def handle_opening_a_new_cell(self, x:int, y:int) -> None:
+    def handle_opening_a_new_cell(self, x:int, y:int) -> None:                  # ALL NEW CELL OPENINGS GO HERE, doesn't matter how the cell was opened (player/bot/single click/chord)
         print('\nhandle_opening_of_a_new_cell()')
         self.opened.add((x, y))                                                 # why: in case a zero is clicked open, I'm using handle_click recursively to open up all the surrounding cells that are not mines. For that, this list is needed, so that an endless recursion doesn't occur.
         neighbours = self.neighbours_coordinates(x, y)
@@ -161,14 +162,14 @@ class Minesweeper:
             if neighbour in self.mine_locations:
                 label += 1
         self.map[y][x] = labellize(label)
-        if label == 0:                                                  # cells with label '0' are never in 'self.front', as they provide no information that's useful for solving the remaining map (they are the 2nd- or higher order neighbours of unsolved cells)
+        if label == 0:                                                          # the idea is that cells with label '0' are never in 'self.front', as they provide no information that's useful for solving the remaining map (they are the 2nd- or higher order neighbours of unsolved cells)
             for neighbour in neighbours:
-                self.probe(neighbour[0], neighbour[1])
+                self.probe(neighbour[0], neighbour[1], primary=True)
         else:
             self.front.add((x,y))                                               # bookkeeping of the current frontline (rintama) of not-yet-solved parts of the map
 
     def neighbours_coordinates(self, x:int, y:int) -> list:                     # returns a list of tuples [(x1,y1), (x2,y2),...]
-        neighbours = [(w,h) for h in range(y-1, y+1+1) for w in range(x-1,x+1+1) if 0<=w<self.width and 0<=h<self.height and (w,h) != (x,y)]    # this returns ALL the neighbours; no matter if 0,1,2,3,4,5,6,7,8,flag,mine,whatever
+        neighbours = [(w,h) for h in range(y-1, y+1+1) for w in range(x-1, x+1+1) if 0 <= w < self.width and 0 <= h < self.height and (w,h) != (x,y)]    # this returns ALL the neighbours; no matter if 0,1,2,3,4,5,6,7,8,flag,mine,whatever
         return neighbours
 
     def count_flags(self, neighbours:list) -> int:
@@ -201,7 +202,10 @@ class Minesweeper:
         return l
 
     def handle_chord(self, x:int, y:int):
-        for neighbour in self.neighbours_coordinates(x,y):
+        print('\nchord')
+        neighbours = self.neighbours_coordinates(x,y)
+        print(f'- ({x,y}) neighbours:', neighbours)
+        for neighbour in neighbours:
             if self.map[neighbour[1]][neighbour[0]] == unclicked:                   # without this, it would chord also flagged cells
                 self.probe(neighbour[0], neighbour[1])
 
@@ -218,17 +222,18 @@ class Minesweeper:
 
         def brain() -> None:
             obsolete_front = []                                                         # all members of the 'self.front' [(x1,y1), (x2,y2)..] that no longer provide useful information for solving the game; they will be removed later
-            print('- brain')
-            print(' - self.front size:', len(self.front))
+            print('\tbrain')
+            print('\t- self.front size:', len(self.front))
             for x,y in self.front:
                 
                 label = self.map[y][x]
+                print('\t- label:', label)
                 neighbours = self.neighbours_coordinates(x,y)                                   # self.bot_x and self.bot_y had been initially set in self.handle_first_left_click as the x (column number) and y (row number) of the first click
                 unflagged_unclicked_neighbours = self.get_cells_of_type(unclicked, neighbours)  # this is indeed 'unclicked unflagged neighbours', since label 'unclicked' means exactly that; the picture for 'unclicked' is an unprobed cell. A big confusing perhaps, I know.
                 number_of_surrounding_flags = self.count_cells_of_type(flag, neighbours)
                 
                 if len(unflagged_unclicked_neighbours) + number_of_surrounding_flags == label:
-                    print('  - flag_all()')
+                    print('\t\tflag_all()')
                     flag_all(unflagged_unclicked_neighbours)
                 if label == labellize(number_of_surrounding_flags):                     # If the number of flagged neighbours equals to the label of the current cell,
                     if len(unflagged_unclicked_neighbours) >= 1:                        # if there also are unclicked cells around,
@@ -259,15 +264,28 @@ class Minesweeper:
             self.screen.blit(minecount_surface, (10,10))
         
         def draw_timer() -> None:
-            if self.timer_active:
-                current_time = pygame.time.get_ticks()
-                self.elapsed_time = (current_time - self.start_time) / 1000 
-            timer_surface = self.font.render(f'Time: {self.elapsed_time}', True, (255,255,255))             # 'self.elapsed_time' is 0 by default
+            if self.timer_active :
+                self.current_time = pygame.time.get_ticks()
+                self.elapsed_time = (self.current_time - self.start_time) / 1000 
+                shown_time = f'{((self.current_time - self.start_time) // 1000):.0f}'
+            elif not self.started:
+                shown_time = 0
+            else:
+                shown_time = f'{self.elapsed_time:.3f}'                                                 # after clearing the map, show exact time
+            timer_surface = self.font.render(f'Time: {shown_time}', True, (255,255,255))                # 'self.elapsed_time' is 0 by default
             self.screen.blit(timer_surface, (10, 50)) 
         
         def draw_victory() -> None:
-            victory_surface = self.font.render(f'MAP CLEARED!', True, (0,255,0))
-            self.screen.blit(victory_surface, (self.cell_size*self.width-200, 10))
+            if not self.hit_a_mine:
+                text = 'MAP CLEARED!'
+                y = 10
+                x = self.cell_size*self.width-200
+            else:
+                text = '.. and completed'
+                y = 50
+                x = self.cell_size*self.width-230
+            victory_surface = self.font.render(text, True, (0,255,0))
+            self.screen.blit(victory_surface, (x, y))
         
         def draw_hit_a_mine() -> None:
             hit_a_mine_surface = self.font.render(f'HIT A MINE!', True, (255,0,0))
@@ -311,7 +329,7 @@ class Minesweeper:
         
         if self.victory:
             draw_victory()
-        elif self.hit_a_mine:
+        if self.hit_a_mine:                                                                         # I'm enabling both, in case someone wants to try to finish it still
             draw_hit_a_mine()
         
         draw_minecount()
