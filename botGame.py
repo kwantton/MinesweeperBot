@@ -12,8 +12,9 @@ class Minesweeper:
         self.opened = set()                             # all thus-far opened cells {(x0,y0), (x1,y1),...}, updated when new cells are opened
         self.cells_to_open = width*height - mines
 
-        self.scale = 50                                 # how many px in height and width should each cell be?
-        self.infobar_height = 100                       # pixels above the actual map
+        self.cell_size = 50                             # how many px in height and width should each cell be?
+        self.infobar_height = 100                       # pixels for the infobar above the minesweeper map
+        self.instructions_height = 150                  # pixels for the instructions bar below the minesweeper map
         self.font = pygame.font.Font(None, 36)
         self.height = height                            # map height measured in in rows
         self.width = width
@@ -21,20 +22,25 @@ class Minesweeper:
         self.mines = mines
         if mines >= width*height:
             raise ValueError(f'too many mines, max is {width*height-1} for this size')
-
+        
+        self.initialize_debug_features()
         self.images = {}                                # {name : loaded image}
         self.load_images()
 
-        self.screen = pygame.display.set_mode((self.scale*width, self.scale*height + self.infobar_height)) # each .png is 100 px, which is large. Extra height for info bar above the actual map
+        self.screen = pygame.display.set_mode((self.cell_size*width, self.cell_size*height + self.infobar_height + self.instructions_height)) # each .png is 100 px, which is large. Extra height for info bar above the minesweeper map, and instructions bar below the minesweeper map
         self.clock = pygame.time.Clock()
         self.new_game()
         self.loop()
+
+    def initialize_debug_features(self):
+        self.highlight_front = False                    # 'front' cells = number-labeled cells that neighbour unsolved cells, i.e. cells in x € {1,2,...8} that do not have x flags marked around them. When this is 'True', it draws a yellow rectangle around each such cell.
+        self.highlight_bot_location = False
 
     def load_images(self):
         print('\nload_images')
         image_names = ['images/' + name + '.png' for name in '0 1 2 3 4 5 6 7 8 flag mine unclicked has_to_have_a_mine safe'.split()]
         for image_name in image_names:
-            self.images[image_name] = pygame.transform.scale(pygame.image.load(image_name), (self.scale,self.scale))
+            self.images[image_name] = pygame.transform.scale(pygame.image.load(image_name), (self.cell_size,self.cell_size))
 
     def new_game(self):                     # i.e. initialize all variables
         print("\nnew_game")
@@ -56,19 +62,24 @@ class Minesweeper:
 
     def inspect_event(self, event):
         if event.type == pygame.KEYDOWN:
+            print('KEYDOWN:')
             if event.key == pygame.K_SPACE:                                         # event.key, not event.type, sigh. I was looking for this with cats and dogs
                 self.new_game()
-            elif event.key == pygame.K_RETURN:                                      # BOT:
-                self.bot_brain()                                                    # the bot makes a move when you press enter
+            elif event.key == pygame.K_b:                                           # BOT:
+                self.bot_logic()                                                    # the bot makes a move when you press b
+            elif event.key == pygame.K_f:
+                self.highlight_front = not self.highlight_front                     # toggle debug; highlighting the frontline (rintama) of not-yet-solved portion of the map, on/off toggle
+            elif event.key == pygame.K_l:
+                self.highlight_bot_location = not self.highlight_bot_location       # toggle debug: highlighting the bot 'location' on/off toggle
         elif event.type == pygame.MOUSEBUTTONDOWN:
-            print(f'inspect_event(); MOUSEBUTTONDOWN;')
+            print(f'MOUSEBUTTONDOWN;')
             mouse_x, mouse_y = pygame.mouse.get_pos()                               # to-do: make a check if it's on a cell, if needed!
-            cell_x = mouse_x // self.scale
-            cell_y = (mouse_y - self.infobar_height) // self.scale                  # adjust for the infobar ('raise' the click by infobar height), then get the row number by division by self.scale. Asked from ChatGPT when trying to find the problem
+            cell_x = mouse_x // self.cell_size
+            cell_y = (mouse_y - self.infobar_height) // self.cell_size                  # adjust for the infobar ('raise' the click by infobar height), then get the row number by division by self.scale. Asked from ChatGPT when trying to find the problem
             if cell_y < 0:
                 self.new_game()                                                     # if you click the top bar, it starts a new game
             elif event.button == 1:                                                 # left click == 2!
-                print(f'- mouse_x//scale, mouse_y//scale: {cell_x, cell_y}')        # if each cell width is e.g. 100 px, then if you click e.g. on x-coord 540, it's the 6th column (40 would be 1st)
+                print(f'- cell_x, cell_y: {cell_x, cell_y}')                        # if each cell width is e.g. 100 px, then if you click e.g. on x-coord 540, it's the 6th column (40 would be 1st)
                 if not self.started:
                     self.handle_first_left_click(cell_x, cell_y)
                 else:
@@ -98,7 +109,7 @@ class Minesweeper:
         print('\nprobe();')
         print('- entered cell (x,y):', (x, y))
 
-        if self.map[y][x] == flag:                            # if you left click on a red flag (i.e. 'probe' a flagged cell), it does nothing (like in real minesweeper)
+        if self.map[y][x] == flag:                              # if you left click on a red flag (i.e. 'probe' a flagged cell), it does nothing (like in real minesweeper)
             pass
         elif (x, y) in self.mine_locations:
             self.map[y][x] = mine
@@ -108,7 +119,7 @@ class Minesweeper:
             self.handle_probing_of_already_opened_cell(x,y)     # it's possible that this is a chording, but you can't know that unless you check the number of marked flags around the cell first
             return
         elif self.map[y][x] == unclicked:                       
-            self.handle_opening_a_new_cell(x, y)            
+            self.handle_opening_a_new_cell(x, y)
         
     def game_over(self, x, y):
         print('- HIT A MINE AT COORDINATES:', (x, y))
@@ -136,6 +147,8 @@ class Minesweeper:
         if label == 0:
             for neighbour in neighbours:
                 self.probe(neighbour[0], neighbour[1])
+        else:
+            self.front.add((x,y))                           # bookkeeping of the current frontline (rintama) of not-yet-solved parts of the map
 
     def neighbours_coordinates(self, x, y):
         neighbours = [(w,h) for h in range(y-1, y+1+1) for w in range(x-1,x+1+1) if 0<=w<self.width and 0<=h<self.height and (w,h) != (x,y)]
@@ -161,9 +174,8 @@ class Minesweeper:
             self.map[y][x] = flag
             self.minecount -= 1
 
-    def bot_brain(self):
-        
-        print('\nbot_brain:')
+    def bot_logic(self):
+        print('\nbot_logic():')                                                     # the following prints will be '- something', '- something_else'. I like this way of console printing because it makes it faster to search for the useful stuff at a given moment in the console, and makes it clear which print originates from which function.
 
         def flag_all_neighbours(neighbours):
             for neighbour in neighbours:
@@ -176,14 +188,17 @@ class Minesweeper:
         neighbours = self.neighbours_coordinates(self.bot_x, self.bot_y)            # self.bot_x and self.bot_y had been initially set in self.handle_first_left_click as the x (column number) and y (row number) of the first click
         if cell_id(len(neighbours)) == self.map[self.bot_y][self.bot_x]:            # if the number of neighbours equals to the number of the current cell, then flag all neighbours
             flag_all_neighbours(neighbours)
+            if (self.bot_x, self.bot_y) in self.front:                              # if all the mines have been marked for the current cell (e.g. 3 flags around a cell with label 3), then remove that cell from the front
+                self.front.remove((self.bot_x, self.bot_y))
     
     def is_map_cleared(self):
         if len(self.opened) == self.cells_to_open:
             self.victory = True
             self.timer_active = False
-    
+
     def draw_display(self):
         self.screen.fill((0,0,0))
+
         def draw_minecount():
             minecount_surface = self.font.render(f'Mines left: {self.minecount}', True, (255,255,255))      # True is for antialias, white is 255
             self.screen.blit(minecount_surface, (10,10))
@@ -197,19 +212,40 @@ class Minesweeper:
         
         def draw_victory():
             victory_surface = self.font.render(f'MAP CLEARED!', True, (0,255,0))
-            self.screen.blit(victory_surface, (self.scale*self.width-200, 10))
+            self.screen.blit(victory_surface, (self.cell_size*self.width-200, 10))
         
         def draw_hit_a_mine():
             hit_a_mine_surface = self.font.render(f'HIT A MINE!', True, (255,0,0))
-            self.screen.blit(hit_a_mine_surface, (self.scale*self.width-200, 10))
+            self.screen.blit(hit_a_mine_surface, (self.cell_size*self.width-200, 10))
             draw_minecount()
             draw_timer()
+
+        def transparent_highlight_surface(r,g,b,a):
+            highlight_surface = pygame.Surface((self.cell_size, self.cell_size), pygame.SRCALPHA)           # I want to have alpha for the highlights so they don't cover everything. For this, I asked ChatGPT
+            highlight_surface.fill((r,g,b,a))                                                               # R,G,B,alpha. Asked ChatGPT to get the alpha
+            return highlight_surface
+        
+        def highlight_front_cells_yellow():                                                                 # highlight yellow every cell that's in 'self.front'. This is for visualization and debugging in the bot_logic development                  
+            surface = transparent_highlight_surface(255,255,0,128)
+            for x,y in self.front:
+                self.screen.blit(surface, (x*self.cell_size, y*self.cell_size + self.infobar_height))
+        
+        def highlight_bot_blue():
+            surface = transparent_highlight_surface(0,0,255,128)
+            self.screen.blit(surface, (self.bot_x*self.cell_size, self.bot_y*self.cell_size + self.infobar_height))
         
         def draw_map():
             for x in range (self.width):
                 for y in range(self.height):
-                    cell_status = self.map[y][x]                    # self.map is a list of lists; indices start from 0
-                    self.screen.blit(source=self.images[cell_status], dest=(x*self.scale, y*self.scale+self.infobar_height))
+                    cell_status = self.map[y][x]                                                # self.map is a list of lists; indices start from 0
+                    self.screen.blit(source=self.images[cell_status], dest=(x*self.cell_size, y*self.cell_size+self.infobar_height))
+        
+        def draw_instructions_bar():
+            instructions = 'b = bot move  f = front highlighting  l = location of bot'.split('  ') # this is used a lot on the 'Data analysis with Python' cours, it's very handy for making lists quickly. This splits at each double space (two spaces in a row)
+            start_y = self.height * self.cell_size + self.infobar_height + 10
+            for i, instruction in enumerate(instructions):                                      # it isn't possible to use a multiline text, so each instruction has to be drawn separately. For this solution, I asked ChatGPT.
+                instruction_surface = self.font.render(instruction, True, (255,255,255))
+                self.screen.blit(instruction_surface, (10, start_y + i * 30))                   # draw all the instructions beneath each other
         
         if self.victory:
             draw_victory()
@@ -220,6 +256,11 @@ class Minesweeper:
         draw_minecount()
         draw_timer()
         draw_map()
+        draw_instructions_bar()
+        if self.highlight_front:
+            highlight_front_cells_yellow()
+        if self.highlight_bot_location:
+            highlight_bot_blue()
         pygame.display.flip()                                   # display.flip() will update the contents of the entire display. display.update() enables updating of just a part IF you specify which part
         self.clock.tick(30)
     
