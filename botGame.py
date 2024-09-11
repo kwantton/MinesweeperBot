@@ -14,7 +14,6 @@ class Minesweeper:
 
         self.cell_size = 50                             # how many px in height and width should each cell be?
         self.infobar_height = 100                       # pixels for the infobar above the minesweeper map
-        self.instructions_height = 150                  # pixels for the instructions bar below the minesweeper map
         self.font = pygame.font.Font(None, 36)
         self.height = height                            # map height measured in in rows
         self.width = width
@@ -34,8 +33,15 @@ class Minesweeper:
 
     def initialize_debug_features(self):
         print('\ninitialize_debug_features()')
-        self.highlight_front = False                    # 'front' cells = number-labeled cells that neighbour unsolved cells, i.e. cells in x € {1,2,...8} that do not have x flags marked around them. When this is 'True', it draws a yellow rectangle around each such cell.
+        self.highlight_front = False                                                # 'front' cells = number-labeled cells that neighbour unsolved cells, i.e. cells in x € {1,2,...8} that do not have x flags marked around them. When this is 'True', it draws a yellow rectangle around each such cell.
         self.highlight_bot_location = False
+        self.show_mines = False
+        self.instructions = '''b : bot move
+        f : front highlighting
+        l : bot start location
+        spacebar : new game
+        m : show mine locations'''.split('\n        ')                              # used a lot on the 'Data analysis with Python' course, it's very handy for making lists quickly. This splits at each '\n        ' to form a list.
+        self.instructions_height = 20 + len(self.instructions)*30                   # pixels for the instructions bar below the minesweeper map
 
     def load_images(self):
         print('\nload_images')
@@ -74,6 +80,8 @@ class Minesweeper:
                 self.highlight_front = not self.highlight_front                     # toggle debug; highlighting the frontline (rintama) of not-yet-solved portion of the map, on/off toggle
             elif event.key == pygame.K_l:
                 self.highlight_bot_location = not self.highlight_bot_location       # toggle debug: highlighting the bot 'location' on/off toggle
+            elif event.key == pygame.K_m:
+                self.show_mines = not self.show_mines
             elif event.key == pygame.K_q:
                 exit()
         elif event.type == pygame.MOUSEBUTTONDOWN:
@@ -280,6 +288,14 @@ class Minesweeper:
         def highlight_bot_blue() -> None:
             surface = transparent_highlight_surface(0,0,255,128)
             self.screen.blit(surface, (self.start_x*self.cell_size, self.start_y*self.cell_size + self.infobar_height))
+
+        def highlight_mines_red() -> None:
+            surface = transparent_highlight_surface(255,0,0,128)
+            try:                                                                                    # if the first click has not been done, there are no self.mine_locations. I didn't want to create an empty one, as the initialization section of this class is so big already, I don't want to bloat it more.
+                for x,y in self.mine_locations:
+                    self.screen.blit(surface, (x*self.cell_size, y*self.cell_size + self.infobar_height))
+            except:
+                pass
         
         def draw_map() -> None:
             for x in range (self.width):
@@ -288,9 +304,8 @@ class Minesweeper:
                     self.screen.blit(source=self.images[cell_status], dest=(x*self.cell_size, y*self.cell_size+self.infobar_height))
         
         def draw_instructions_bar() -> None:
-            instructions = 'b = bot move  f = front highlighting  l = bot start location  spacebar = new game'.split('  ')  # this is used a lot on the 'Data analysis with Python' cours, it's very handy for making lists quickly. This splits at each double space (two spaces in a row)
             start_y = self.height * self.cell_size + self.infobar_height + 10
-            for i, instruction in enumerate(instructions):                                          # it isn't possible to use a multiline text, so each instruction has to be drawn separately. For this solution, I asked ChatGPT.
+            for i, instruction in enumerate(self.instructions):                                          # it isn't possible to use a multiline text, so each instruction has to be drawn separately. For this solution, I asked ChatGPT.
                 instruction_surface = self.font.render(instruction, True, (255,255,255))
                 self.screen.blit(instruction_surface, (10, start_y + i * 30))                       # draw all the instructions beneath each other
         
@@ -307,6 +322,8 @@ class Minesweeper:
             highlight_front_cells_yellow()
         if self.highlight_bot_location:
             highlight_bot_blue()
+        if self.show_mines:
+            highlight_mines_red()
         pygame.display.flip()                                               # display.flip() will update the contents of the entire display. display.update() enables updating of just a part IF you specify which part
         self.clock.tick(30)
     
