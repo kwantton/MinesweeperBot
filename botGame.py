@@ -134,8 +134,6 @@ class Minesweeper:
             return
         elif self.map[y][x] == unclicked:
             self.handle_opening_a_new_cell(x, y)
-        elif y >= self.height:                                      # if the lower box is clicked (below the minesweeper map). This has to be written here, or the last elif (self.map[y][x]) will cause an error.
-            pass
         elif (x, y) in self.opened and primary:
             # only if 'probe()' was not called from 'chord()'!
             self.handle_probing_of_already_opened_cell(x,y)         # it's possible that this is a chording, but you can't know that unless you check the number of marked flags around the cell first
