@@ -1,6 +1,7 @@
 import pygame
 from random import sample
 from constraint import Problem                          # this can be used to solve groups of CSP-equations (CSP = constraint satisfaction problem)
+from CSP_solver import CSP_solver, format_equation_for_csp_solver
 from cell_id_names import flag, unclicked, mine, labellize, read_number
 
 # cell = a clickable square of the minesweeper map, 'ruutu'. 'Label' = the id of a cell, like '0' or 'flag'.
@@ -66,6 +67,7 @@ class Minesweeper:
         self.start_time = None
         self.hit_a_mine = False
         self.timer_active = False
+        self.solver = CSP_solver()
         self.new_front_members = set()
         
         self.minecount = self.mines
@@ -146,7 +148,7 @@ class Minesweeper:
 
     def handle_probing_of_already_opened_cell(self, x:int, y:int) -> None:      # this kind of a probing (when humans play) is either a chording, or a wasted click (it doesn't do anything)
         print('\nhandle_probing_of_already_opened_cell()')
-        neighbours = self.get_neighbours_of(x, y)                          # finds all the actual cells neighbouring (x,y)
+        neighbours = self.get_neighbours_of(x, y)                               # finds all the actual cells neighbouring (x,y)
         n_surrounding_flags = self.count_flags(neighbours)
         label = self.map[y][x]
         if label == labellize(n_surrounding_flags):
@@ -166,10 +168,10 @@ class Minesweeper:
             for neighbour in neighbours:
                 self.probe(neighbour[0], neighbour[1], primary=True)
         else:
-            # self.front.add((x,y))                                               # bookkeeping of the current frontline (rintama) of not-yet-solved parts of the map
+            # self.front.add((x,y))                                             # bookkeeping of the current frontline (rintama) of not-yet-solved parts of the map
             self.new_front_members.add((x,y))                                   # In the bot version, I can't directly do this because 'self.front' is being iterated through; you can't add new members to the iterated set during iteration, so I'm gathering the new members here to be added AFTER each entire run-through of 'self.front'
 
-    def get_neighbours_of(self, x:int, y:int) -> list:                     # returns a list of tuples [(x1,y1), (x2,y2),...]
+    def get_neighbours_of(self, x:int, y:int) -> list:                          # returns a list of tuples [(x1,y1), (x2,y2),...]
         neighbours = [(w,h) for h in range(y-1, y+1+1) for w in range(x-1, x+1+1) if 0 <= w < self.width and 0 <= h < self.height and (w,h) != (x,y)]    # this returns ALL the neighbours; no matter if 0,1,2,3,4,5,6,7,8,flag,mine,whatever
         return neighbours
 
@@ -207,7 +209,7 @@ class Minesweeper:
         neighbours = self.get_neighbours_of(x,y)
         print(f'- ({x,y}) neighbours:', neighbours)
         for neighbour in neighbours:
-            if self.map[neighbour[1]][neighbour[0]] == unclicked:                   # without this, it would chord also flagged cells
+            if self.map[neighbour[1]][neighbour[0]] == unclicked:                       # without this, it would chord also flagged cells
                 self.probe(neighbour[0], neighbour[1])
 
     def update_minecount(self, x:int, y:int):
@@ -222,7 +224,7 @@ class Minesweeper:
         print('\nbot_act():')                                                           # the following prints will be '- something', '- something_else'. I like this way of console printing because it makes it faster to search for the useful stuff at a given moment in the console, and makes it clear which print originates from which function.
 
         def brain() -> None:
-            
+    
             obsolete_front = []                                                         # all members of the 'self.front' [(x1,y1), (x2,y2)..] that no longer provide useful information for solving the game will be gathered here; they will be removed later after the 'for x,y' loop below
             # this 'for x,y in self.front' loop finds SIMPLE solutions: (1) where the number of neighbouring unflagged unclicked cells equals to the label -> flag all, and (2) chord if label = number of surrounding flags. Then, I remove unnecessary cells from the front to cut unnecessary computing work for the linear equation CSP solver.
             for x,y in self.front:
@@ -237,26 +239,24 @@ class Minesweeper:
                     if len(unflagged_unclicked_neighbours) >= 1:                        # then if there also are unclicked cells around the current front cell,
                         self.handle_chord(x,y)                                          # then open all of them (i.e. 'chord' at the front cell).
                     if (x,y) in self.front:                                             # if all the mines have been marked for the current cell (e.g. 3 flags around a cell with label 3) and the cell has been chorded, then remove that cell from the front, as it no longer provides useful information, and would waste computing resources during the next bot_act() rounds.
-                        obsolete_front.append((x,y))
+                        obsolete_front.append((x,y))                                    # since we just chorded at (x,y), (x,y) cannot have useful information anymore (all its neighbours are either open or flags) -> (x,y) should not be in self.front anymore
             for coordinate in obsolete_front:                                           # why not remove them already during the 'for x,y' loop above? Because you can't remove an item from an iterable while it's being iterated over, otherwise, in this case, you'll get 'RuntimeError: Set changed size during iteration'
                 self.front.remove(coordinate)
             self.add_new_front_members()
 
-            # BTW! I'm thinking of making my own CSP solver since this 'constraint.Problem' is quite limited; you can't remove stuff from there...
-            # after removing thus far redundant cells from the 'self.front' (done above), feed variables into 'problem' CSP linear equation solver:
-            problem = Problem()            # 'constraint satisfaction problem' (CSP) solver class (https://pypi.org/project/python-constraint/). I'm using 'problem.addVariables(list_of_cells, [domain_member_1, domain_member_2,...])' where 'domain' = lähtöjoukko, i.e. the constraints, i.e. the list of accepted values for each variable, i.e. {0,1} in the case of minesweeper. This helps narrowing down the results (I do not know how it's implemented in the class, though!)
-            problem_variables = set()
+            # I'm making my own CSP solver since 'constraint.Problem' was quite limited; you can't remove stuff from there, nor can you change the values of any variables afterwards... if you put x = 1 after x = 0, everything fails since x can't be 1 and 0 at the same time. Sucks.
+            # after removing thus far redundant cells from the 'self.front' (done above), I'm feeding equations into my CSP linear equation solver:
+            csp_solver_input = []                                                       # a list of lists; [ [x, y, ('var_a', 'var_b', 'var_c', ...), label_of_cell], [...], ...]; each inner list represents a set of (1) (x,y), (2) variables to try to solve (cells, which can have value 0 or 1), (3) the total number of mines (sum) of those variables
             for x,y in self.front:
-                n_surrounding_mines = read_number(self.map[y][x])                       # all 'self.front' cells have number labels, number = 1,...8 (not 0). It cannot be 0, since we just removed those cells from 'self.front' above
+                surrounding_mine_count = read_number(self.map[y][x])                    # all 'self.front' cells have number labels, number = 1,...8 (not 0). It cannot be 0, since we just removed those cells from 'self.front' in the 'for...' loop above
                 neighbours = self.get_neighbours_of(x,y)
                 unflagged_unclicked_neighbours = self.get_cells_of_type(unclicked, neighbours)
-                for uu_neighbour_x, uu_neighbour_y in unflagged_unclicked_neighbours:
-                    if str((uu_neighbour_x, uu_neighbour_y)) not in problem_variables:
-                        problem.addVariable(str((uu_neighbour_x, uu_neighbour_y)), [0,1])              # if there's a cell with (x,y) = (4,5) in self.front, then the variable name shall be '(4,5)'. Simple and effective. The constraint for each variable is [0,1], meaning that the solution for each variable has to be 0 or 1.
-                    problem_variables.add(str((uu_neighbour_x,uu_neighbour_y)))
-                variables = [str(coordinate_tuple) for coordinate_tuple in unflagged_unclicked_neighbours]
-                unflagged_unclicked_neighbours
-                problem.addConstraint(lambda *args: sum(args) == n_surrounding_mines, variables)   # *args allows for any number of arbitrary type of arguments. Here' *args will be a tuple consisting of the items (alkiot) of 'variables', that is, a tuple listing all the coordinates of the unflagged unclicked neighbours
+                csp_solver_input_addition = format_equation_for_csp_solver(x, y, unflagged_unclicked_neighbours, surrounding_mine_count)    
+                csp_solver_input.append(csp_solver_input_addition)
+            self.solver.add_equations(csp_solver_input)
+            self.solver.factor_one_solve()
+            solved_vars = self.solver.solved_variables
+            print('- solved_vars:', solved_vars)
 
         def flag_all(cells) -> None:
             for cell in cells:
@@ -375,5 +375,6 @@ if __name__ == '__main__':
     dense_beg = 9,9,70
     beginner = 9,9,10
     intermediate = 16,16,40
-    expert = 30,16,99           
-    Minesweeper(beginner[0], beginner[1], beginner[2])          # width, height, mines
+    expert = 30,16,99  
+    Minesweeper(beginner[0], beginner[1], beginner[2]) 
+    #           width        height       mines    

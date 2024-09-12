@@ -8,4 +8,4 @@ unclicked   = labellize('unclicked')
 safe        = labellize('safe')
 
 def read_number(label : str) -> int:
-    return label[7]
+    return int(label[7])
