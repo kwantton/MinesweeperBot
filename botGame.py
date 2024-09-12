@@ -103,7 +103,7 @@ class Minesweeper:
                 else:
                     self.probe(cell_x, cell_y, primary=True)
             elif event.button == 3:                                                 # right click == 3!
-                self.handle_right_click(cell_x, cell_y)
+                self.update_minecount(cell_x, cell_y)
         elif event.type == pygame.QUIT:
             exit()
     
@@ -211,7 +211,7 @@ class Minesweeper:
             if self.map[neighbour[1]][neighbour[0]] == unclicked:                   # without this, it would chord also flagged cells
                 self.probe(neighbour[0], neighbour[1])
 
-    def handle_right_click(self, x:int, y:int):
+    def update_minecount(self, x:int, y:int):
         if self.map[y][x] == flag:
             self.map[y][x] = unclicked
             self.minecount += 1                                                         # 'minecount' is the number visible on top left of the infobar. It simply is self.mines - 'the Number Of Flags On The Map Currently'
@@ -249,7 +249,7 @@ class Minesweeper:
             for cell in cells:
                 x,y = cell[0], cell[1]
                 if self.map[y][x] == unclicked:
-                    self.map[cell[1]][cell[0]] = flag
+                    self.update_minecount(cell[0],cell[1])
         brain()
 
     def add_new_front_members(self):
