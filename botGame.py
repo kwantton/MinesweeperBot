@@ -66,6 +66,7 @@ class Minesweeper:
         self.start_time = None
         self.hit_a_mine = False
         self.timer_active = False
+        self.new_front_members = set()
         
         self.minecount = self.mines
         self.map = [[unclicked for x in range(self.width)] for y in range(self.infobar_height, self.height + self.infobar_height)]   # map = all the mines. Since the infobar is on top, the '0' y for mines = infobar_height. This map records the names of the images of each cell on the map.
@@ -166,7 +167,8 @@ class Minesweeper:
             for neighbour in neighbours:
                 self.probe(neighbour[0], neighbour[1], primary=True)
         else:
-            self.front.add((x,y))                                               # bookkeeping of the current frontline (rintama) of not-yet-solved parts of the map
+            # self.front.add((x,y))                                               # bookkeeping of the current frontline (rintama) of not-yet-solved parts of the map
+            self.new_front_members.add((x,y))                                   # In the bot version, I can't directly do this because 'self.front' is being iterated through; you can't add new members to the iterated set during iteration, so I'm gathering the new members here to be added AFTER each entire run-through of 'self.front'
 
     def neighbours_coordinates(self, x:int, y:int) -> list:                     # returns a list of tuples [(x1,y1), (x2,y2),...]
         neighbours = [(w,h) for h in range(y-1, y+1+1) for w in range(x-1, x+1+1) if 0 <= w < self.width and 0 <= h < self.height and (w,h) != (x,y)]    # this returns ALL the neighbours; no matter if 0,1,2,3,4,5,6,7,8,flag,mine,whatever
@@ -221,7 +223,7 @@ class Minesweeper:
         print('\nbot_act():')                                                           # the following prints will be '- something', '- something_else'. I like this way of console printing because it makes it faster to search for the useful stuff at a given moment in the console, and makes it clear which print originates from which function.
 
         def brain() -> None:
-            obsolete_front = []                                                         # all members of the 'self.front' [(x1,y1), (x2,y2)..] that no longer provide useful information for solving the game; they will be removed later
+            obsolete_front = []                                                         # all members of the 'self.front' [(x1,y1), (x2,y2)..] that no longer provide useful information for solving the game will be gathered here; they will be removed later after the 'for x,y' loop below
             print('\tbrain')
             print('\t- self.front size:', len(self.front))
             for x,y in self.front:
@@ -241,6 +243,7 @@ class Minesweeper:
                         obsolete_front.append((x,y))
             for coordinate in obsolete_front:                                           # why not remove them right away? Because you can't remove an item from an iterable while it's being iterated over, otherwise, in this case, you'll get 'RuntimeError: Set changed size during iteration'
                 self.front.remove(coordinate)
+            self.add_new_front_members()
 
         def flag_all(cells) -> None:
             for cell in cells:
@@ -248,7 +251,11 @@ class Minesweeper:
                 if self.map[y][x] == unclicked:
                     self.map[cell[1]][cell[0]] = flag
         brain()
-        
+
+    def add_new_front_members(self):
+        for member in self.new_front_members:
+            self.front.add(member)
+        self.new_front_members.clear()
     
     def is_map_cleared(self) -> None:
         if len(self.opened) == self.cells_to_open:
@@ -356,4 +363,4 @@ if __name__ == '__main__':
     beginner = 9,9,10
     intermediate = 16,16,40
     expert = 30,16,99           
-    Minesweeper(dense_beg[0], dense_beg[1], dense_beg[2])          # width, height, mines
+    Minesweeper(beginner[0], beginner[1], beginner[2])          # width, height, mines
