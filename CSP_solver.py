@@ -4,7 +4,7 @@ class CSP_solver:
     def __init__(self):
         #self.json = dict()                                 # self.json = eq{ { variable1 : count1, variable2 : count2 }, { count : set(variable1, variable2...) }, sum}: Why also count : set(variables)
         self.seen_xy = set()                                # Dunno if this will be needed. Per each (x,y) on the minesweeper map, the equations can change gradually, that's why this was created; to be able to update old info in case the equation is new but the (x,y) has already been seen before; in that case, I'd update the (x,y)-specific equation.
-        self.unique_equations = set()                       # I want uniqe equations (=> not x,y) here: {(variables, sum)} it's possible to get the same equation from two sides, for example - and it's of course possible to mistakenly add the same thing multiple times        
+        self.unique_equations = set()                       # I want uniqe equations (=> not x,y) here: { (variables, sum) } it's possible to get the same equation from two sides, for example - and it's of course possible to mistakenly add the same thing multiple times        
         self.solved_variables = set()                       # ((x,y), value)
         self.variable_to_equations = dict()                 # { variable_a:set(equation5, equation12, equation4,...), variable_b:set(equation3, equation4...)}
         self.tried_equation_combinations = set()            # set(set(), set(),...). TO-DO! Implement this checking + adding in 'factor_one_solve'
@@ -62,6 +62,14 @@ class CSP_solver:
                 self.numberOfVariables_to_equations[variable_count].add((variables, total))
                 #self.json[(variables, total)]
             # if (x,y) in self.seen_xy: # why 'if ((x,y) in self.seen_xy)'? Because per each (x,y) on the minesweeper map, the equations can change gradually; hence I am enabling an update to maintain the info about the specific (x,y) location. Will it be useful? Probably not, but just in case.
+    
+    def remove_obsolete_equations(self, equations:list) -> None:
+        for eq in equations:                    # format of eq: (variables, sum)
+            self.unique_equations.remove(eq)
+    
+    def get_solved_variables(self):
+        pass
+
 
 def format_equation_for_csp_solver(x:int, y:int, variables:tuple, surrounding_mine_count:int) -> list:
     # NB! 'variables' has to be a tuple OR something that can be converted to a tuple; so 

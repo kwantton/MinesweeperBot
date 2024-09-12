@@ -244,7 +244,7 @@ class Minesweeper:
                 self.front.remove(coordinate)
             self.add_new_front_members()
 
-            # I'm making my own CSP solver since 'constraint.Problem' was quite limited; you can't remove stuff from there, nor can you change the values of any variables afterwards... if you put x = 1 after x = 0, everything fails since x can't be 1 and 0 at the same time. Sucks.
+            # I'm making my own CSP solver since 'constraint.Problem' was pretty limited; you can't remove stuff from there, nor can you change the values of any variables afterwards... for example if you label x = 1 after x = 0, no solutions will come out since x can't be 1 and 0 at the same time. So, variable values can't be changed there.
             # after removing thus far redundant cells from the 'self.front' (done above), I'm feeding equations into my CSP linear equation solver:
             csp_solver_input = []                                                       # a list of lists; [ [x, y, ('var_a', 'var_b', 'var_c', ...), label_of_cell], [...], ...]; each inner list represents a set of (1) (x,y), (2) variables to try to solve (cells, which can have value 0 or 1), (3) the total number of mines (sum) of those variables
             for x,y in self.front:
@@ -255,14 +255,22 @@ class Minesweeper:
                 csp_solver_input.append(csp_solver_input_addition)
             self.solver.add_equations(csp_solver_input)
             self.solver.factor_one_solve()
-            solved_vars = self.solver.solved_variables
+            solved_vars = self.solver.solved_variables                                  # THESE ARE STRINGS, REMEMBER
+            # for coord, value in solved_vars:
+            #     print('coord:', coord)
+            #     x, y = int(coord[1]), int(coord[4])
+            #     print('x, y:', x,y)
+            #     if value == 1:
+            #         flag_all([(x,y)])
+            #     elif value == 0:
+            #         self.handle_opening_a_new_cell(x, y)
+                # self.solver.remove_obsolete_equations([])                             # [ (variables, sum), (variables2, sum2), ...]
             print('- solved_vars:', solved_vars)
 
         def flag_all(cells) -> None:
-            for cell in cells:
-                x,y = cell[0], cell[1]
+            for x,y in cells:
                 if self.map[y][x] == unclicked:
-                    self.update_minecount(cell[0],cell[1])
+                    self.update_minecount(x,y)
         brain()
 
     def add_new_front_members(self) -> None:
