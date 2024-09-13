@@ -1,30 +1,91 @@
+'''To.do: 
+(-2) destructuring in case of non-tuple variable names will not work; beware in the examples! (variables like 'a', 'b' may not work, when you attempt to destructure them like '(x,y), value', for example)
+(-1) at the end of 'factor_one_solve', update all equations with the variables that were solved
+(0) update 'variable_to_equations' after solving!
+(1) update self.numberOfVariables_to_equations, as you update old equations to ones with solved variables taken into account
+(2) create a function for updating all necessary info
+- [isn't this done now in 'update_unique_equation'?] for solved variables, check each of them in factor_one_solve. This should be taken into account also when considering new equations; don't save unsolved bootleg duplicates as 'new' equations if in reality they are the unsolved versions of already solved equations
+- in 'factor_one_solve', an easy way to check if subtracting the subset from the larger set is correct is as follows: if you end up with a+b+.... < 0, the subtraction was WRONG - something was wrong in the code itself. Why; because x ∈{0,1} for all cells x, and because I'm always subtracting a subset from a larger or equally sized set. Therefore, as every element of each set is 0 or 1, it is not possible to end up with a negative result for the resulting equation. For example: a+b+c = 1, a+b+c+d = 2 -> d = 1. The resulting equation can never have a negative value, if every element of the subset is found in the larger set, and every element x ∈{0,1} for all cells x!
+
+done:
+- 'filter_out_solved_variables' was faulty
+- If you end up with 'a+b+c+... = 0' as the result equation, assign every one of those variables as 0 (this is CSP where the constraint is that x ∈{0,1} for all cells x)
+'''
+
 # NB! 'sum' = the label of the cell in minesweeer map (the number seen on the cell)
-# Searching: (1) variable_to_equations; get all equations that contain a specific variable, (2) self.json: get all the info about an equation; {equation : info_structures_here}. Together, these two enable efficient search of info about any equation based on the variable included in the equation
+# Searching: (1) 'variable_to_equations'; get all equations that contain a specific 'variable' as key, (2) self.json: get all the info about an equation; {equation : info_structures_here}. Together, these two enable efficient search of info about any equation based on the variable included in the equation
 class CSP_solver:
     def __init__(self):
-        #self.json = dict()                                 # self.json = eq{ { variable1 : count1, variable2 : count2 }, { count : set(variable1, variable2...) }, sum}: Why also count : set(variables)
-        self.seen_xy = set()                                # Dunno if this will be needed. Per each (x,y) on the minesweeper map, the equations can change gradually, that's why this was created; to be able to update old info in case the equation is new but the (x,y) has already been seen before; in that case, I'd update the (x,y)-specific equation.
-        self.unique_equations = set()                       # I want uniqe equations (=> not x,y) here: { (variables, sum) } it's possible to get the same equation from two sides, for example - and it's of course possible to mistakenly add the same thing multiple times        
+
+        self.seen_xy = set()                                # Dunno if this will be ever needed. Per each (x,y) on the minesweeper map, the equations can change gradually, and that's why I created this; to be able to update old info in case the equation is new but the (x,y) has already been seen before; in that case, I'd update the (x,y)-specific equation.
+        self.unique_equations = set()                       # { ((var1, var2, ..), sum_of_mines_in_vars), (...) }. Each var (variable) has format (x,y) of that cell's location; cell with a number label 1...8 = var. Here, I want uniqe EQUATIONS, not unique LOCATIONS, and therefore origin-(x,y) is not stored here. It's possible to get the same equation for example from two different sides, and via multiple different calculation routes, and it's of course possible to mistakenly try to add the same equation multiple times; that's another reason to use a set() here, the main reason being fast search from this hashed set.        
         self.solved_variables = set()                       # ((x,y), value)
         self.variable_to_equations = dict()                 # { variable_a:set(equation5, equation12, equation4,...), variable_b:set(equation3, equation4...)}
         self.tried_equation_combinations = set()            # set(set(), set(),...). TO-DO! Implement this checking + adding in 'factor_one_solve'
         self.numberOfVariables_to_equations = {             # { numberOfVariables : set(equation1, equation2, ...) }; all equations with numberOfVariables = x. I want to look at those equations with low number of variables, and see for each of those variables if they can be found in equations with more variables.
-            x:set() for x in range(1, 8+1)
+            x:set() for x in range(1, 8+1)                  # Why up to 8? Because a single '1' cell, resulting from a forced guess, can have 8 neighbours; some of these neighbours can be shared with other cells in case of a compulsory guess having been made (the lonely '1' in the middle would be the guess then, obviously).
         }        
-        #self.xy_specific_equations = []                    # self.equations = y[ x[ eq{ { variable1 : count1, variable2 : count2 }, { count : set(variable1, variable2...) }, sum} ] ]: entry by [y][x], where y = row number, x = column number. Why also count : set(variables)
+    
+    
+    def add_equations_if_new(self, equations:list):                                      # equations = [(x, y, ((x1, y1), (x2, y2), ...), sum), ...]; so each equation is a tuple of of x, y, unflagged unclicked neighbours (coordinates; unique variables, that is!), and the label of the cell (1,2,...8)
+        for equation in equations:
+            # x, y, variables, summa = equation
+            x, y, variables, summa = self.update_equation(equation)              # both updates, IF NECESSARY, 'self.unique_equations' (removes the old one, adds the shorter one), AND returns the new one right away
+            if (variables, summa) not in self.unique_equations:                         # can't hash sets; 'variables' has to be a tuple!
+                variable_count = 0
+                for variable in variables:
+                    variable_count += 1
+                    if variable not in self.variable_to_equations:
+                        self.variable_to_equations[variable] = set()
+                    self.variable_to_equations[variable].add((variables, summa))        # the purpose of {variable : equations} is to be able to find all equations that have the variable
+                    if (x,y) not in self.seen_xy:                                       # this 'if' clause is technically speaking redundant, as 'self.seen_xy' is a set() so .add() is ok even in the case of duplicates, but I still want to show the logic
+                        self.seen_xy.add((x,y))        
+                self.unique_equations.add((variables, summa))
+                if variable_count not in self.numberOfVariables_to_equations:
+                    self.numberOfVariables_to_equations[variable_count] = set()
+                self.numberOfVariables_to_equations[variable_count].add((variables, summa)) # same format as in 'self.unique_equations'; without (x,y) that is
+                #self.json[(variables, total)]
+            # if (x,y) in self.seen_xy: # why 'if ((x,y) in self.seen_xy)'? Because per each (x,y) on the minesweeper map, the equations can change gradually; hence I am enabling an update to maintain the info about the specific (x,y) location. Will it be useful? Probably not, but just in case.
+    
+    # this is used in (1) 'add_equations' and in (2) 'factor_one_solve'; (1) do not add 'new' equations that have been already (partially) solved; that is, take into account the fact that some variables have been solved already (2) TO-DO
+    def update_equation(self, equation:tuple) -> None:                                   # equation = ( (var1, var2, ...), sum_of_variables). There's no origin (x,y) here, because all of those are unique, and irrelevant here!
+        x, y, variables, summa = equation
+        unsolved_variables, sum_of_solved_vars = self.filter_out_solved_variables(variables)
+        if len(unsolved_variables) != len(variables):                                           # if some variables had been solved already, then we need to update all related information: (1) 'self.unique_equations', (2) 'self.numberOfVariables_to_equations', (3) DONE AT THE END OF 'factor_one_solve': 'self.variable_to_equations'. Otherwise 'factor_one_solve' will have old info and will not work.
+            if (variables, summa) in self.unique_equations:
+                self.unique_equations.remove((variables, summa))
+            if len(variables) in self.numberOfVariables_to_equations:
+                if (variables, summa) in self.numberOfVariables_to_equations[len(variables)]:
+                    self.numberOfVariables_to_equations[len(variables)].remove((variables, summa))
+            self.unique_equations.add((unsolved_variables, summa-sum_of_solved_vars))
+            self
+            x = y = -1                                                                          # if information from already solved variables has been used to simplify equation, then this equation no longer has defnitivie single (x,y) origin from the minesweeper map; hence, mark it as (-1,-1).
+        return [x, y, unsolved_variables, summa-sum_of_solved_vars]
+    
+    def filter_out_solved_variables(self, variables) -> tuple:
+        unsolved_vars = []
+        sum_of_solved_vars = 0
+        for var in variables:
+            # ((x,y), value). I can't know if it's 0 or 1, so I'm checking both. 'var' = (x,y) and each var is unique cell of the minesweeper map
+            if (var, 0) not in self.solved_variables and (var, 1) not in self.solved_variables: # ((x,y), value), in 'self.solved_variables'
+                unsolved_vars.append(var)
+            elif (var, 1) in self.solved_variables:
+                sum_of_solved_vars += 1
+        return tuple(unsolved_vars), sum_of_solved_vars                                 # you can't hash sets or lists (not immutable), hence a tuple is returned instead for 'unsolved_vars'. Hashing of 'unsolved_variables' is needed in 'add_equations' from where this function is used.
     
     # NB! the 'rounds=1' is arbitrary, and is convenient for debugging and visualization purposes. In 'botGame.py' I am calling one 'bot_move' per one press of key 'b' by the person running the program, and a part of each of these 'bot_move's is this 'factor_one_solve()' here. Therefore, for visualization and debugging purposes, I want to make it possible to advance one small step at a time; that's why I have the 'rounds=1' set by default. Also, performance-wise, there is no obvious way to tell if performing one or multiple of these rounds in a row is faster or not (on average; this depends on so many things, including the map itself!) without considering first if the simpler logic in 'bot_move' before this 'CSP_solver' has anything more to offer before this 'CSP_solver' is performed or not; so performance-wise, it's a bit of a (micro)mystery, at least yet, whether one should let this run for a longer time or not by default.
-    def factor_one_solve(self, rounds=1):                                   # 'factor_one' here means that each variable has a factor of exactly one (or zero, mathematically speaking), no more, for this solver (e.g. a+b+c=2, never a+2b+c=2 for example, since each minesweeper map cell has exactly one of each neighbour). This should be enough; there should not be a need to sum equations in my case!
-        equations_to_add = []                                               # these will have to wait for loop ending, otherwise 'Set changed size during iteration'
-        for s in range(1, 8+1):                                             # s for short. Why to 8? Because a single '1' cell can have 8 neighbours; some of these neighbours can be shared with other cells in case of a compulsory guess having been made (the lonely '1' in the middle would be the guess then, obviously).
+    def factor_one_solve(self, rounds=1):                                               # 'factor_one' here means that each variable has a factor of exactly one (or zero, mathematically speaking), no more, for this solver (e.g. a+b+c=2, never a+2b+c=2 for example, since each minesweeper map cell has exactly one of each neighbour). This should be enough; there should not be a need to sum equations in my case!
+        print('factor_one_solve():')
+        equations_to_add = []                                                           # these will have to wait for loop ending, otherwise 'Set changed size during iteration'
+        for s in range(1, 8+1):                                                         # 's' means short. # Why up to 8? Because a single '1' cell, resulting from a forced guess, can have 8 neighbours; some of these neighbours can be shared with other cells in case of a compulsory guess having been made (the lonely '1' in the middle would be the guess then, obviously).
             if s in self.numberOfVariables_to_equations:
-                short_equations = self.numberOfVariables_to_equations[s]    # gets all equations with 's' number of variables, 'shorty_vars' below
+                short_equations = self.numberOfVariables_to_equations[s]                # gets all equations with 's' number of variables, 'shorty_vars' below
                 for shorty in short_equations:
-                    shorty_vars, shorty_sum = shorty                        # e.g. if the equation was a+b+c=1, then shorty_vars = (a,b,c) and shorty_sum = 1)
-                    for l in range (s+1, 8+1):                              # l for the length of a potential longer-than-shorty equation
-                        longer_equations = self.numberOfVariables_to_equations[l]   # 0 or more long_equations
+                    shorty_vars, shorty_sum = shorty                                    # e.g. if the equation was a+b+c=1, then shorty_vars = (a,b,c) and shorty_sum = 1)
+                    for l in range (s+1, 8+1):                                          # l for the length of a possibly existing longer-than-shorty equation
+                        longer_equations = self.numberOfVariables_to_equations[l]       # 0 or more long_equations
                         for longy in longer_equations:
-                            all_shorty_vars_found_in_this_longer_equation = True    # what this is for: if we have a+b+c = 1 (shorty) and a+b+c+d=1 (longy; it has more variables than 'shorty'), we get d=0 by subtracting shorty from longy. Or if shorty is 'a+b=1' and longy is 'a+b+c+d+e=2', then after subtraction we have c+d+e=1. That's why I'm checking if EVERY SINGLE variable in shorty is found in longy, before subtracting and registering the result as a potentially new equation (possibly solving a variable, OR helping later on with other equations). In the case of minesweeper, there should not be any case NEEDED where one has to do a subtraction where you end up with some terms negative; hence the check is justified.
+                            all_shorty_vars_found_in_this_longer_equation = True        # what this is for: if we have a+b+c = 1 (shorty) and a+b+c+d=1 (longy; it has more variables than 'shorty'), we get d=0 by subtracting shorty from longy. Or if shorty is 'a+b=1' and longy is 'a+b+c+d+e=2', then after subtraction we have c+d+e=1. That's why I'm checking if EVERY SINGLE variable in shorty is found in longy, before subtracting and registering the result as a potentially new equation (possibly solving a variable, OR helping later on with other equations). In the case of minesweeper, there should not be any case NEEDED where one has to do a subtraction where you end up with some terms negative; hence the check is justified.
                             longy_vars, longy_sum = longy
                             for variable in shorty_vars:
                                 if variable not in longy_vars:
@@ -32,52 +93,43 @@ class CSP_solver:
                                     break
                             if all_shorty_vars_found_in_this_longer_equation:
                                 result_equation = (tuple(var for var in longy_vars if var not in shorty_vars), longy_sum - shorty_sum) # since factors for all variables are 1, for all variables that were found in both shorty and longy, they are subtracted to 0. As for the sum, it's the longy_sum - shorty_sum
-                                if result_equation not in self.unique_equations:   # once again, technically this 'if' check is unnecessary, but it's better to write out the logic
-                                    equations_to_add.append([-1,-1, (result_equation[0]), result_equation[1]]) # add_equations uses format [ [x, y, tuple(variables), int] ]. Since this a hybrid equation, let's say it has (x,y) of (-1,-1), as it doesn't have one definitive 'origin' coordinate (x,y)
-                                    # self.add_equations([]) # OLD; you can't add them here, or 'Set changed size during iteration' since add_equations() will add to 'self.numberOfVariables_to_equations', which is being iterated over
-                                    result_vars, new_sum = result_equation
-                                    if len(result_vars) == 1:
-                                        print("solved a new variable! Variable:", result_vars[0], "=", new_sum)
-                                        self.solved_variables.add((result_vars[0], new_sum))
-        
-        self.add_equations(equations_to_add)
+                                if result_equation not in self.unique_equations:        # once again, technically this 'if' check is unnecessary, but it's better to write out the logic
+                                    equations_to_add.append([-1,-1, (result_equation[0]), result_equation[1]]) # add_equations uses format [ [x, y, tuple(variables), int] ]. Since this a hybrid equation, let's abitrarily says it has (x,y) of (-1,-1), as it doesn't have one definitive 'origin' coordinate (x,y)
+                                    remaining_vars, new_sum = result_equation
+                                    newly_solved_vars = []                              # [ ((x1,y1), 1), ((x2,y2), 0), ...]
+                                    if len(remaining_vars) == 1:
+                                        only_remaining_var = remaining_vars[0]
+                                        newly_solved_vars.append((only_remaining_var, new_sum))
+                                    else:
+                                        if new_sum == 0:                                    # CSP: if the 'result_equation' is a+b+c+... = 0, then all of a,b,c,... = 0, since every var ∈ {0,1}
+                                            for var in remaining_vars:
+                                                newly_solved_vars.append((var, 0))
+                                    for newly_solved_var in newly_solved_vars:                # [ ((x1,y1), 1), ((x2,y2), 0), ...]
+                                        self.solved_variables.add(newly_solved_var)
+                                        self.update_info_after_solving_new_variable(newly_solved_var)
+        self.add_equations_if_new(equations_to_add)
         if rounds > 1:
             self.factor_one_solve(rounds-1)
-
-    def add_equations(self, equations:list):                            # equations = [(x,y,tuple(),sum), (x,y,tuple(),sum)]; so each equation is a tuple of a set consisting of x, y, unflagged unclicked neighbours (coordinates; unique variables, that is!), and the label of the cell (1,2,...8)
-        for equation in equations:
-            x, y, variables, total = equation
-            if (variables, total) not in self.unique_equations:         # can't hash sets; variables has to be a tuple!
-                variable_count = 0
-                for variable in variables:
-                    variable_count += 1
-                    if variable not in self.variable_to_equations:
-                        self.variable_to_equations[variable] = set()
-                    self.variable_to_equations[variable].add((variables, total))        # the purpose of {variable : equations} is to be able to find all equations that have the variable
-                    if (x,y) not in self.seen_xy:                                       # this 'if' clause is technically speaking redundant, as 'self.seen_xy' is a set() so .add() is ok even in the case of duplicates, but I still want to show the logic
-                        self.seen_xy.add((x,y))        
-                self.unique_equations.add((variables, sum))
-                if variable_count not in self.numberOfVariables_to_equations:
-                    self.numberOfVariables_to_equations[variable_count] = set()
-                self.numberOfVariables_to_equations[variable_count].add((variables, total))
-                #self.json[(variables, total)]
-            # if (x,y) in self.seen_xy: # why 'if ((x,y) in self.seen_xy)'? Because per each (x,y) on the minesweeper map, the equations can change gradually; hence I am enabling an update to maintain the info about the specific (x,y) location. Will it be useful? Probably not, but just in case.
     
-    def remove_obsolete_equations(self, equations:list) -> None:
-        for eq in equations:                    # format of eq: (variables, sum)
-            self.unique_equations.remove(eq)
-    
-    def get_solved_variables(self):
-        pass
-
+    def update_info_after_solving_new_variable(self, solved_var):
+        if solved_var in self.variable_to_equations:
+            equations_with_the_var = self.variable_to_equations[solved_var]
+            for variables, value in equations_with_the_var:
+                self.update_equation(-1,-1, variables, value)
+            self.variable_to_equations[solved_var] = set()
+        
 
 def format_equation_for_csp_solver(x:int, y:int, variables:tuple, surrounding_mine_count:int) -> list:
     # NB! 'variables' has to be a tuple OR something that can be converted to a tuple; so 
-    variables = tuple(str(coordinate_tuple) for coordinate_tuple in variables)  # if there's a cell with (x,y) = (4,5) in self.front, then the variable name shall be '(4,5)'. Simple and effective. The constraint for each variable is [0,1], meaning that the solution for each variable has to be 0 or 1.
+    variables = tuple(coordinate_tuple for coordinate_tuple in variables)  # if there's a cell with (x,y) = (4,5) in self.front, then the variable name shall be '(4,5)'. Simple and effective. The constraint for each variable is [0,1], meaning that the solution for each variable has to be 0 or 1.
     input_addition = [x, y, variables, surrounding_mine_count]
     return input_addition
 
 if __name__ == '__main__':
+
+    def print_solved_variables(csp:CSP_solver):
+        for variable, value in csp.solved_variables:
+            print("- solved a new variable!", variable , "=", value)
 
     ''' 
     Example: solving
@@ -91,8 +143,9 @@ if __name__ == '__main__':
     eq3 = [2, 1, ('c', 'd', 'e'), 2]
     eq4 = [3, 1, ('d', 'e'), 1]
     csp = CSP_solver()
-    csp.add_equations([eq1, eq2, eq3, eq4])
+    csp.add_equations_if_new([eq1, eq2, eq3, eq4])
     csp.factor_one_solve()                          # PRINT: "solved a new variable! Variable: c = 1" which is correct
+    print_solved_variables(csp)
     
     ###### a minesweeper map, where X means 'unclicked' cell, * is a 'mine' cell (not seen by the player), and 1 is '1' cell, 2 is '2' cell. Every # is edge of the map, essentially means nothing
     #X*X*#
@@ -105,8 +158,10 @@ if __name__ == '__main__':
     c21 = [2, 1, ('(1,0)', '(2,0)', '(3,0)'), 2]
     c31 = [3, 1, ('(2,0)', '(3,0)'), 1]
     csp = CSP_solver()
-    csp.add_equations([c01, c11, c21, c31])
+    csp.add_equations_if_new([c01, c11, c21, c31])
     csp.factor_one_solve()                          # PRINT: "solved a new variable! Variable: (1,0) = 1" which is correct! It means that (x,y) = (1,0) is a mine, which it indeed is.
+
+    print_solved_variables(csp)
         
 
 '''
@@ -121,62 +176,7 @@ In fact, all raw equations that come straight from the minesweeper map have fact
 All the operations I need for handling these equations are (1) subtraction between these linear equations and (2) the inspection of constraint that each cell ∈ {0,1}. This is done by checking if for example ...+2x+... = 1, where the only possible solution for x is x=0, since if x was 1, others would have to be negative, or if a+b+c+... = 0, which means that all terms are 0. This latter one (all 0) can happen only after initial processing, as (like mentioned above), no such equations come 'raw' from the map.
 '''
 
-# IGNORE BELOW SKETCHING
-'''
-
-self.json = eq{ { variable1 : count1, variable2 : count2 }, { count : {variable1, variable2...} }, sum}:
-
-        equation1 : {
-            variables: {
-                variable1 : count_of_variable1,
-                variable2 : count_of_variable2,
-                ...
-            },
-            counts: {
-                1 : set(all variables with count 1 in the equation),
-                2 : set(all variables with count 2 in the equation),
-                ...
-            }
-            sum : int
-        },
-
-        equation2 : {...}
-    ],
-
-^^ above example: 2x2 map (a list of two lists (rows) with two items per list (row)), not very interesting
-
-self.equations = y[ x[ eq{ { variable1 : count1, variable2 : count2 }, { count : {variable1, variable2...} }, sum} ] ]: entry by [y][x], where y = row number, x = column number
-[
-    [
-        {
-            variables: {
-                variable1 : count_of_variable1,
-                variable2 : count_of_variable2,
-                ...
-            },
-            counts: {
-                1 : set(all variables with count 1 in the equation),
-                2 : set(all variables with count 2 in the equation),
-                ...
-            }
-            sum : int
-        },
-
-        {...}
-    ],
-
-    [
-        {...},
-        {...}
-    ]
-]
-^^ above example: 2x2 map (a list of two lists (rows) with two items per list (row)), not very interesting
-
-self.which_equationss_have_variable_x = [[set()]], entry by [y][x] like above:
-{
-    equation1: {variable1, vari}
-}
-
-IDEAS:
-- sort equations by length. Start with the shortest one, and see which of the other equations has all its terms -> subtract -> see if the new equation is unique. Efficient
+'''What is done:
+- sort equations by length. Start with the shortest one, and see which of the longer equations has all its terms -> subtract -> see if the new equation is unique. Efficient
+- save all solved variables
 '''
