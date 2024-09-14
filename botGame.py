@@ -159,6 +159,7 @@ class Minesweeper:
         if label == labellize(n_surrounding_flags):
             self.handle_chord(x, y)
 
+    # TO-DO: not the problem of this function, but there's a problem in the csp-solver causing some of flagged tiles, and mine-containing to be handled through this function, as they are falsely labelled as 0, not 1. A quick patch would be to check here if label=flag, and return if true, but that's obviously not a real solution.
     def handle_opening_a_new_cell(self, x:int, y:int) -> None:                  # ALL NEW CELL OPENINGS GO HERE, doesn't matter how the cell was opened (player/bot/single click/chord)
         print('\nhandle_opening_of_a_new_cell()')
         self.opened.add((x, y))                                                 # why: in case a zero is clicked open, I'm using handle_click recursively to open up all the surrounding cells that are not mines. For that, this list is needed, so that an endless recursion doesn't occur.
@@ -285,14 +286,14 @@ class Minesweeper:
                     print(f'- solved {x,y} = {value}')
                     if value == 1:
                         flag_all([(x,y)])
-                    elif value == 0:
+                    elif value == 0:                                                        # TO-DO: some are mislabeled as 0 -> many problems. CSP is broken still
                         self.handle_opening_a_new_cell(x, y)                                # NB! 'handle_opening_a_new_cell' adds new front members to 'self.new_front_members', NOT yet to self.front, as 'handle_opening_a_new_cell' was originally used in 'simple_solver' which iterates over 'self.front' and thus cannot directly modify 'self.front' while iterating over it. That's why 'add_new_front_members()' was created originally
                         add_new_front_cells_to_self_front()
                     
                     
                 # print('- solved_vars:', solved_vars)
             
-            # csp_solve()
+            csp_solve()
 
         def flag_all(cells) -> None:
             for x,y in cells:
