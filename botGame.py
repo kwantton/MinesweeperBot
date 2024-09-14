@@ -278,7 +278,7 @@ class Minesweeper:
             feed_csp_solver()
 
             def csp_solve():
-                self.solver.factor_one_solve()
+                self.solver.factor_one_binary_solve()
                 solved_vars = self.solver.solved_variables                                  # each var is a tuple (x,y)
                 print('csp_solve():')
                 print('solved_vars:', solved_vars)
