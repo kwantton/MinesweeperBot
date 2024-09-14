@@ -32,9 +32,8 @@ class CSP_solver:
     
 
     # NB! This is called, when adding new equations for the first time, AND after finding new variables. Hence, sometimes the 'self.update_equation(equation)' is necessary.
-    def add_equations_if_new(self, equations:list) -> None:                             # equations = [(x, y, ((x1, y1), (x2, y2), ...), sum), ...]; so each equation is a tuple of of x, y, unflagged unclicked neighbours (coordinates; unique variables, that is!), and the label of the cell (1,2,...8)
-        for equation in equations:
-            # x, y, variables, summa = equation
+    def add_equations_if_new(self, equations:list) -> None:                             # equations = [(x, y, ((x1, y1), (x2, y2), ...), summa), ...]; so each equation is a tuple of of x, y, unflagged unclicked neighbours (coordinates; unique variables, that is!), and the label of the cell (1,2,...8)
+        for equation in equations:                                                      # (x,y,(variables),sum_of_variables)
             x, y, variables, summa = self.update_equation(equation)                     # both updates, IF NECESSARY, 'self.unique_equations' (removes the old one, adds the shorter one), AND returns the new one right away
             if (variables, summa) not in self.unique_equations:                         # can't hash sets; 'variables' has to be a tuple!
                 variable_count = 0
@@ -145,13 +144,12 @@ class CSP_solver:
                 found_solutions = True
                 for var in variables:
                     new_solutions.append((var, 0))
-                    #     self.update_equation((-1,-1, eq[0], eq[1]))
             elif len(variables) == 1:
                 new_solutions.append((variables[0], summa))
                 found_solutions = True
             else:
                 if (variables, summa) not in self.unique_equations:                     # if the equation is longer than 1 (e.g. if 'its a+b=1) and not =0 (not a+b=0), and if it's not already in 'self.unique_equations', then add it to 'self.unique_equations'
-                    equations_to_add.append((variables, summa))
+                    equations_to_add.append((-1, -1, variables, summa))                 # why (-1, -1) is included in front (it's (x,y)): because 'add_equations_if_new()' will feed the equations to 'update_equations' which takes this format. Also, this (-1,-1) means that it's not an original equation originating from a single cell on the map; it means that this equation is the result of a calculation (no matter how simple the calculation is)
                     subtractions_done = True
         for new_solution in new_solutions:
             self.mark_var_as_solved_and_update_related_info(new_solution)
