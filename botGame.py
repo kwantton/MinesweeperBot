@@ -6,13 +6,14 @@ from cell_id_names import flag, unclicked, mine, safe, labellize, read_number
 
 # cell = a clickable square of the minesweeper map, 'ruutu'. 'Label' = the id of a cell, like '0' or 'flag'.
 class Minesweeper:
-    def __init__(self, width, height, mines):
+    def __init__(self, width, height, mines, csp_on=True):
         pygame.init()
         pygame.display.set_caption('MINESWEEPER')
         self.cells_to_open = width*height - mines
         
         self.mines = mines
         self.width = width
+        self.csp_on = csp_on
         self.cell_size = 50                             # how many px in height and width should each cell be?
         self.height = height                            # map height measured in in rows
         self.infobar_height = 100                       # pixels for the infobar above the minesweeper map
@@ -293,7 +294,8 @@ class Minesweeper:
                     
                 # print('- solved_vars:', solved_vars)
             
-            csp_solve()
+            if self.csp_on:
+                csp_solve()
 
         def flag_all(cells) -> None:
             for x,y in cells:
@@ -419,5 +421,8 @@ if __name__ == '__main__':
     beginner = 9,9,10
     intermediate = 16,16,40
     expert = 30,16,99  
-    Minesweeper(beginner[0], beginner[1], beginner[2]) 
+
+    # START A NEW MINESWEEPER with the ability to play the bot by pressing b
+    # Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=False) # IF YOU WANT ONLY simple_solver(), which WORKS at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
+    Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=True) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
     #           width        height       mines    

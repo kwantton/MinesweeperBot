@@ -29,7 +29,6 @@ class CSP_solver:
         
         self.variables_and_sum_to_DELETE_from_self_numberOfVariables_to_equations_after_iteration = set()   # needed to avoid error 'Set changed size during iteration'; this set is needed as one-round-lived storage for 'self.factor_one_solve()' since there is a loop that involves these equations that should be removed later; therefore, they cannot be removed from 'self.numberOfVariables_to_equations' during iteration, but instead they have to be temporarily stored here, and removed AFTER the iteration round.
         self.variables_and_sum_to_ADD_to_self_numberOfVariables_to_equations_after_iteration = set()        # same as above; needed to avoid error of 'Set changed size during iteration'
-    
 
     # NB! This is called, when adding new equations for the first time, AND after finding new variables. Hence, sometimes the 'self.update_equation(equation)' is necessary.
     def add_equations_if_new(self, equations:list) -> None:                             # equations = [(x, y, ((x1, y1), (x2, y2), ...), summa), ...]; so each equation is a tuple of of x, y, unflagged unclicked neighbours (coordinates; unique variables, that is!), and the label of the cell (1,2,...8)
@@ -234,8 +233,6 @@ if __name__ == '__main__':
 
     print_solved_variables(csp)
 
-
-        
 
 '''
 This class is exclusively for MinesweeperBot's botGame; hence, all equations are 1st order, and of the type 
