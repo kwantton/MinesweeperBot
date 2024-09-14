@@ -31,6 +31,7 @@ class CSP_solver:
         self.variables_and_sum_to_ADD_to_self_numberOfVariables_to_equations_after_iteration = set()        # same as above; needed to avoid error of 'Set changed size during iteration'
     
 
+    # NB! This is called, when adding new equations for the first time, AND after finding new variables. Hence, sometimes the 'self.update_equation(equation)' is necessary.
     def add_equations_if_new(self, equations:list) -> None:                             # equations = [(x, y, ((x1, y1), (x2, y2), ...), sum), ...]; so each equation is a tuple of of x, y, unflagged unclicked neighbours (coordinates; unique variables, that is!), and the label of the cell (1,2,...8)
         for equation in equations:
             # x, y, variables, summa = equation
@@ -79,15 +80,15 @@ class CSP_solver:
         self.variables_and_sum_to_DELETE_from_self_numberOfVariables_to_equations_after_iteration.clear()
 
         mark_these_as_solved_after_iteration = []                                               # (var, value). NB! I had to create this list again so that I don't run into the 'Set changed size during iteration' error. Ironically, this whole function was created to prevent that from happening!
-        for variables, summa in self.variables_and_sum_to_ADD_to_self_numberOfVariables_to_equations_after_iteration:
-            if summa == 0:                                                                      # for example, variables = (a,d), summa = 0 -> this means that a = 0, and d = 0
-                for var in variables:
-                    if (var,0) not in self.solved_variables:
-                        mark_these_as_solved_after_iteration.append((var,0))
-            elif len(variables) == 1:
-                mark_these_as_solved_after_iteration.append((variables[0], summa))              # TO-DO: check if this ever happens (is this line needed here)
-            else:                                                                               # we don't want equations like (('a','d'),0), as they would just cause more work in the 'self.factor_one_solve', as they provide no new information during subtractions with other equations
-                self.numberOfVariables_to_equations[len(variables)].add((variables, summa))      
+        # for variables, summa in self.variables_and_sum_to_ADD_to_self_numberOfVariables_to_equations_after_iteration:
+        #     if summa == 0:                                                                      # for example, variables = (a,d), summa = 0 -> this means that a = 0, and d = 0
+        #         for var in variables:
+        #             if (var,0) not in self.solved_variables:
+        #                 mark_these_as_solved_after_iteration.append((var,0))
+        #     elif len(variables) == 1:
+        #         mark_these_as_solved_after_iteration.append((variables[0], summa))              # TO-DO: check if this ever happens (is this line needed here)
+            # else:                                                                               # we don't want equations like (('a','d'),0), as they would just cause more work in the 'self.factor_one_solve', as they provide no new information during subtractions with other equations
+                # self.numberOfVariables_to_equations[len(variables)].add((variables, summa))      
         self.variables_and_sum_to_ADD_to_self_numberOfVariables_to_equations_after_iteration.clear()
         for above_solved_var in mark_these_as_solved_after_iteration:
             self.mark_var_as_solved_and_update_related_info(above_solved_var)
@@ -106,7 +107,7 @@ class CSP_solver:
     # NB! the 'rounds=1' is arbitrary, and is fun for testing (has never proven to solve anything extra, though, when higher than 1!). In 'botGame.py' I am calling one 'bot_move' per one press of key 'b' by the person running the program, and a part of each of these 'bot_move's is this 'factor_one_solve()' here. Therefore, for visualization and debugging purposes, I want to make it possible to advance one small step at a time; that's why I have the 'rounds=1' set by default. Also, performance-wise, there is no obvious way to tell if performing one or multiple of these rounds in a row is faster or not (on average; this depends on so many things, including the map itself!) without considering first if the simpler logic in 'bot_move' before this 'CSP_solver' has anything more to offer before this 'CSP_solver' is performed or not; so performance-wise, it's a bit of a (micro)mystery, at least yet, whether one should let this run for a longer time or not by default.
     def factor_one_binary_solve(self, how_many_rounds=1):                                  # 'factor_one' here means that each variable has a factor of exactly one (or, to be exact, zero when it's not present), no more, for this solver (e.g. a+b+c=2, never a+2b+c=2 for example, since each minesweeper map cell has exactly one of each neighbour). This should be enough; there should not be a need to sum equations in my case!
         print('factor_one_solve():')
-        equations_to_add = []                                                           # TO-DO: I'm adding also those of size 1 here, unnecessarily, as those already go to 'self.solved_variables'. The reason for gathering these: These will have to wait for loop ending, otherwise 'Set changed size during iteration'
+        equations_to_check_for_found_solutions = []
         subtractions_done = False                                                       # if no subtractions are done, it means that there are no different-sized equations that share a subset of variables (e.g., there's no pair a+b=1 and a+b+c=2, so that the shorter equation could be subtracted from the longer equation)
         for s in range(1, 8+1):                                                         # 's' means short. # Why up to 8? Because a single '1' cell, resulting from a forced guess, can have 8 neighbours; some of these neighbours can be shared with other cells in case of a compulsory guess having been made (the lonely '1' in the middle would be the guess then, obviously).
             short_equations = self.numberOfVariables_to_equations[s]                    # gets all equations with 's' number of variables, 'shorty_vars' below
@@ -124,44 +125,43 @@ class CSP_solver:
                         if all_shorty_vars_found_in_this_longer_equation:               # if shorty is a+b=1, and longy is a+b+c=2, then as a and b both were found in longy, we go here and perform the subtraction
                             # SUBTRACTION IS DONE HERE; subtract the shorter equation from the longer one, if all shorty vars were found in the longer equation, as is hopefully obvious from the check 'all_shorty_vars_found_in_this_longer_equation == True' above
                             result_equation = (tuple(var for var in longy_vars if var not in shorty_vars), longy_sum - shorty_sum) # since factors for all variables are 1, for all variables that were found in both shorty and longy, they are subtracted to 0. As for the sum, it's the longy_sum - shorty_sum
-                            if result_equation not in self.unique_equations:            # once again, technically this 'if' check is unnecessary, but it's better to write out the logic
-                                remaining_vars, new_sum = result_equation
-                                if len(remaining_vars) > 1:                             # if length = 1, then they go instead to 'self.solved_variables'.
-                                    equations_to_add.append([-1,-1, (result_equation[0]), result_equation[1]]) # TO-DO: is this () correct? Does it do anything?? add_equations uses format [ [x, y, tuple(variables), int] ]. Since this a hybrid equation, let's abitrarily says it has (x,y) of (-1,-1), as it doesn't have one definitive 'origin' coordinate (x,y)
-                                new_solutions = []                                      # [ ((x1,y1), 1), ((x2,y2), 0), ...]
-                                if len(remaining_vars) == 1:
-                                    solved_var = remaining_vars[0]
-                                    new_solutions.append((solved_var, new_sum))
-                                else:
-                                    if new_sum == 0:                                    # CSP: if the 'result_equation' is a+b+c+... = 0, then all of a,b,c,... = 0, since every var ∈ {0,1}
-                                        for var in remaining_vars:
-                                            new_solutions.append((var, 0))
-                                for new_solution in new_solutions:                      # [ ((x1,y1), 1), ((x2,y2), 0), ...]
-                                    self.mark_var_as_solved_and_update_related_info(new_solution)  # TO-DO: should I also solve 'b' during this 1st round, or later?
+                            equations_to_check_for_found_solutions.append(result_equation)
+        self.find_solutions_from_equations(equations_to_check_for_found_solutions)
         self.modify_iterables_after_iterations_in_factor_one()                          # this is for modifying all those variables that are part of 'self.numberOfVariables_to_equations' or other targets of iteration loops above, and which thus could not be removed during iterations above without causing an error
-        self.add_equations_if_new(equations_to_add)                                     # these were gathered in a list, because 'self.numberOfVariables_to_equations' can't be changed during its iteration
+        
         
         # TO-DO: the two functions right above have to be performed BEFORE the section below, or half of the variables will remain unsolved
+        
         if not subtractions_done:                                                       # possible cases: (1) all equations were of equal length , (2) they don't share common variables -> can't be solved without guessing
-            sum_zeros = False
-            eqs_to_update = []
-            for variables, summa in self.unique_equations:
-                if summa == 0:
-                    sum_zeros = True
-                    for var in variables:
-                        self.solved_variables.add((var, 0))                             # I can't use 'mark_var_as_solved_and_update_related_info()' here or it will cause RuntimeError 'Set changed size during iteration'. Instead, I have to just add the variable to 'self.solved_variables' and gather a list of the equations to update, which I can update AFTER this loop. The reason for the error is that one functionality of 'self.update_equations(equation)' is to update 'self.unique_equations', which here is being iterated over.
-                        for eq in self.variable_to_equations[var]:                    
-                            eqs_to_update.append((-1,-1,eq[0],eq[1]))                   # This list exists to avoid RuntimeError 'Set changed size during iteration'
-                        #     self.update_equation((-1,-1, eq[0], eq[1]))
-            if sum_zeros:
-                for eq in eqs_to_update:
-                    self.update_equation(eq)
-            if not sum_zeros:
+            found_new_variables = self.find_solutions_from_equations(self.unique_equations)
+            
+            if not found_new_variables:
                 pass # forced guess. TO-DO; handle this here and/or in 'botGame.py'. Possibly will be implemented in 'botGame.py', because 'CSP_solver.py' doesn't (currently at least) have information about unclicked cell locations
         if how_many_rounds > 1:
             self.factor_one_binary_solve(how_many_rounds-1)
 
-    def mark_var_as_solved_and_update_related_info(self, new_solution):
+    def find_solutions_from_equations(self, equations:list) -> bool:
+        new_solutions = []
+        equations_to_add = []
+        found_solutions = False
+        for variables, summa in equations:
+            if summa == 0:
+                found_solutions = True
+                for var in variables:
+                    new_solutions.append((var, 0))
+                    #     self.update_equation((-1,-1, eq[0], eq[1]))
+            elif len(variables) == 1:
+                new_solutions.append((variables[0], summa))
+                found_solutions = True
+            else:
+                if (variables, summa) not in self.unique_equations:                     # if the equation is longer than 1 (e.g. if 'its a+b=1) and not =0 (not a+b=0), and if it's not already in 'self.unique_equations', then add it to 'self.unique_equations'
+                    equations_to_add.append((variables, summa))
+        for new_solution in new_solutions:
+            self.mark_var_as_solved_and_update_related_info(new_solution)
+        self.add_equations_if_new(equations_to_add)                                     # these were gathered in a list, because 'self.numberOfVariables_to_equations' can't be changed during its iteration
+        return found_solutions
+    
+    def mark_var_as_solved_and_update_related_info(self, new_solution:tuple) -> None:
         solved_var, summa = new_solution
         self.solved_variables.add((solved_var, summa))
         if solved_var in self.variable_to_equations:
