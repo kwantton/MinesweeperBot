@@ -22,7 +22,7 @@ class CSP_solver:
         self.variables = set()                              # all variables.
         self.unique_equations = set()                       # { ((var1, var2, ..), sum_of_mines_in_vars), (...) }. Each var (variable) has format (x,y) of that cell's location; cell with a number label 1...8 = var. Here, I want uniqe EQUATIONS, not unique LOCATIONS, and therefore origin-(x,y) is not stored here. It's possible to get the same equation for example from two different sides, and via multiple different calculation routes, and it's of course possible to mistakenly try to add the same equation multiple times; that's another reason to use a set() here, the main reason being fast search from this hashed set.        
         self.solved_variables = set()                       # ((x,y), value)
-        self.variable_to_equations = dict()                 # { variable_a:set(equation5, equation12, equation4,...), variable_b:set(equation3, equation4...)}
+        self.variable_to_equations = dict()                 # { variable_a : set(equation5, equation12, equation4,...), variable_b : set(equation3, equation4...)}
         self.numberOfVariables_to_equations = {             # { numberOfVariables : set(equation1, equation2, ...) }; each key of this dict is integer x, and x's values are all equations with x number of variables. I want to look at those equations with low number of variables, and see for each of those variables if they can be found in equations with more variables; if all the variables in the shorter equation are found in the longer equation, then perform subtraction to get rid of those varibles in the longer equation (linear equation solving), then save the formed result equation to 'self.unique_equations' and 'self.numberOfVariables_to_equations'.
             x:set() for x in range(0, 8+1)                  # Why up to 8? Because a single '1' cell, resulting from a forced guess in the middle of unclicked cells, has 8 neighbours, hence 8 variables in the equation for that '1' cell; some of these neighbours can be shared with other cells in case of a compulsory guess having been made (the lonely '1' in the middle would be the guess then, obviously). NB! It's possible that when all variables in a given equation have just been solved, all are canceled out, and at that point the length of the equation (i.e. the number of variables) becomes 0; that's why I'm starting from 0.
         }                                                   # { numberOfVariables : set(equation1, equation2, ...) }; all equations with numberOfVariables = x. I want to look at those equations with low number of variables, and see for each of those variables if they can be found in equations with more variables.
@@ -53,14 +53,16 @@ class CSP_solver:
     def update_equation(self, equation:tuple) -> None:                                      # equation = ( (var1, var2, ...), sum_of_variables). There's no origin (x,y) here, because all of those are unique, and irrelevant here!
         x, y, original_vars, original_summa = equation
         unsolved_variables, sum_of_solved_vars = self.filter_out_solved_variables(original_vars)
-        if len(unsolved_variables) != len(original_vars):                                   # True, if one or more variables in 'original_vars' had indeed been solved already; in that case we need to update all related information: (1) 'self.unique_equations', (2) 'self.numberOfVariables_to_equations', (3) DONE AT THE END OF 'factor_one_solve': 'self.variable_to_equations'. Otherwise 'factor_one_solve' will have old info and will not work.
+        if len(unsolved_variables) != len(original_vars):                                   # if one or more variables in 'original_vars' had indeed been solved already; in that case we need to update all related information: (1) 'self.unique_equations', (2) 'self.numberOfVariables_to_equations', (3) DONE AT THE END OF 'factor_one_solve': 'self.variable_to_equations'. Otherwise 'factor_one_solve' will have old info and will not work.
             if (original_vars, original_summa) in self.unique_equations:
                 self.unique_equations.remove((original_vars, original_summa))
             if len(original_vars) in self.numberOfVariables_to_equations:
                 if (original_vars, original_summa) in self.numberOfVariables_to_equations[len(original_vars)]:
                     self.variables_and_sum_to_DELETE_from_self_numberOfVariables_to_equations_after_iteration.add((original_vars, original_summa))
             
+            # TO-DO: sum 0 check?
             if len(unsolved_variables) == 1:
+                # if original_summa-sum_of_solved_vars >= 0: # TO-DO: why does it sometimes add negative values, when used from 'botGame.py'?
                 self.solved_variables.add((unsolved_variables[0], original_summa-sum_of_solved_vars))
             else:
                 self.unique_equations.add((unsolved_variables, original_summa-sum_of_solved_vars))
@@ -83,8 +85,8 @@ class CSP_solver:
                 for var in variables:
                     if (var,0) not in self.solved_variables:
                         mark_these_as_solved_after_iteration.append((var,0))
-            elif len(variables) == 1:
-                mark_these_as_solved_after_iteration.append((variables[0], summa))              # TO-DO: check if this ever happens (is this line needed here)
+            elif len(variables) == 1:                                                           # TO-DO: check if this case ever happens here (is this line needed here)
+                mark_these_as_solved_after_iteration.append((variables[0], summa))
             else:                                                                               # we don't want equations like (('a','d'),0), as they would just cause more work in the 'self.factor_one_solve', as they provide no new information during subtractions with other equations
                 self.numberOfVariables_to_equations[len(variables)].add((variables, summa))      
         self.variables_and_sum_to_ADD_to_self_numberOfVariables_to_equations_after_iteration.clear()
@@ -124,16 +126,16 @@ class CSP_solver:
                             # SUBTRACTION IS DONE HERE; subtract the shorter equation from the longer one, if all shorty vars were found in the longer equation, as is hopefully obvious from the check 'all_shorty_vars_found_in_this_longer_equation == True' above
                             result_equation = (tuple(var for var in longy_vars if var not in shorty_vars), longy_sum - shorty_sum) # since factors for all variables are 1, for all variables that were found in both shorty and longy, they are subtracted to 0. As for the sum, it's the longy_sum - shorty_sum
                             equations_to_check_for_found_solutions.append(result_equation)
-        found_solutions, subtractions_done = self.find_solutions_from_equations(equations_to_check_for_found_solutions)
+        found_solutions, subtractions_done = self.find_solutions_from_single_equations(equations_to_check_for_found_solutions)
         self.modify_iterables_after_iterations_in_factor_one()                          # this is for modifying all those variables that are part of 'self.numberOfVariables_to_equations' or other targets of iteration loops above, and which thus could not be removed during iterations above without causing an error
         if not subtractions_done:                                                       # possible cases: (1) all equations were of equal length , (2) they don't share common variables -> can't be solved without guessing
-            found_new_variables = self.find_solutions_from_equations(self.unique_equations)
+            found_new_variables = self.find_solutions_from_single_equations(self.unique_equations)
             if not found_new_variables:
                 pass # forced guess. TO-DO; handle this here and/or in 'botGame.py'. Possibly will be implemented in 'botGame.py', because 'CSP_solver.py' doesn't (currently at least) have information about unclicked cell locations
         if how_many_rounds > 1:
             self.factor_one_binary_solve(how_many_rounds-1)
 
-    def find_solutions_from_equations(self, equations:list) -> bool:                    # this checks if (1) a+b+...=0 -> then a,b,... = 0, since every variable is 0 or 1, (2) if the length of the variables is 1, then there's only one variable x with value y -> mark variable x as y, (3) if a new equation is found, then check it and mark all variables associated with it
+    def find_solutions_from_single_equations(self, equations:list) -> bool:                    # this checks if (1) a+b+...=0 -> then a,b,... = 0, since every variable is 0 or 1, (2) if the length of the variables is 1, then there's only one variable x with value y -> mark variable x as y, (3) if a new equation is found, then check it and mark all variables associated with it
         new_solutions = []
         equations_to_add = []
         found_solutions = False
@@ -157,6 +159,7 @@ class CSP_solver:
     
     def mark_var_as_solved_and_update_related_info(self, new_solution:tuple) -> None:
         solved_var, summa = new_solution
+        # if summa >= 0: # TO-DO; why does it sometimes add negative values, when used from botGame.py?
         self.solved_variables.add((solved_var, summa))
         if solved_var in self.variable_to_equations:
             equations_with_the_var = self.variable_to_equations[solved_var]
@@ -172,12 +175,16 @@ def format_equation_for_csp_solver(x:int, y:int, variables:tuple, surrounding_mi
 
 if __name__ == '__main__':
     
-    def print_solved_variables(csp:CSP_solver) -> None:
+    def print_solved_variables(csp:CSP_solver, name='random test') -> None:
+        print(f'Solving "{name}"')
         if len(csp.solved_variables) > 1:
             for variable, value in sorted(csp.solved_variables):
                 print("- solved a new variable!", variable , "=", value)
         else:
             print("- solved a new variable!", csp.solved_variables[0] , "=", csp.solved_variables[1])
+
+
+    ################################# Test 1 ##########################################
 
     '''                                             answer (which is printed also): 
     Example: solving                                a = 0
@@ -195,7 +202,9 @@ if __name__ == '__main__':
     csp = CSP_solver()
     csp.add_equations_if_new([eq1, eq2, eq3, eq4])
     csp.factor_one_binary_solve()                           # PRINT: see answer above in orange
-    print_solved_variables(csp)
+    print_solved_variables(csp, 'test 1')
+
+    ############################## Test 2 #############################################
 
     '''from the above, as c=1 is solved, we get:'''
 
@@ -213,8 +222,30 @@ if __name__ == '__main__':
     eq4 = [3, 1, ('d', 'e'), 1]
     csp = CSP_solver()
     csp.add_equations_if_new([eq1, eq2, eq3, eq4])
-    csp.factor_one_binary_solve()                          # PRINT: "solved a new variable! Variable: c = 1" which is correct
-    print_solved_variables(csp)
+    csp.factor_one_binary_solve()                          
+    print_solved_variables(csp, 'test 2')
+
+    ############################## Test 3 #############################################
+    '''                                             answer (which is printed also): 
+    Example: solving                                a = 0
+    a + b + d = 2                                   b = 1
+    a + b + c + d + e = 2                           c = 0
+    b + c + e = 1                                   d = 1
+    d + e = 1                                       e = 0                                       
+    
+    The only possible answer for this group of 4 equations, when a,b,c,d,e ∈ {0,1}, is obtained in 3 parts: (1) c = 1 based on 3rd and 4th equations, then (2) -> a+d=0 so a=0 and d=0 (CSP), (3) -> b=1 and e=1. Part (2) could be said to be 'CSP' (constraint satisfaction problem) where the constraint is simply the fact that every variable is either 0 or 1.
+    '''                                                   
+
+    eq1 = [0, 1, ('a', 'b', 'd'), 2]
+    eq2 = [1, 1, ('a', 'b', 'c', 'd', 'e'), 2]
+    eq3 = [2, 1, ('b', 'c', 'e'), 1]
+    eq4 = [1, 2, ('d', 'e'), 1]
+    csp = CSP_solver()
+    csp.add_equations_if_new([eq1, eq2, eq3, eq4])
+    csp.factor_one_binary_solve()                          
+    print_solved_variables(csp, 'test 3')
+
+    ############################ Test 4 ############################################
     
     ###### a minesweeper map, where X means 'unclicked' cell, * is a 'mine' cell (not seen by the player), and 1 is '1' cell, 2 is '2' cell. Every # is edge of the map, essentially means nothing
     #X*X*#
@@ -222,15 +253,22 @@ if __name__ == '__main__':
     ######
     
     # the above map is described by these inputs that are used as input for 'add_equations'
-    c01 = [0, 1, ((0,0), (0,1)), 1]             # 'c01' means 'cell x=0 y=1'. There are 2 variables in C01, '(0,0)' and '(0,1)', and the sum of these two is 1. The variable names mean (x,y), and each variable is either 0 or 1, meaning the number of mines in that cell (x,y) of the minesweeper map.
+    c01 = [0, 1, ((0,0), (0,1)), 1]                         # 'c01' means 'cell x=0 y=1'. There are 2 variables in C01, '(0,0)' and '(0,1)', and the sum of these two is 1. The variable names mean (x,y), and each variable is either 0 or 1, meaning the number of mines in that cell (x,y) of the minesweeper map.
     c11 = [1, 1, ((0,0), (1,0), (2,0)), 1]
     c21 = [2, 1, ((1,0), (2,0), (3,0)), 2]
     c31 = [3, 1, ((2,0), (3,0)), 1]
     csp = CSP_solver()
     csp.add_equations_if_new([c01, c11, c21, c31])
-    csp.factor_one_binary_solve()                          # PRINT: "solved a new variable! Variable: (1,0) = 1" which is correct! It means that (x,y) = (1,0) is a mine, which it indeed is.
+    csp.factor_one_binary_solve()
 
-    print_solved_variables(csp)
+    print_solved_variables(csp, 'test 4')
+
+    '''correct result:
+    - solved a new variable! (0, 0) = 0
+    - solved a new variable! (0, 1) = 1
+    - solved a new variable! (1, 0) = 1
+    - solved a new variable! (2, 0) = 0
+    - solved a new variable! (3, 0) = 1'''
 
 
 '''

@@ -6,17 +6,18 @@ from cell_id_names import flag, unclicked, mine, safe, labellize, read_number
 
 # cell = a clickable square of the minesweeper map, 'ruutu'. 'Label' = the id of a cell, like '0' or 'flag'.
 class Minesweeper:
-    def __init__(self, width, height, mines, csp_on=True):
+    def __init__(self, width, height, mines, csp_on=True, debug_csp=False):
         pygame.init()
         pygame.display.set_caption('MINESWEEPER')
         self.cells_to_open = width*height - mines
         
         self.mines = mines
         self.width = width
-        self.csp_on = csp_on
         self.cell_size = 50                             # how many px in height and width should each cell be?
+        self.csp_on = csp_on
         self.height = height                            # map height measured in in rows
         self.infobar_height = 100                       # pixels for the infobar above the minesweeper map
+        self.debug_csp = debug_csp
         self.clock = pygame.time.Clock()
         self.initialize_debug_features()
         self.font = pygame.font.Font(None, 36)
@@ -35,8 +36,8 @@ class Minesweeper:
         print('\ninitialize_debug_features()')
         self.show_mines = False
         self.highlight_front = False                                                # 'front' cells = number-labeled cells that neighbour unsolved cells, i.e. cells in x € {1,2,...8} that do not have x flags marked around them. When this is 'True', it draws a yellow rectangle around each such cell.
-        self.highlight_csp_solved = False
         self.highlight_bot_location = False
+        self.highlight_csp_solved = self.debug_csp
         self.instructions = '''
         b : bot move
         f : front highlighting
@@ -160,7 +161,7 @@ class Minesweeper:
         if label == labellize(n_surrounding_flags):
             self.handle_chord(x, y)
 
-    # TO-DO: not the problem of this function, but there's a problem in the csp-solver causing some of flagged tiles, and mine-containing to be handled through this function, as they are falsely labelled as 0, not 1. A quick patch would be to check here if label=flag, and return if true, but that's obviously not a real solution.
+    # TO-DO: not caused by this function as such, but there's a problem in the csp-solver causing some of flagged tiles and mine-containing cells to be handled through this function, as they are falsely labelled as 0 instead of as 1 by the CSP-solver. A quick patch would be to check HERE if label=flag, and return if true, but that's obviously not a real solution.
     def handle_opening_a_new_cell(self, x:int, y:int) -> None:                  # ALL NEW CELL OPENINGS GO HERE, doesn't matter how the cell was opened (player/bot/single click/chord)
         print('\nhandle_opening_of_a_new_cell()')
         self.opened.add((x, y))                                                 # why: in case a zero is clicked open, I'm using handle_click recursively to open up all the surrounding cells that are not mines. For that, this list is needed, so that an endless recursion doesn't occur.
@@ -168,7 +169,7 @@ class Minesweeper:
         
         surrounding_mines = 0
         for neighbour in neighbours:
-            if neighbour in self.mine_locations:
+            if neighbour in self.mine_locations:                                # NB! 'self.mine_locations' is the set of ACTUAL mine locations, so this is correct
                 surrounding_mines += 1
         self.map[y][x] = labellize(surrounding_mines)
         if surrounding_mines == 0:                                              # the idea is that cells with label '0' are never in 'self.front', as they provide no information that's useful for solving the remaining map (they are the 2nd- or higher order neighbours of unsolved cells)
@@ -246,7 +247,7 @@ class Minesweeper:
                 self.new_front_members.clear()
     
             # this function's "for x,y in self.front" loop finds SIMPLE non-CSP solutions: (1) where the number of neighbouring unflagged unclicked cells + flagged cells equals to the label -> flag all, and (2) if label = number of surrounding flags, then perform a chord. Then, I remove unnecessary cells from the front to cut unnecessary computing work for the linear equation CSP solver.
-            def simple_solver():    
+            def simple_solver() -> None:    
                 obsolete_front = []                                                         # all members of the 'self.front' [(x1,y1), (x2,y2)..] that no longer provide useful information for solving the game will be gathered here; they will be removed later after the 'for x,y' loop below
                 for x,y in self.front:
                     label = self.map[y][x]    
@@ -255,7 +256,7 @@ class Minesweeper:
                     number_of_surrounding_flags = self.count_cells_of_type(flag, neighbours)
                     
                     if label == labellize(len(unflagged_unclicked_neighbours) + number_of_surrounding_flags):   # If the number of surrounding ('unclicked' + 'flag') cells equals to the label of the front cell in question (for example, 1 flagged + 2 unclicked = 3 = the label of the cell),
-                        flag_all(unflagged_unclicked_neighbours)                            # then flag the remaining unflagged cells around the front cell in question (flag the remaining 2 unclicked cells in this example case).
+                        flag_these(unflagged_unclicked_neighbours)                            # then flag the remaining unflagged cells around the front cell in question (flag the remaining 2 unclicked cells in this example case).
                     if label == labellize(number_of_surrounding_flags):                     # NB! 'if', not 'elif'. If the number of flagged neighbours equals to the label of the current front cell,
                         if len(unflagged_unclicked_neighbours) >= 1:                        # then if there also are unclicked cells around the current front cell,
                             self.handle_chord(x,y)                                          # then open all of them (i.e. 'chord' at the front cell).
@@ -264,6 +265,10 @@ class Minesweeper:
                 update_front(obsolete_front)
             
             simple_solver()
+            
+            # if I don't 'draw_display()' here, when using debugger, I wouldn't be able to see the map before csp-section code is executed c:
+            if self.debug_csp:
+                self.draw_display()
 
             # after removing thus far redundant cells from the 'self.front' (done in 'update_front'), I'm feeding equations into my CSP linear equation solver:
             def feed_csp_solver():
@@ -276,28 +281,29 @@ class Minesweeper:
                     csp_solver_input.append(csp_solver_input_addition)
                 self.solver.add_equations_if_new(csp_solver_input)
             
+            if self.debug_csp:
+                self.draw_display()
+    
             feed_csp_solver()
 
             def csp_solve():
                 self.solver.factor_one_binary_solve()
-                solved_vars = self.solver.solved_variables                                  # each var is a tuple (x,y)
+                solved_vars = self.solver.solved_variables      # each var is a tuple (x,y)
                 print('csp_solve():')
-                print('solved_vars:', solved_vars)
+                print('-solved_vars:', solved_vars)
                 for (x,y), value in solved_vars:
                     print(f'- solved {x,y} = {value}')
                     if value == 1:
-                        flag_all([(x,y)])
-                    elif value == 0:                                                        # TO-DO: some are mislabeled as 0 -> many problems. CSP is broken still
-                        self.handle_opening_a_new_cell(x, y)                                # NB! 'handle_opening_a_new_cell' adds new front members to 'self.new_front_members', NOT yet to self.front, as 'handle_opening_a_new_cell' was originally used in 'simple_solver' which iterates over 'self.front' and thus cannot directly modify 'self.front' while iterating over it. That's why 'add_new_front_members()' was created originally
+                        flag_these([(x,y)])
+                    elif value == 0:                            # TO-DO: some are mislabeled as 0 -> many problems. CSP is broken still
+                        self.handle_opening_a_new_cell(x, y)    # NB! 'handle_opening_a_new_cell' adds new front members to 'self.new_front_members', NOT yet to self.front, to avoid 'Set changed size during iteration', since 'handle_opening_a_new_cell' was originally used in 'simple_solver' which iterates over 'self.front' and thus cannot directly modify 'self.front' while iterating over it without causing the error.
                         add_new_front_cells_to_self_front()
-                    
-                    
                 # print('- solved_vars:', solved_vars)
             
             if self.csp_on:
                 csp_solve()
 
-        def flag_all(cells) -> None:
+        def flag_these(cells) -> None:
             for x,y in cells:
                 if self.map[y][x] == unclicked:
                     self.update_minecount(x,y)
@@ -424,5 +430,5 @@ if __name__ == '__main__':
 
     # START A NEW MINESWEEPER with the ability to play the bot by pressing b
     # Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=False) # IF YOU WANT ONLY simple_solver(), which WORKS at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
-    Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=True) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
+    Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=True, debug_csp=True) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
     #           width        height       mines    
