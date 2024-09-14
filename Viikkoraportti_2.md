@@ -10,11 +10,11 @@
     - frontin päivitys CSP:tä käytettäessä ei toimi; ainoastaan pelkkää `simple_solver()`:ia käytettäessä frontin päivitys joka b-painalluksen jälkeen toimii oikein
 
 Luokassa toimii
-- [x] mapin generointi (mielivaltainen koko, miinoja korkeintaan korkeys$\cdot$leveys - 1) ensimmäisen klikkauksen jälkeen
+- [x] mapin generointi (mielivaltainen koko, miinoja korkeintaan korkeus $\cdot$ leveys - 1) ensimmäisen klikkauksen jälkeen
 - [x] häviön ja voiton tunnistaminen
 - [x] miinalaskuri
-- [x] chordaus (sikäli turhahko botin kannalta, mutta oli hauska tehdä)
-- [x] 0-ruutujen ja näitä ympäröivien tiilien automaattinen ketjuuntuva avautuminen 0:aa klikatessa, kuten oikeassakin 
+- [x] chordaus, joka on käytettävissä myös botin pelatessa (chordaus tarkoittaa sitä, että kun hiiren vasemmalla klikataan toisen kerran avattua ruutua, jonka ympärille on merkitty sama määrä lippuja kuin mikä ruudun arvo on, niin kaikki liputtamattomat ympäröivät ruudut avautuvat)
+- [x] 0-ruutujen ja näitä ympäröivien tiilien automaattinen ketjuuntuva avautuminen 0-ruudun avaamisen jälkeen, kuten oikeassakin miinaharavassa
 - [x] `Minesweeper(width,height,mines,csp_on=False)` aloittaa `simple_solver()`:iin rajoittuvan pelimuodon, jossa botilla pelatessa (kun painaa `b`, yksi liike per b-painallus) käytetään pelkkää `simple_solver()`:in logiikkaa
 - [x] puolestaan `Minesweeper(width,height,mines,csp_on=True)` aloittaa pelimuodon, jossa botilla pelatessa (kun painaa 'b' näppäimistöltä toistuvasti, yksi liike per b-painallus) on käytössä myös `CSP_solver()`-luokka, ja tämän lisäksi pohjalla `simple_solver()`:in logiikka. 
 HUOM! En takaa toteutuksessani minimi-3x3:n alkuavausta toisin kuin alkuperäisessä miinaharavassa taataan, vaan teen kuten 'minesweeper.online'-sivulla, eli ilman alkuavauksen takaamista. Tämän voi helposti muuttaa myöhemmin jos haluaa vertailla esim. Becerran kandityön prosenttiosuuksiin voitoista eri pelimuodoissa.
@@ -37,5 +37,5 @@ miinaharavassa. Joskus se muuttaa ruutuja toisiksi (`handle_opening_a_new_cell()
 - [x] CSP-solverin väsäystä
 - [x] `botGame.py`:n Minesweeper-luokka on melko hyvin jaettu funktioihin, ja esim. käyttöliittymään toiminnallisuuksien lisääminen on hyvin suoraviivaista.
 
-4. Epäselvää: ei sinänsä mikään; pitää jatkaa CSP_solver-luokan tekemistä (korjaamista) ja selkiyttää sen koodia niin paljon kuin mahdollista. Huom. olen käyttänyt tähän vasta 7 päivää, sikäli hyvin etenee.
-5. Seuraavaksi: jatkan CSP_solver-luokan tekemistä (korjaamista) ja selkiyttää sen koodia niin paljon kuin mahdollista
+4. Epäselvää: ei sinänsä mikään; pitää jatkaa `CSP_solver`-luokan tekemistä (korjaamista) ja selkiyttää sen koodia niin paljon kuin mahdollista. Huom. olen käyttänyt tähän vasta 7 päivää, sikäli hyvin etenee.
+5. Seuraavaksi: jatkan `CSP_solver`-luokan tekemistä (korjaamista) ja selkiytän sen koodia niin paljon kuin mahdollista. Jos saan `CSP_solver`:in nähtävästi toimimaan, keskityn seuraavaksi testien tekemiseen, jotta voidaan selvittää, toimiiko solver oikeasti _kaikissa_ tapauksissa.
