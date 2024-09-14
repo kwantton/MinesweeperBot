@@ -1,13 +1,13 @@
 1. Tehty tällä viikolla:
-- `class Minesweeper` on nyt olemassa mapGenerator.py:ssä. Tämä on ihmisten (hiirellä) JA BOTIN (`simple_solver`, ja halutessaan lisäksi `CSP_solver`) pelattava versio
+- `class Minesweeper` on nyt olemassa `mapGenerator.py`:ssä. Tämä on ihmisten (hiirellä) JA BOTIN (`simple_solver`, ja halutessaan lisäksi `CSP_solver`) pelattava versio
     - visuaalista käyttöliittymää käytetään näppäimillä, jotka on lueteltu itse käyttöliittymän alaosassa
         - bottia käytetään b-näppäimellä; jos miinaharavapeli käynnistettiin esim. `Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=True)`-komennolla, tällöin botin älyllä on käytössään myös `CSP_solver`-luokka. Jos `csp_on=False`, tällöin on käytössä vain `simple_solver()`-funktio `bot_act()`-metodin `brain`-funktiossa. 
         - HUOM! `CSP_solver`-luokka tai sen keskustelu `botGame.py`:n kanssa (?) on osin rikki vielä. Sitä voi kuitenkin käyttää, ja näkee mielenkiintoisia bugeja sitä käyttäessään, kun painaa `c`-näppäintä
         - `space` aloittaa uuden pelin
         - `q` lopettaa
         - `m` näyttää kaikkien miinojen todelliset sijainnit (tiedon, jota automaattisesti pelaajalla tai botilla ei ole ilman päättelyä (ja tuuria))
-        - `f` näyttää frontin; tämä toimii täysin oikein, jos csp_on=False, mutta on vielä rikki jos `csp_on=False`
-    - frontin päivitys CSP:tä käytettäessä ei toimi; ainoastaan pelkkää `simple_solver()`:ia käytettäessä frontin päivitys joka `b`-painalluksen jälkeen toimii oikein
+        - `f` näyttää `self.front`:in (`self.front` on `set()` johon joka b-painalluksella päivittyvät etulinjan ruudut eli ne ruudut joista on päättelyssä hyötyä; kun `csp_on=False`, tämä `front`:in päivittäminen toimii täysin oikein, mutta ei yleensä toimi 1. b-painalluksen jälkeen, jos `csp_on=True` eli jos `CSP_solver` on käytössä, koska sen tekeminen on kesken.
+    - frontin päivitys CSP:tä käytettäessä ei toimi; ainoastaan pelkkää `simple_solver()`:ia käytettäessä frontin päivitys joka b-painalluksen jälkeen toimii oikein
 
 Luokassa toimii
 - [x] mapin generointi (mielivaltainen koko, miinoja korkeintaan korkeys$\cdot$leveys - 1) ensimmäisen klikkauksen jälkeen
