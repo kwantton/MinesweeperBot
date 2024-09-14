@@ -1,6 +1,6 @@
 (WIP viikko 2: tulee päivittymään vielä ennen lauantaita)
 
-1. viime viikolla tehdyn lisäksi:
+1. Tehty tällä viikolla:
 - `class Minesweeper` on nyt olemassa mapGenerator.py:ssä. Tämä on ihmisten (hiirellä) JA BOTIN (simple solver, ja halutessaan lisäksi CSP_solver) pelattava versio
     - visuaalista käyttöliittymää käytetään näppäimillä, jotka on lueteltu itse käyttöliittymän alaosassa
         - bottia käytetään b-näppäimellä; jos miinaharavapeli käynnistettiin esim. 'Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=True)'-komennolla, tällöin botin älyllä on käytössään myös 'CSP_solver'-luokka. Jos csp_on=False, tällöin on käytössä vain 'simple_solver()'-funktio bot_act().metodin brain-funktiossa. 
@@ -23,13 +23,17 @@ HUOM! En takaa toteutuksessani minimi-3x3:n alkuavausta toisin kuin alkuperäise
 - [x] esimerkkikuva lineaariyhtälöryppäästä, jossa sekä ilman CSP:tä (ilman tietoa siitä että joka ruudulle $r$ pätee $r \in \set{0,1}$ missä 0 ja 1 ovat miinojen lukumäärä kyseisessä ruudussa) saadaan pääteltyä turvallinen ruutu
 - [x] `python-constraint` toimii näköjään hyvin näiden CSP-yhtälöryhmien ratkaisussa. Voisin käyttää tätä testaamisessa sen varmistamiseen, että oma CSP_solver-luokkani toimii kaikissa tapauksissa
 [ ] vilkuiltu Becerran kandityötä, pitää lukea lisää
-2. Tehty: 
+2. Miten edistynyt: melko erinomaisesti, yllä asiat
     - `Minesweeper`-luokka on tehty, ja hahmottelin lineaariyhtälöitä CSP:llä ja ilman (tiedosto '/Esim_evil_1.png').
     - `CSP_solver`-luokka
+        - [x] kolme yksikkötestiä löytyy (kolme yhtälörypästä miinaharavan kontekstissa, eli CSP-rajoitteella että jokainen solu (eli muuttuja) on joko 0 tai 1)
 3. Mitä opin:
 - [x] Tein esimerkkitilanteen (no guessing evil-peli) jossa sekä CSP:llä että ilman saatiin ratkaisu käyttäen yhtälöryhmiä
 - [x] opin siitä että ainakin joskus monimutkaisissakin tilanteissa on mahdollista saada ratkaisu sekä CSP:llä että ilman
 - [x] Opin että `python-constraint` on olemassa, ja jos sen kaikissa tuloksissa on jokin muuttuja 0, kyseinen ruutu on miinaton, ja jos taas aina 1, niin siinä on miina
+- [x] Kahden luokan tekeminen
+- [x] CSP-solverin väsäystä
+- [x] botGame.py:n Minesweeper-luokka on melko mainiosti jaettu funktioihin, ja esim. käyttöliittymään toiminnallisuuksien lisääminen on hyvin suoraviivaista.
 
 4. Epäselvää: ei sinänsä mikään; pitää jatkaa CSP_solver-luokan tekemistä (korjaamista) ja selkiyttää sen koodia niin paljon kuin mahdollista. Huom. olen käyttänyt tähän vasta 7 päivää, sikäli hyvin etenee.
 5. Seuraavaksi: jatkan CSP_solver-luokan tekemistä (korjaamista) ja selkiyttää sen koodia niin paljon kuin mahdollista
