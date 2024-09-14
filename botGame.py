@@ -45,7 +45,7 @@ class Minesweeper:
         f : front highlighting
         o : obsolete front highlighting
         c : highlight csp-solved cells
-        l : bot start location
+        l : (bot) start location
         spacebar : new game
         m : show mine locations
         q: quit'''.split('\n        ')                                              # This way of writing lists is used a lot on the 'Data analysis with Python' course, it's very handy for writing longer lists quickly. This splits at each '\n        ' to form a list.
@@ -123,7 +123,7 @@ class Minesweeper:
     
     def handle_first_left_click(self, x:int, y:int) -> None:
         print('\nhandle_first_left_click()')
-        self.start_x = x                                                      # If you click, the start coordinates are where you first click. If you don't click, but instead press b right away to let the bot make the first move, then by default 'self.start_x' = 'self.start_y' = 0 (top left corner of the map).
+        self.start_x = x                                                            # If you click the map in the beginning, the start coordinates are where you first click. If you don't click, but instead press b right away to let the bot make the first move, then by default 'self.start_x' = 'self.start_y' = 0 (top left corner of the map).
         self.start_y = y
         self.started = True
         self.start_time = pygame.time.get_ticks()
@@ -181,7 +181,6 @@ class Minesweeper:
                 surrounding_mines += 1
         self.map[y][x] = labellize(surrounding_mines)
         if surrounding_mines == 0:
-            self.obsolete_front.add((x,y))                                      # the idea is that cells with label '0' are never in 'self.front', as they provide no information that's useful for solving the remaining map (they are the 2nd- or higher order neighbours of unsolved cells)
             for neighbour in neighbours:
                 self.probe(neighbour[0], neighbour[1], primary=True)            # this is normal minesweeper; whenever a 0 is clicked, all the neighbouring 0s, AND each of the neighours of each 0 are opened as well (i.e., the 0-front stops at numbers 1,2,...8). However, I can't know how many of the neighbours have already been opened, flagged, etc, so 'self.probe()' is the function to use, as it does the sorting automatically
         else:
@@ -200,12 +199,10 @@ class Minesweeper:
         return count
 
     def count_cells_of_type(self, counted_cell_type:str, coordinates:list) -> int:
-        print(f'\ncount_cells_of_type({counted_cell_type})')
         count = 0
         for c in coordinates:
             if self.map[c[1]][c[0]] == counted_cell_type:
                 count += 1
-        print('- count:', count)
         return count
     
     def get_cells_of_type(self, wanted_cell_type:str, coordinates:list, negative=False) -> list:
@@ -228,7 +225,6 @@ class Minesweeper:
         for neighbour in neighbours:
             if self.map[neighbour[1]][neighbour[0]] == unclicked:                       # without this, it would chord also flagged cells
                 self.probe(neighbour[0], neighbour[1])
-        self.obsolete_front.add((x,y))                                                  # after chording, this cell can no longer provide useful information about its neighbours -> to be removed from 'self.front' later
 
     def toggle_flag(self, x:int, y:int) -> None:
         if self.map[y][x] == flag:
@@ -258,7 +254,7 @@ class Minesweeper:
                     self.front.add(member)
                 self.new_front_members.clear()                                              # now that they are added, reset this list for the next round of bot_act()
             
-            # CSP-solver is giving me trouble. This function is for ensuring that there DEFINITELY are no obsolete front cells in self.front any longer, as that has been my problem for 2 days now.
+            # This is the most straightforward way of removing obsolete front cells from 'self.front'. Previously, I had this split up into chording and entering new cell, but that's complicated and doesn't really save processing (almost) at all. This is much better, universal, and clearer, and can be used by the CSP-bot too. CSP-solver is giving me trouble. This function is for ensuring that there DEFINITELY are no obsolete front cells in self.front any longer, as that has been my problem for 2 days now.
             def filter_front_cells():
                 for x,y in self.front:
                     neighbours = self.get_neighbours_of(x, y)
@@ -278,12 +274,11 @@ class Minesweeper:
                     
                     if label == labellize(len(unflagged_unclicked_neighbours) + number_of_surrounding_flags):   # If the number of surrounding ('unclicked' + 'flag') cells equals to the label of the front cell in question (for example, 1 flagged + 2 unclicked = 3 = the label of the cell),
                         flag_these(unflagged_unclicked_neighbours)                          # then flag the remaining unflagged cells around the front cell in question (flag the remaining 2 unclicked cells in this example case).
-                        self.obsolete_front.add((x,y))                                      # if all neighbours have been flagged, then this cell no longer provides information that would be usable for solving the rest of the map -> remove this cell from 'self.front'
                     # At this point, I could update the 'number_of_surrounding_flags' again, since I just placed new flags above (potentially); if I updated the number of surrounding flags at this point, there would be a chance for the 'if' clause below to perform a chord. However, it's much better and clearer to proceed one step at a time; it helps in debugging, and ... simply looks much nicer when looking at the bot doing its job one small step at a time.
                     if label == labellize(number_of_surrounding_flags):                     # NB! 'if', not 'elif'. If the number of flagged neighbours equals to the label of the current front cell,
                         if len(unflagged_unclicked_neighbours) >= 1:                        # then if there also are unclicked cells around the current front cell,
                             self.handle_chord(x,y)                                          # then open all of them (i.e. 'chord' at the front cell).
-                update_front()
+                filter_front_cells()
             
             simple_solver()
             
@@ -298,7 +293,8 @@ class Minesweeper:
                     surrounding_mine_count = read_number_from_label(self.map[y][x])                    # all 'self.front' cells have number labels, number = 1,...8 (not 0). It cannot be 0, since we just removed those cells from 'self.front' in the 'for...' loop above
                     neighbours = self.get_neighbours_of(x,y)
                     unflagged_unclicked_neighbours = self.get_cells_of_type(unclicked, neighbours)
-                    csp_solver_input_addition = format_equation_for_csp_solver(x, y, unflagged_unclicked_neighbours, surrounding_mine_count)    
+                    n_surrounding_flags = self.count_flags(neighbours)
+                    csp_solver_input_addition = format_equation_for_csp_solver(x, y, unflagged_unclicked_neighbours, surrounding_mine_count-n_surrounding_flags)    # TO-DO! What if there are flags around??? They should be removed from the minecount first, shouldn't they! HAHAAAAAAAAAAA!!!!!!!!!!!!!
                     csp_solver_input.append(csp_solver_input_addition)
                 self.solver.add_equations_if_new(csp_solver_input)
             
@@ -319,7 +315,7 @@ class Minesweeper:
                     elif value == 0:                            # TO-DO: some are mislabeled as 0 -> many problems. CSP is broken still
                         self.handle_opening_a_new_cell(x, y)    # NB! 'handle_opening_a_new_cell' adds new front members to 'self.new_front_members', NOT yet to self.front, to avoid 'Set changed size during iteration', since 'handle_opening_a_new_cell' was originally used in 'simple_solver' which iterates over 'self.front' and thus cannot directly modify 'self.front' while iterating over it without causing the error.
                         # TO-DO; now, via utilizing handle_opening_a_new_cell, obsolete front should be added from there correctly.
-                    filter_front_cells()
+                filter_front_cells()
                 # print('- solved_vars:', solved_vars)
             
             if self.csp_on:
@@ -389,7 +385,7 @@ class Minesweeper:
             for x,y in self.obsolete_front:
                 self.screen.blit(surface, ((x*self.cell_size, y*self.cell_size + self.infobar_height)))
         
-        def highlight_bot_blue() -> None:
+        def highlight_start_location_blue() -> None:
             surface = transparent_highlight_surface(0,0,255,128)
             self.screen.blit(surface, (self.start_x*self.cell_size, self.start_y*self.cell_size + self.infobar_height))
 
@@ -434,7 +430,7 @@ class Minesweeper:
         if self.highlight_front:
             highlight_front_cells_yellow()
         if self.highlight_bot_location:
-            highlight_bot_blue()
+            highlight_start_location_blue()
         if self.show_mines:
             highlight_mines_red()
         if self.highlight_csp_solved:
@@ -457,5 +453,5 @@ if __name__ == '__main__':
 
     # START A NEW MINESWEEPER with the ability to play the bot by pressing b
     # Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=False) # IF YOU WANT ONLY simple_solver(), which WORKS at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
-    Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=False, debug_csp=False) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
+    Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=True, debug_csp=False) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
     #           width        height       mines    
