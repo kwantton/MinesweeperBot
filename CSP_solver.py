@@ -1,6 +1,6 @@
 '''to-do: 
-- [isn't this done now in 'update_unique_equation'?] for solved variables, check each of them in factor_one_solve. This should be taken into account also when considering new equations; don't save unsolved bootleg duplicates as 'new' equations if in reality they are the unsolved versions of already solved equations
-- in 'factor_one_solve', an easy way to check if subtracting the subset from the larger set is correct is as follows: if you end up with a+b+.... < 0, the subtraction was WRONG - something was wrong in the code itself. Why; because x ∈{0,1} for all cells x, and because I'm always subtracting a subset from a larger or equally sized set. Therefore, as every element of each set is 0 or 1, it is not possible to end up with a negative result for the resulting equation. For example: a+b+c = 1, a+b+c+d = 2 -> d = 1. The resulting equation can never have a negative value, if every element of the subset is found in the larger set, and every element x ∈{0,1} for all cells x!
+- for solved variables, check each of them in factor_one_solve. This should be taken into account also when considering new equations; don't save unsolved bootleg duplicates as 'new' equations if in reality they are the unsolved versions of already solved equations
+- in 'factor_one_solve', an easy way to check if subtracting the subset from the larger set is correct is as follows: if you end up with a+b+.... < 0, the subtraction was WRONG - something was wrong in the code itself. Why; because x ∈{0,1} for all cells x, and because I'm always subtracting a subset from a larger or equally sized set. Therefore, as every element of each set is 0 or 1, it is not possible to end up with a negative result for the resulting equation. For example: a+b+c = 1, a+b+c+d = 2 -> d = 1. The resulting equation can never have a negative value, if every element of the subset is found in the larger set, and every element x ∈{0,1} for all cells x! Therefore, it would be good the specifically add this at some point to facilitate debugging.
 - destructuring in case of non-tuple variable names will not work; beware in the examples! (variables like 'a', 'b' may not work, when you attempt to destructure them like '(x,y), value', for example)
 
 done:
@@ -65,9 +65,8 @@ class CSP_solver:
             else:
                 self.unique_equations.add((unsolved_variables, original_summa-sum_of_solved_vars))
             
-            # if (unsolved_variables, summa-sum_of_solved_vars) not in self.numberOfVariables_to_equations[len(unsolved_variables)]:      # TO-DO: why is there a key error occasionally? I had to comment this out. Of course, technically this is a redundant check, since we're adding to a set, but the check would be useful for showing the logic AND useful for debugging
-            self.variables_and_sum_to_ADD_to_self_numberOfVariables_to_equations_after_iteration.add((unsolved_variables, original_summa-sum_of_solved_vars))
-                #self.numberOfVariables_to_equations[len(unsolved_variables)].add((unsolved_variables, summa-sum_of_solved_vars))
+            if (unsolved_variables, original_summa-sum_of_solved_vars) not in self.numberOfVariables_to_equations[len(unsolved_variables)]:      # technically this is a redundant check, since we're adding to a set, but the check is useful for showing the logic AND useful for debugging
+                self.variables_and_sum_to_ADD_to_self_numberOfVariables_to_equations_after_iteration.add((unsolved_variables, original_summa-sum_of_solved_vars))
             x = y = -1                                                                          # if information from already solved variables has been used to simplify equation, then this equation no longer has defnitivie single (x,y) origin from the minesweeper map; hence, mark it as (-1,-1).
         return [x, y, unsolved_variables, original_summa-sum_of_solved_vars]
      
@@ -77,6 +76,7 @@ class CSP_solver:
                 self.numberOfVariables_to_equations[len(variables)].remove((variables, summa))  # to-do: without this check, key error sometimes without the check, unexpectedly. Figure out why
         self.variables_and_sum_to_DELETE_from_self_numberOfVariables_to_equations_after_iteration.clear()
 
+        # THESE CHECKS BELOW ARE NEEDED! TO-DO: it's unclear to me at this point, why equations with lengths 1 or sums 0 survive this far, not detected earlier, but anyways, these checks are necessary at the moment.
         mark_these_as_solved_after_iteration = []                                               # (var, value). NB! I had to create this list again so that I don't run into the 'Set changed size during iteration' error. Ironically, this whole function was created to prevent that from happening!
         for variables, summa in self.variables_and_sum_to_ADD_to_self_numberOfVariables_to_equations_after_iteration:
             if summa == 0:                                                                      # for example, variables = (a,d), summa = 0 -> this means that a = 0, and d = 0
@@ -178,7 +178,6 @@ if __name__ == '__main__':
                 print("- solved a new variable!", variable , "=", value)
         else:
             print("- solved a new variable!", csp.solved_variables[0] , "=", csp.solved_variables[1])
-
 
     '''                                             answer (which is printed also): 
     Example: solving                                a = 0
