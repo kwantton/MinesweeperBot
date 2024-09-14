@@ -51,34 +51,34 @@ class CSP_solver:
 
     # this is used in (1) 'self.add_equations_if_new()' and in (2) 'self.factor_one_solve()' (3) 'self.update_info_after_solving_new_variable'; (1) do not add 'new' equations that have been already (partially) solved; that is, take into account the fact that some variables have been solved already (2) TO-DO
     # (1) in all equations where solved variables exist, reduce for solved variables (2) update the reduced form to 'self.unique_equations' (3) update to 'self.numberOfVariables_to_equations' (4) others? TO-DO, CHECK!
-    def update_equation(self, equation:tuple) -> None:                                   # equation = ( (var1, var2, ...), sum_of_variables). There's no origin (x,y) here, because all of those are unique, and irrelevant here!
-        x, y, variables, summa = equation
-        unsolved_variables, sum_of_solved_vars = self.filter_out_solved_variables(variables)
-        if len(unsolved_variables) != len(variables):                                           # if one or more variables in 'variables' had indeed been solved already, then we need to update all related information: (1) 'self.unique_equations', (2) 'self.numberOfVariables_to_equations', (3) DONE AT THE END OF 'factor_one_solve': 'self.variable_to_equations'. Otherwise 'factor_one_solve' will have old info and will not work.
-            if (variables, summa) in self.unique_equations:
-                self.unique_equations.remove((variables, summa))
-            if len(variables) in self.numberOfVariables_to_equations:
-                if (variables, summa) in self.numberOfVariables_to_equations[len(variables)]:
-                    self.variables_and_sum_to_DELETE_from_self_numberOfVariables_to_equations_after_iteration.add((variables, summa))
+    def update_equation(self, equation:tuple) -> None:                                      # equation = ( (var1, var2, ...), sum_of_variables). There's no origin (x,y) here, because all of those are unique, and irrelevant here!
+        x, y, original_vars, original_summa = equation
+        unsolved_variables, sum_of_solved_vars = self.filter_out_solved_variables(original_vars)
+        if len(unsolved_variables) != len(original_vars):                                   # True, if one or more variables in 'original_vars' had indeed been solved already; in that case we need to update all related information: (1) 'self.unique_equations', (2) 'self.numberOfVariables_to_equations', (3) DONE AT THE END OF 'factor_one_solve': 'self.variable_to_equations'. Otherwise 'factor_one_solve' will have old info and will not work.
+            if (original_vars, original_summa) in self.unique_equations:
+                self.unique_equations.remove((original_vars, original_summa))
+            if len(original_vars) in self.numberOfVariables_to_equations:
+                if (original_vars, original_summa) in self.numberOfVariables_to_equations[len(original_vars)]:
+                    self.variables_and_sum_to_DELETE_from_self_numberOfVariables_to_equations_after_iteration.add((original_vars, original_summa))
             
             if len(unsolved_variables) == 1:
-                self.solved_variables.add((unsolved_variables[0], summa-sum_of_solved_vars))
+                self.solved_variables.add((unsolved_variables[0], original_summa-sum_of_solved_vars))
             else:
-                self.unique_equations.add((unsolved_variables, summa-sum_of_solved_vars))
+                self.unique_equations.add((unsolved_variables, original_summa-sum_of_solved_vars))
             
             # if (unsolved_variables, summa-sum_of_solved_vars) not in self.numberOfVariables_to_equations[len(unsolved_variables)]:      # TO-DO: why is there a key error occasionally? I had to comment this out. Of course, technically this is a redundant check, since we're adding to a set, but the check would be useful for showing the logic AND useful for debugging
-            self.variables_and_sum_to_ADD_to_self_numberOfVariables_to_equations_after_iteration.add((unsolved_variables, summa-sum_of_solved_vars))
+            self.variables_and_sum_to_ADD_to_self_numberOfVariables_to_equations_after_iteration.add((unsolved_variables, original_summa-sum_of_solved_vars))
                 #self.numberOfVariables_to_equations[len(unsolved_variables)].add((unsolved_variables, summa-sum_of_solved_vars))
             x = y = -1                                                                          # if information from already solved variables has been used to simplify equation, then this equation no longer has defnitivie single (x,y) origin from the minesweeper map; hence, mark it as (-1,-1).
-        return [x, y, unsolved_variables, summa-sum_of_solved_vars]
+        return [x, y, unsolved_variables, original_summa-sum_of_solved_vars]
      
-    def modify_iterables_after_iteration(self):                                                 
+    def modify_iterables_after_iterations_in_factor_one(self):                                                 
         for variables, summa in self.variables_and_sum_to_DELETE_from_self_numberOfVariables_to_equations_after_iteration:
             if (variables, summa) in self.numberOfVariables_to_equations[len(variables)]:
-                self.numberOfVariables_to_equations[len(variables)].remove((variables, summa))      # TO-DO: key error sometimes, unexpectedly. Figure out why
+                self.numberOfVariables_to_equations[len(variables)].remove((variables, summa))  # to-do: without this check, key error sometimes without the check, unexpectedly. Figure out why
         self.variables_and_sum_to_DELETE_from_self_numberOfVariables_to_equations_after_iteration.clear()
 
-        mark_these_as_solved_after_iteration = []                                               # (var, value)
+        mark_these_as_solved_after_iteration = []                                               # (var, value). NB! I had to create this list again so that I don't run into the 'Set changed size during iteration' error. Ironically, this whole function was created to prevent that from happening!
         for variables, summa in self.variables_and_sum_to_ADD_to_self_numberOfVariables_to_equations_after_iteration:
             if summa == 0:                                                                      # for example, variables = (a,d), summa = 0 -> this means that a = 0, and d = 0
                 for var in variables:
@@ -107,7 +107,7 @@ class CSP_solver:
     def factor_one_binary_solve(self, how_many_rounds=1):                                  # 'factor_one' here means that each variable has a factor of exactly one (or, to be exact, zero when it's not present), no more, for this solver (e.g. a+b+c=2, never a+2b+c=2 for example, since each minesweeper map cell has exactly one of each neighbour). This should be enough; there should not be a need to sum equations in my case!
         print('factor_one_solve():')
         equations_to_add = []                                                           # TO-DO: I'm adding also those of size 1 here, unnecessarily, as those already go to 'self.solved_variables'. The reason for gathering these: These will have to wait for loop ending, otherwise 'Set changed size during iteration'
-        subtractions_done = False                                                       # if no subtractions are done, it means that there are no different-sized equations that share a subset of variables (e.g., there's no pair a+b=1 and a+b+c=2)
+        subtractions_done = False                                                       # if no subtractions are done, it means that there are no different-sized equations that share a subset of variables (e.g., there's no pair a+b=1 and a+b+c=2, so that the shorter equation could be subtracted from the longer equation)
         for s in range(1, 8+1):                                                         # 's' means short. # Why up to 8? Because a single '1' cell, resulting from a forced guess, can have 8 neighbours; some of these neighbours can be shared with other cells in case of a compulsory guess having been made (the lonely '1' in the middle would be the guess then, obviously).
             short_equations = self.numberOfVariables_to_equations[s]                    # gets all equations with 's' number of variables, 'shorty_vars' below
             for shorty in short_equations:
@@ -138,22 +138,26 @@ class CSP_solver:
                                             new_solutions.append((var, 0))
                                 for new_solution in new_solutions:                      # [ ((x1,y1), 1), ((x2,y2), 0), ...]
                                     self.mark_var_as_solved_and_update_related_info(new_solution)  # TO-DO: should I also solve 'b' during this 1st round, or later?
-        self.modify_iterables_after_iteration()                                         # this is for modifying all those variables that are part of 'self.numberOfVariables_to_equations' or other targets of iteration loops above, and which thus could not be removed during iterations above without causing an error
+        self.modify_iterables_after_iterations_in_factor_one()                          # this is for modifying all those variables that are part of 'self.numberOfVariables_to_equations' or other targets of iteration loops above, and which thus could not be removed during iterations above without causing an error
         self.add_equations_if_new(equations_to_add)                                     # these were gathered in a list, because 'self.numberOfVariables_to_equations' can't be changed during its iteration
         
-        # TO-DO: the functions above have to be performed BEFORE the section below, or half of the variables will remain unsolved
+        # TO-DO: the two functions right above have to be performed BEFORE the section below, or half of the variables will remain unsolved
         if not subtractions_done:                                                       # possible cases: (1) all equations were of equal length , (2) they don't share common variables -> can't be solved without guessing
             sum_zeros = False
+            eqs_to_update = []
             for variables, summa in self.unique_equations:
                 if summa == 0:
                     sum_zeros = True
                     for var in variables:
-                        self.solved_variables.add((var, 0))                             # TO-DO: I can't use 'mark_var_as_solved_and_update_related_info' or it will cause RuntimeError 'Set changed size during iteration'
+                        self.solved_variables.add((var, 0))                             # I can't use 'mark_var_as_solved_and_update_related_info()' here or it will cause RuntimeError 'Set changed size during iteration'. Instead, I have to just add the variable to 'self.solved_variables' and gather a list of the equations to update, which I can update AFTER this loop. The reason for the error is that one functionality of 'self.update_equations(equation)' is to update 'self.unique_equations', which here is being iterated over.
+                        for eq in self.variable_to_equations[var]:                    
+                            eqs_to_update.append((-1,-1,eq[0],eq[1]))                   # This list exists to avoid RuntimeError 'Set changed size during iteration'
+                        #     self.update_equation((-1,-1, eq[0], eq[1]))
+            if sum_zeros:
+                for eq in eqs_to_update:
+                    self.update_equation(eq)
             if not sum_zeros:
-                
                 pass # forced guess. TO-DO; handle this here and/or in 'botGame.py'. Possibly will be implemented in 'botGame.py', because 'CSP_solver.py' doesn't (currently at least) have information about unclicked cell locations
-
-        
         if how_many_rounds > 1:
             self.factor_one_binary_solve(how_many_rounds-1)
 
@@ -163,7 +167,7 @@ class CSP_solver:
         if solved_var in self.variable_to_equations:
             equations_with_the_var = self.variable_to_equations[solved_var]
             for variables, value in equations_with_the_var:
-                self.update_equation((-1,-1, (variables), value))
+                self.update_equation((-1,-1, (variables), value))                       # this updates all equations with the newly solved variable, for example if a=1 was solved, then for a+b+e=2 -> b+e=1, etc.
             self.variable_to_equations[solved_var] = set()                              # now that all info regarding this solved variable and the equations containing this solved variable has been updated, I can empty the set of equations containing this variable (i.e., they no longer should contain this variable, as its value has been set as 0 or 1 in those equations)
 
 def format_equation_for_csp_solver(x:int, y:int, variables:tuple, surrounding_mine_count:int) -> list:
@@ -208,7 +212,7 @@ if __name__ == '__main__':
     a + d = 0
     d + e = 1
     d + e = 1
-    TO-DO: why doesn't this provide solutions?
+    TO-DO: it only gets a = 0, d = 0, but nothing after that. Fix the check commencing so that also the others are added to 'self.solved_variables' right away.
     '''
     eq1 = [0, 1, ('a', 'b'), 1]
     eq2 = [1, 1, ('a', 'd'), 0]
