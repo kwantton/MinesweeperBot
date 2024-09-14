@@ -2,7 +2,7 @@ import pygame
 from random import sample
 from constraint import Problem                          # this can be used to solve groups of CSP-equations (CSP = constraint satisfaction problem)
 from CSP_solver import CSP_solver, format_equation_for_csp_solver
-from cell_id_names import flag, unclicked, mine, safe, labellize, read_number
+from cell_id_names import flag, unclicked, mine, safe, labellize, read_number_from_label
 
 # cell = a clickable square of the minesweeper map, 'ruutu'. 'Label' = the id of a cell, like '0' or 'flag'.
 class Minesweeper:
@@ -11,6 +11,7 @@ class Minesweeper:
         pygame.display.set_caption('MINESWEEPER')
         self.cells_to_open = width*height - mines
         
+        # NB! Put here ONLY those that are not reset at every 'new_game()'
         self.mines = mines
         self.width = width
         self.cell_size = 50                             # how many px in height and width should each cell be?
@@ -18,7 +19,6 @@ class Minesweeper:
         self.height = height                            # map height measured in in rows
         self.infobar_height = 100                       # pixels for the infobar above the minesweeper map
         self.debug_csp = debug_csp
-        self.obsolete_front = set()                     # after each legitimate chording, and after entering a new previously unprobed cell if it has no neighbours
         self.clock = pygame.time.Clock()
         self.initialize_debug_features()
         self.font = pygame.font.Font(None, 36)
@@ -38,10 +38,12 @@ class Minesweeper:
         self.show_mines = False
         self.highlight_front = False                                                # 'front' cells = number-labeled cells that neighbour unsolved cells, i.e. cells in x € {1,2,...8} that do not have x flags marked around them. When this is 'True', it draws a yellow rectangle around each such cell.
         self.highlight_bot_location = False
+        self.highlight_obsolete_front = False
         self.highlight_csp_solved = self.debug_csp
         self.instructions = '''
         b : bot move
         f : front highlighting
+        o : obsolete front highlighting
         c : highlight csp-solved cells
         l : bot start location
         spacebar : new game
@@ -61,7 +63,7 @@ class Minesweeper:
         self.start_x = 0
         self.start_y = 0
         self.front = set()                  # cells that are not finished
-        self.inner = set()                  # cells that are not finished and are not neighboured by any opened cells (i.e., are not 'seen' by any opened cells)
+        self.inner = set()                  # cells that are not finished and are not neighboured by any opened cells (i.e., are not 'seen' by any opened cells). TO-DO; I haven't touched these yet; these come into play when I start handling guesses
         self.opened = set()                 # all thus-far opened cells {(x0,y0), (x1,y1),...}, updated when new cells are opened
 
         self.started = False                # the mines will be placed AFTER the first click, as in real minesweeper. Otherwise you could lose on the first click. For that, we need to keep track on if the first click has already commenced or not.
@@ -74,6 +76,7 @@ class Minesweeper:
         self.hit_a_mine = False
         self.timer_active = False
         self.solver = CSP_solver()
+        self.obsolete_front = set()         # after each legitimate chording, and after entering a new previously unprobed cell if it has no neighbours
         self.new_front_members = set()
         
         self.minecount = self.mines
@@ -89,6 +92,8 @@ class Minesweeper:
                 self.bot_act()                                                      # the bot makes a move when you press b
             elif event.key == pygame.K_f:
                 self.highlight_front = not self.highlight_front                     # toggle debug; highlighting the frontline (rintama) of not-yet-solved portion of the map, on/off toggle
+            elif event.key == pygame.K_o:
+                self.highlight_obsolete_front = not self.highlight_obsolete_front   # good for debugging, however note: you should NOT see anything! If somethign is in self.obsolete_front, it is immediately removed at the end of that round -> nothing to be seen any longer.
             elif event.key == pygame.K_l:
                 self.highlight_bot_location = not self.highlight_bot_location       # toggle debug: highlighting the bot 'location' on/off toggle
             elif event.key == pygame.K_m:
@@ -125,7 +130,7 @@ class Minesweeper:
         self.timer_active = True
         self.generate_map(x, y)
         self.probe(x, y, primary=True)
-
+    
     # based on the coordinates of the first clicked cell (mouse_x, mouse_y), place the mines elsewhere
     def generate_map(self, mouse_x:int, mouse_y:int) -> None:
         print('\ngenerate_map()')
@@ -161,6 +166,8 @@ class Minesweeper:
         label = self.map[y][x]
         if label == labellize(n_surrounding_flags):
             self.handle_chord(x, y)
+        else:
+            pass
 
     # TO-DO: not caused by this function as such, but there's a problem in the csp-solver causing some of flagged tiles and mine-containing cells to be handled through this function, as they are falsely labelled as 0 instead of as 1 by the CSP-solver. A quick patch would be to check HERE if label=flag, and return if true, but that's obviously not a real solution.
     def handle_opening_a_new_cell(self, x:int, y:int) -> None:                  # ALL NEW CELL OPENINGS GO HERE, doesn't matter how the cell was opened (player/bot/single click/chord)
@@ -173,10 +180,10 @@ class Minesweeper:
             if neighbour in self.mine_locations:                                # NB! 'self.mine_locations' is the set of ACTUAL mine locations, so this is correct
                 surrounding_mines += 1
         self.map[y][x] = labellize(surrounding_mines)
-        if surrounding_mines == 0:                                              # the idea is that cells with label '0' are never in 'self.front', as they provide no information that's useful for solving the remaining map (they are the 2nd- or higher order neighbours of unsolved cells)
-            self.obsolete_front.add((x,y))
+        if surrounding_mines == 0:
+            self.obsolete_front.add((x,y))                                      # the idea is that cells with label '0' are never in 'self.front', as they provide no information that's useful for solving the remaining map (they are the 2nd- or higher order neighbours of unsolved cells)
             for neighbour in neighbours:
-                self.probe(neighbour[0], neighbour[1], primary=True)
+                self.probe(neighbour[0], neighbour[1], primary=True)            # this is normal minesweeper; whenever a 0 is clicked, all the neighbouring 0s, AND each of the neighours of each 0 are opened as well (i.e., the 0-front stops at numbers 1,2,...8). However, I can't know how many of the neighbours have already been opened, flagged, etc, so 'self.probe()' is the function to use, as it does the sorting automatically
         else:
             # self.front.add((x,y))                                             # bookkeeping of the current frontline (rintama) of not-yet-solved parts of the map
             self.new_front_members.add((x,y))                                   # In the bot version, I can't directly do this because 'self.front' is being iterated through; you can't add new members to the iterated set during iteration, so I'm gathering the new members here to be added AFTER each entire run-through of 'self.front'
@@ -250,18 +257,29 @@ class Minesweeper:
                 for member in self.new_front_members:
                     self.front.add(member)
                 self.new_front_members.clear()                                              # now that they are added, reset this list for the next round of bot_act()
+            
+            # CSP-solver is giving me trouble. This function is for ensuring that there DEFINITELY are no obsolete front cells in self.front any longer, as that has been my problem for 2 days now.
+            def filter_front_cells():
+                for x,y in self.front:
+                    neighbours = self.get_neighbours_of(x, y)
+                    n_unclicked_unflagged_neighbours = self.count_cells_of_type(unclicked, neighbours)
+                    if n_unclicked_unflagged_neighbours == 0:
+                        if (x,y) in self.front:
+                            self.obsolete_front.add((x,y))
+                update_front()
     
             # this function's "for x,y in self.front" loop finds SIMPLE non-CSP solutions: (1) where the number of neighbouring unflagged unclicked cells + flagged cells equals to the label -> flag all, and (2) if label = number of surrounding flags, then perform a chord. Then, I remove unnecessary cells from the front to cut unnecessary computing work for the linear equation CSP solver.
             def simple_solver() -> None:    
                 for x,y in self.front:
                     label = self.map[y][x]    
-                    neighbours = self.get_neighbours_of(x,y)                                # self.bot_x and self.bot_y had been initially set in self.handle_first_left_click as the x (column number) and y (row number) of the first click
-                    unflagged_unclicked_neighbours = self.get_cells_of_type(unclicked, neighbours)              # this is indeed 'unclicked unflagged neighbours', since label 'unclicked' means exactly that; the picture for 'unclicked' is an unprobed cell. A big confusing perhaps, I know.
+                    neighbours = self.get_neighbours_of(x,y)                                                    # self.bot_x and self.bot_y had been initially set in self.handle_first_left_click as the x (column number) and y (row number) of the first click
                     number_of_surrounding_flags = self.count_cells_of_type(flag, neighbours)
+                    unflagged_unclicked_neighbours = self.get_cells_of_type(unclicked, neighbours)              # this is indeed 'unclicked unflagged neighbours', since label 'unclicked' means exactly that; the picture for 'unclicked' is an unprobed cell. A big confusing perhaps, I know.
                     
                     if label == labellize(len(unflagged_unclicked_neighbours) + number_of_surrounding_flags):   # If the number of surrounding ('unclicked' + 'flag') cells equals to the label of the front cell in question (for example, 1 flagged + 2 unclicked = 3 = the label of the cell),
                         flag_these(unflagged_unclicked_neighbours)                          # then flag the remaining unflagged cells around the front cell in question (flag the remaining 2 unclicked cells in this example case).
                         self.obsolete_front.add((x,y))                                      # if all neighbours have been flagged, then this cell no longer provides information that would be usable for solving the rest of the map -> remove this cell from 'self.front'
+                    # At this point, I could update the 'number_of_surrounding_flags' again, since I just placed new flags above (potentially); if I updated the number of surrounding flags at this point, there would be a chance for the 'if' clause below to perform a chord. However, it's much better and clearer to proceed one step at a time; it helps in debugging, and ... simply looks much nicer when looking at the bot doing its job one small step at a time.
                     if label == labellize(number_of_surrounding_flags):                     # NB! 'if', not 'elif'. If the number of flagged neighbours equals to the label of the current front cell,
                         if len(unflagged_unclicked_neighbours) >= 1:                        # then if there also are unclicked cells around the current front cell,
                             self.handle_chord(x,y)                                          # then open all of them (i.e. 'chord' at the front cell).
@@ -277,7 +295,7 @@ class Minesweeper:
             def feed_csp_solver():
                 csp_solver_input = []                                                       # a list of lists; [ [x, y, ('var_a', 'var_b', 'var_c', ...), label_of_cell], [...], ...]; each inner list represents a set of (1) (x,y), (2) variables to try to solve (cells, which can have value 0 or 1), (3) the total number of mines (sum) of those variables
                 for x,y in self.front:
-                    surrounding_mine_count = read_number(self.map[y][x])                    # all 'self.front' cells have number labels, number = 1,...8 (not 0). It cannot be 0, since we just removed those cells from 'self.front' in the 'for...' loop above
+                    surrounding_mine_count = read_number_from_label(self.map[y][x])                    # all 'self.front' cells have number labels, number = 1,...8 (not 0). It cannot be 0, since we just removed those cells from 'self.front' in the 'for...' loop above
                     neighbours = self.get_neighbours_of(x,y)
                     unflagged_unclicked_neighbours = self.get_cells_of_type(unclicked, neighbours)
                     csp_solver_input_addition = format_equation_for_csp_solver(x, y, unflagged_unclicked_neighbours, surrounding_mine_count)    
@@ -301,7 +319,7 @@ class Minesweeper:
                     elif value == 0:                            # TO-DO: some are mislabeled as 0 -> many problems. CSP is broken still
                         self.handle_opening_a_new_cell(x, y)    # NB! 'handle_opening_a_new_cell' adds new front members to 'self.new_front_members', NOT yet to self.front, to avoid 'Set changed size during iteration', since 'handle_opening_a_new_cell' was originally used in 'simple_solver' which iterates over 'self.front' and thus cannot directly modify 'self.front' while iterating over it without causing the error.
                         # TO-DO; now, via utilizing handle_opening_a_new_cell, obsolete front should be added from there correctly.
-                        update_front()
+                    filter_front_cells()
                 # print('- solved_vars:', solved_vars)
             
             if self.csp_on:
@@ -365,6 +383,11 @@ class Minesweeper:
             surface = transparent_highlight_surface(255,255,0,128)
             for x,y in self.front:
                 self.screen.blit(surface, (x*self.cell_size, y*self.cell_size + self.infobar_height))
+
+        def highlight_obsolete_front_grey() -> None:
+            surface = transparent_highlight_surface(0,0,0,128)
+            for x,y in self.obsolete_front:
+                self.screen.blit(surface, ((x*self.cell_size, y*self.cell_size + self.infobar_height)))
         
         def highlight_bot_blue() -> None:
             surface = transparent_highlight_surface(0,0,255,128)
