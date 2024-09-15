@@ -19,9 +19,9 @@ done:
 class CSP_solver:
     def __init__(self):
 
-        self.variables = set()                              # all variables.
+        self.variables = set()                              # all variables, which are in format (x,y) per variable (when talking about minesweeper variables, that is; also other formats are ok, such as letters 'a', etc.)
         self.unique_equations = set()                       # { ((var1, var2, ..), sum_of_mines_in_vars), (...) }. Each var (variable) has format (x,y) of that cell's location; cell with a number label 1...8 = var. Here, I want uniqe EQUATIONS, not unique LOCATIONS, and therefore origin-(x,y) is not stored here. It's possible to get the same equation for example from two different sides, and via multiple different calculation routes, and it's of course possible to mistakenly try to add the same equation multiple times; that's another reason to use a set() here, the main reason being fast search from this hashed set.        
-        self.solved_variables = set()                       # ((x,y), value)
+        self.solved_variables = set()                       # ((x,y), value); the name of the variable is (x,y) where x and y are its location in the minesweeper map (if applicable), and the value of the variable is either 0 or 1, if everything is ok (each variable is one cell in the minesweeper map, and its value is the number of mines in the cell; 0 or 1, that is)
         self.variable_to_equations = dict()                 # { variable_a : set(equation5, equation12, equation4,...), variable_b : set(equation3, equation4...)}
         self.numberOfVariables_to_equations = {             # { numberOfVariables : set(equation1, equation2, ...) }; each key of this dict is integer x, and x's values are all equations with x number of variables. I want to look at those equations with low number of variables, and see for each of those variables if they can be found in equations with more variables; if all the variables in the shorter equation are found in the longer equation, then perform subtraction to get rid of those varibles in the longer equation (linear equation solving), then save the formed result equation to 'self.unique_equations' and 'self.numberOfVariables_to_equations'.
             x:set() for x in range(0, 8+1)                  # Why up to 8? Because a single '1' cell, resulting from a forced guess in the middle of unclicked cells, has 8 neighbours, hence 8 variables in the equation for that '1' cell; some of these neighbours can be shared with other cells in case of a compulsory guess having been made (the lonely '1' in the middle would be the guess then, obviously). NB! It's possible that when all variables in a given equation have just been solved, all are canceled out, and at that point the length of the equation (i.e. the number of variables) becomes 0; that's why I'm starting from 0.
@@ -64,6 +64,9 @@ class CSP_solver:
             if len(unsolved_variables) == 1:
                 # if original_summa-sum_of_solved_vars >= 0: # TO-DO: why does it sometimes add negative values, when used from 'botGame.py'?
                 self.solved_variables.add((unsolved_variables[0], original_summa-sum_of_solved_vars))
+            elif len(unsolved_variables) == original_summa-sum_of_solved_vars:
+                for var in unsolved_variables:
+                    self.solved_variables.add((var, 1))
             else:
                 self.unique_equations.add((unsolved_variables, original_summa-sum_of_solved_vars))
             
@@ -87,6 +90,9 @@ class CSP_solver:
                         mark_these_as_solved_after_iteration.append((var,0))
             elif len(variables) == 1:                                                           # TO-DO: check if this case ever happens here (is this line needed here)
                 mark_these_as_solved_after_iteration.append((variables[0], summa))
+            elif len(variables) == summa:
+                for var in variables:
+                    self.solved_variables.add((var, 1))
             else:                                                                               # we don't want equations like (('a','d'),0), as they would just cause more work in the 'self.factor_one_solve', as they provide no new information during subtractions with other equations
                 self.numberOfVariables_to_equations[len(variables)].add((variables, summa))      
         self.variables_and_sum_to_ADD_to_self_numberOfVariables_to_equations_after_iteration.clear()
@@ -104,9 +110,9 @@ class CSP_solver:
                 sum_of_solved_vars += 1
         return tuple(unsolved_vars), sum_of_solved_vars                                 # you can't hash sets or lists (not immutable), hence a tuple is returned instead for 'unsolved_vars'. Hashing of 'unsolved_variables' is needed in 'add_equations' from where this function is used.
     
-    # NB! the 'how_many_rounds=1' is arbitrary, and is fun for testing (has never proven to solve anything extra, though, when higher than 1!). In 'botGame.py' I am calling one 'bot_move' per one press of key 'b' by the person running the program, and a part of each of these 'bot_move's is this 'factor_one_solve()' here. Therefore, for visualization and debugging purposes, I want to make it possible to advance one small step at a time; that's why I have the 'rounds=1' set by default. Also, performance-wise, there is no obvious way to tell if performing one or multiple of these rounds in a row is faster or not (on average; this depends on so many things, including the map itself!) without considering first if the simpler logic in 'bot_move' before this 'CSP_solver' has anything more to offer before this 'CSP_solver' is performed or not; so performance-wise, it's a bit of a (micro)mystery, at least yet, whether one should let this run for a longer time or not by default.
+    # NB! the 'how_many_rounds=1' is arbitrary, and is illustrative for testing (why: because it has never solved more variables after multiple rounds than after just 1 round! Adding rounds doesn't affect the result.). In 'botGame.py' I am calling one 'bot_move' per one press of key 'b' by the person running the program, and a part of each of these 'bot_move's is this 'factor_one_solve()' here. Therefore, for visualization and debugging purposes, I want to make it possible to advance one small step at a time; that's why I have the 'rounds=1' set by default. Also, performance-wise, there is no obvious way to tell if performing one or multiple of these rounds in a row is faster or not (on average; this depends on so many things, including the map itself!) without considering first if the simpler logic in 'bot_move' before this 'CSP_solver' has anything more to offer before this 'CSP_solver' is performed or not; so performance-wise, it's a bit of a (micro)mystery, at least yet, whether one should let this run for a longer time or not by default.
     def factor_one_binary_solve(self, how_many_rounds=1):                               # 'factor_one' here means that each variable has a factor of exactly one (or, to be exact, zero when it's not present), no more, for this solver (e.g. a+b+c=2, never a+2b+c=2 for example, since each minesweeper map cell has exactly one of each neighbour). This should be enough; there should not be a need to sum equations in my case!
-        print('factor_one_solve():')
+        # print('factor_one_solve():')
         equations_to_check_for_found_solutions = []
         subtractions_done = False                                                       # if no subtractions are done, it means that there are no different-sized equations that share a subset of variables (e.g., there's no pair a+b=1 and a+b+c=2, so that the shorter equation could be subtracted from the longer equation)
         for s in range(1, 8+1):                                                         # 's' means short. # Why up to 8? Because a single '1' cell, resulting from a forced guess, can have 8 neighbours; some of these neighbours can be shared with other cells in case of a compulsory guess having been made (the lonely '1' in the middle would be the guess then, obviously).
@@ -148,6 +154,9 @@ class CSP_solver:
             elif len(variables) == 1:
                 new_solutions.append((variables[0], summa))
                 found_solutions = True
+            elif len(variables) == summa:
+                for var in variables:
+                    self.solved_variables.add((var, 1))
             else:
                 if (variables, summa) not in self.unique_equations:                     # if the equation is longer than 1 (e.g. if 'its a+b=1) and not =0 (not a+b=0), and if it's not already in 'self.unique_equations', then add it to 'self.unique_equations'
                     equations_to_add.append((-1, -1, variables, summa))                 # why (-1, -1) is included in front (it's (x,y)): because 'add_equations_if_new()' will feed the equations to 'update_equations' which takes this format. Also, this (-1,-1) means that it's not an original equation originating from a single cell on the map; it means that this equation is the result of a calculation (no matter how simple the calculation is)
@@ -168,25 +177,31 @@ class CSP_solver:
             self.variable_to_equations[solved_var] = set()                              # now that all info regarding this solved variable and the equations containing this solved variable has been updated, I can empty the set of equations containing this variable (i.e., they no longer should contain this variable, as its value has been set as 0 or 1 in those equations)
 
 def format_equation_for_csp_solver(x:int, y:int, variables:tuple, surrounding_mine_count:int) -> list:
-    # NB! 'variables' has to be a tuple OR something that can be converted to a tuple; so 
-    variables = tuple(coordinate_tuple for coordinate_tuple in variables)  # if there's a cell with (x,y) = (4,5) in self.front, then the variable name shall be '(4,5)'. Simple and effective. The constraint for each variable is [0,1], meaning that the solution for each variable has to be 0 or 1.
+    # NB! 'variables' has to be a tuple OR something that can be converted to a tuple
+    variables = tuple(variables)  # if there's a cell with (x,y) = (4,5) in self.front, then the variable name shall be '(4,5)'. Simple and effective. The constraint for each variable is [0,1], meaning that the solution for each variable has to be 0 or 1.
     input_addition = [x, y, variables, surrounding_mine_count]
     return input_addition
 
 if __name__ == '__main__':
     
-    def print_solved_variables(csp:CSP_solver, name='random test') -> None:
-        print(f'Solving "{name}"')
-        if len(csp.solved_variables) > 1:
+    def print_solved_variables(csp:CSP_solver, name='random test', expected_result='') -> None:
+        print(f'\nSolving "{name}"')
+        concat = ''
+        if len(csp.solved_variables) >= 1:
             for variable, value in sorted(csp.solved_variables):
                 print("- solved a new variable!", variable , "=", value)
+                concat += str(value)
+        elif len(csp.solved_variables) == 0:
+            print('- NO SOLVED VARIABLES!')
+        if concat == expected_result:
+            print('test passed!')
         else:
-            print("- solved a new variable!", csp.solved_variables[0] , "=", csp.solved_variables[1])
+            print('TEST FAILED')
 
 
-    ################################# Test 1 ##########################################
+    ################################# Test 1a (using letters instead of (x,y) format for variables) ##########################################
 
-    '''                                             answer (which is printed also): 
+    '''                                             answer (printed also): 
     Example: solving                                a = 0
     a + b = 1                                       b = 1
     a + c + d = 1                                   c = 1
@@ -202,9 +217,34 @@ if __name__ == '__main__':
     csp = CSP_solver()
     csp.add_equations_if_new([eq1, eq2, eq3, eq4])
     csp.factor_one_binary_solve()                           # PRINT: see answer above in orange
-    print_solved_variables(csp, 'test 1')
+    print_solved_variables(csp, 'test 1a: letters. 01101 expected:', '01101')
 
-    ############################## Test 2 #############################################
+    ############################ Test 1b: same as 1a, but using (x,y) format for variables instead of letters ############################################
+    
+    ###### a minesweeper map, where X means 'unclicked' cell, * is a 'mine' cell (not seen by the player), and 1 is '1' cell, 2 is '2' cell. Every # is edge of the map, essentially means nothing
+    #X*X*#
+    #1121#
+    ######
+    
+    # the above map is described by these inputs that are used as input for 'add_equations'
+    c01 = [0, 1, ((0,0), (0,1)), 1]                         # 'c01' means 'cell x=0 y=1'. There are 2 variables in C01, '(0,0)' and '(0,1)', and the sum of these two is 1. The variable names mean (x,y), and each variable is either 0 or 1, meaning the number of mines in that cell (x,y) of the minesweeper map.
+    c11 = [1, 1, ((0,0), (1,0), (2,0)), 1]
+    c21 = [2, 1, ((1,0), (2,0), (3,0)), 2]
+    c31 = [3, 1, ((2,0), (3,0)), 1]
+    csp = CSP_solver()
+    csp.add_equations_if_new([c01, c11, c21, c31])
+    csp.factor_one_binary_solve()
+
+    print_solved_variables(csp, 'test 1b: (x,y): 01101 expected:', '01101')
+
+    '''correct result:
+    - solved a new variable! (0, 0) = 0
+    - solved a new variable! (0, 1) = 1
+    - solved a new variable! (1, 0) = 1
+    - solved a new variable! (2, 0) = 0
+    - solved a new variable! (3, 0) = 1'''
+
+    ########################## Test 1c: will it finish a partially solved equation starting from equation format? #############################################
 
     '''from the above, as c=1 is solved, we get:'''
 
@@ -214,7 +254,7 @@ if __name__ == '__main__':
     a + d = 0
     d + e = 1
     d + e = 1
-    TO-DO: it only gets a = 0, d = 0, but nothing after that. Fix the check commencing so that also the others are added to 'self.solved_variables' right away.
+    expected: a=0, b=1, d=0, e=1
     '''
     eq1 = [0, 1, ('a', 'b'), 1]
     eq2 = [1, 1, ('a', 'd'), 0]
@@ -223,7 +263,7 @@ if __name__ == '__main__':
     csp = CSP_solver()
     csp.add_equations_if_new([eq1, eq2, eq3, eq4])
     csp.factor_one_binary_solve()                          
-    print_solved_variables(csp, 'test 2')
+    print_solved_variables(csp, 'test 1c: 0101 expected', '0101')
 
     ############################## Test 3 #############################################
     '''                                             answer (which is printed also): 
@@ -243,32 +283,51 @@ if __name__ == '__main__':
     csp = CSP_solver()
     csp.add_equations_if_new([eq1, eq2, eq3, eq4])
     csp.factor_one_binary_solve()                          
-    print_solved_variables(csp, 'test 3')
+    print_solved_variables(csp, 'test 3, 01010 expected:', '01010')
 
-    ############################ Test 4 ############################################
     
-    ###### a minesweeper map, where X means 'unclicked' cell, * is a 'mine' cell (not seen by the player), and 1 is '1' cell, 2 is '2' cell. Every # is edge of the map, essentially means nothing
+
+    ############################ Test 4a: letters ############################################
+    
+    ###### a minesweeper map, where X means 'unclicked' cell, * is a 'mine' cell (not seen by the player), and 1 is a '1' cell, 3 is a '3' cell. Every # is edge of the map, essentially means nothing
+    #001*#
+    #113X#
     #X*X*#
-    #1121#
     ######
     
     # the above map is described by these inputs that are used as input for 'add_equations'
-    c01 = [0, 1, ((0,0), (0,1)), 1]                         # 'c01' means 'cell x=0 y=1'. There are 2 variables in C01, '(0,0)' and '(0,1)', and the sum of these two is 1. The variable names mean (x,y), and each variable is either 0 or 1, meaning the number of mines in that cell (x,y) of the minesweeper map.
-    c11 = [1, 1, ((0,0), (1,0), (2,0)), 1]
-    c21 = [2, 1, ((1,0), (2,0), (3,0)), 2]
-    c31 = [3, 1, ((2,0), (3,0)), 1]
+    c01 = [0, 1, ('a', 'b'), 1]                         # 'c01' means 'cell x=0 y=1'. There are 2 variables in C01, '(0,0)' and '(0,1)', and the sum of these two is 1. The variable names mean (x,y), and each variable is either 0 or 1, meaning the number of mines in that cell (x,y) of the minesweeper map.
+    c11 = [1, 1, ('a', 'b', 'c'), 1]
+    c20 = [2, 0, ('d', 'e'), 1]
+    c21 = [2, 1, ('d', 'e', 'f', 'b'), 3]
     csp = CSP_solver()
-    csp.add_equations_if_new([c01, c11, c21, c31])
+    csp.add_equations_if_new([c01, c11, c20, c21])
+    csp.factor_one_binary_solve(1)
+
+    print_solved_variables(csp, 'test 4a: expected 0101', '0101')
+
+    '''correct result: a,c,e=0; b,f,d = 1. This requires the constraints that each is 0 or 1
+    '''
+    
+    ############################ Test 4b: (x,y) ############################################
+    
+    ###### a minesweeper map, where X means 'unclicked' cell, * is a 'mine' cell (not seen by the player), and 1 is a '1' cell, 3 is a '3' cell. Every # is edge of the map, essentially means nothing
+    #001*#
+    #113X#
+    #X*X*#
+    ######
+    
+    # the above map is described by these inputs that are used as input for 'add_equations'
+    c01 = [0, 1, ((0,2), (1,2)), 1]                         # 'c01' means 'cell x=0 y=1'. There are 2 variables in C01, '(0,0)' and '(0,1)', and the sum of these two is 1. The variable names mean (x,y), and each variable is either 0 or 1, meaning the number of mines in that cell (x,y) of the minesweeper map.
+    c11 = [1, 1, ((0,2), (1,2), (2,2)), 1]
+    c20 = [2, 0, ((3,0), (3,1)), 1]
+    c21 = [2, 1, ((3,0), (3,1), (3,2), (1,2)), 3]
+    csp = CSP_solver()
+    csp.add_equations_if_new([c01, c11, c20, c21])
     csp.factor_one_binary_solve()
 
-    print_solved_variables(csp, 'test 4')
+    print_solved_variables(csp, 'test 4b: expected 0101', '0101')
 
-    '''correct result:
-    - solved a new variable! (0, 0) = 0
-    - solved a new variable! (0, 1) = 1
-    - solved a new variable! (1, 0) = 1
-    - solved a new variable! (2, 0) = 0
-    - solved a new variable! (3, 0) = 1'''
 
 
 '''
@@ -276,7 +335,7 @@ This class is exclusively for MinesweeperBot's botGame; hence, all equations are
 
     q*a + w*b + e*c +... = k
 
-where all factors and variables ∈ N (NB: the original 'raw' equations fed into the 'CSP_solver' will never evaluate to less than 1; there would be nothing to solve in those kinds of equations, as the automatic answer would be 0 for all terms, as each term has to be 0 or 1)
+where all factors and variables ∈ N and k ∈[0,8] (NB: the original 'raw' equations fed into the 'CSP_solver' will never evaluate to less than 1; there would be nothing to solve in those kinds of equations, as the automatic answer would be 0 for all terms, as each term has to be 0 or 1)
 
 In fact, all raw equations that come straight from the minesweeper map have factors (q,w,e above) = 1, because there is one of each neighbour for each cell.
 

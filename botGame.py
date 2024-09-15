@@ -14,14 +14,14 @@ class Minesweeper:
         # NB! Put here ONLY those that are not reset at every 'new_game()'
         self.mines = mines
         self.width = width
-        self.cell_size = 50                             # how many px in height and width should each cell be?
+        self.cell_size = 50-int(0.8*height)                      # how many px in height and width should each cell be?
         self.csp_on = csp_on
         self.height = height                            # map height measured in in rows
         self.infobar_height = 100                       # pixels for the infobar above the minesweeper map
         self.debug_csp = debug_csp
         self.clock = pygame.time.Clock()
         self.initialize_debug_features()
-        self.font = pygame.font.Font(None, 36)
+        self.font = pygame.font.Font(None, 36-int(0.5*height))
         
         if mines >= width*height:
             raise ValueError(f'too many mines, max is {width*height-1} for this size')
@@ -43,9 +43,7 @@ class Minesweeper:
         self.instructions = '''
         b : bot move
         f : front highlighting
-        o : obsolete front highlighting
         c : highlight csp-solved cells
-        l : (bot) start location
         spacebar : new game
         m : show mine locations
         q: quit'''.split('\n        ')                                              # This way of writing lists is used a lot on the 'Data analysis with Python' course, it's very handy for writing longer lists quickly. This splits at each '\n        ' to form a list.
@@ -453,5 +451,5 @@ if __name__ == '__main__':
 
     # START A NEW MINESWEEPER with the ability to play the bot by pressing b
     # Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=False) # IF YOU WANT ONLY simple_solver(), which WORKS at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
-    Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=True, debug_csp=False) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
-    #           width        height       mines    
+    Minesweeper(expert[0], expert[1], expert[2], csp_on=True, debug_csp=False) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
+    #           width       height      mines    
