@@ -1,13 +1,14 @@
 1. Tehty tällä viikolla:
-- `class Minesweeper` on nyt olemassa `mapGenerator.py`:ssä. Tämä on ihmisten (hiirellä) JA BOTIN (`simple_solver`, ja halutessaan lisäksi `CSP_solver`) pelattava versio
+- `class Minesweeper` on nyt olemassa `mapGenerator.py`:ssä. Tämä on ihmisten (hiirellä) JA BOTIN (`simple_solver`-osan ja halutessaan lisäksi `CSP_solver`:in) pelattava versio
     - visuaalista käyttöliittymää käytetään näppäimillä, jotka on lueteltu itse käyttöliittymän alaosassa
-        - bottia käytetään b-näppäimellä; jos miinaharavapeli käynnistettiin esim. `Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=True)`-komennolla, tällöin botin älyllä on käytössään myös `CSP_solver`-luokka. Jos `csp_on=False`, tällöin on käytössä vain `simple_solver()`-funktio `bot_act()`-metodin `brain`-funktiossa. 
-        - HUOM! `CSP_solver`-luokka tai sen keskustelu `botGame.py`:n kanssa (?) on osin rikki vielä. Sitä voi kuitenkin käyttää, ja näkee mielenkiintoisia bugeja sitä käyttäessään, kun painaa `c`-näppäintä
+        - bottia käytetään b-näppäimellä; jos miinaharavapeli käynnistettiin esim. `Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=True)`-komennolla, tällöin botin älyllä kyseisessä beginner-mapissa on käytössään myös `CSP_solver`-luokka. Jos `csp_on=False`, tällöin on käytössä vain `simple_solver()`-funktio (`bot_act()`-metodin `brain`-funktiossa). 
+        - UPDATE 15.9: `CSP_solver`-luokka toimii, eikä enää merkkaa väärin miinoja (ongelma ratkaistu eräässä commitissa). Sitä voi nyt hyvin käyttää, ja näkee sen ratkaisemat ruudut, kun painaa `c`-näppäintä
         - `space` aloittaa uuden pelin
         - `q` lopettaa
         - `m` näyttää kaikkien miinojen todelliset sijainnit (tiedon, jota automaattisesti pelaajalla tai botilla ei ole ilman päättelyä (ja tuuria))
-        - `f` näyttää `self.front`:in (`self.front` on `set()` johon joka b-painalluksella päivittyvät etulinjan ruudut eli ne ruudut joista on päättelyssä hyötyä; kun `csp_on=False`, tämä `front`:in päivittäminen toimii täysin oikein, mutta ei yleensä toimi 1. b-painalluksen jälkeen, jos `csp_on=True` eli jos `CSP_solver` on käytössä, koska sen tekeminen on kesken.
-    - frontin päivitys CSP:tä käytettäessä ei toimi; ainoastaan pelkkää `simple_solver()`:ia käytettäessä frontin päivitys joka b-painalluksen jälkeen toimii oikein
+        - `f` näyttää `self.front`:in (`self.front` on `set()` johon joka b-painalluksella päivittyvät etulinjan ruudut eli ne ruudut joista on päättelyssä hyötyä; kun `csp_on=False`, tämä `front`:in päivittäminen toimii täysin oikein, kun taas jos `csp_on=True` eli jos `CSP_solver` on käytössä, frontin vanhojen osien poistaminen ei täysin toimi 1. b-painalluksen jälkeen (to-do).
+    - [ ] frontin päivitys CSP:tä käytettäessä ei siis täysin toimi (vanhojen frontin jäsenten poistaminen on puutteellista);
+    - [x]  pelkkää `simple_solver()`:ia käytettäessä frontin päivitys joka b-painalluksen jälkeen toimii täysin oikein ja halutusti
 
 Luokassa toimii
 - [x] mapin generointi (mielivaltainen koko, miinoja korkeintaan korkeus $\cdot$ leveys - 1) ensimmäisen klikkauksen jälkeen
@@ -22,13 +23,12 @@ HUOM! En takaa toteutuksessani minimi-3x3:n alkuavausta toisin kuin alkuperäise
 - [x] `python-constraint` toimii näköjään hyvin näiden CSP-yhtälöryhmien ratkaisussa. Voisin käyttää tätä testaamisessa sen varmistamiseen, että oma CSP_solver-luokkani toimii kaikissa tapauksissa
 
 Kesken:
-- [ ] `CSP_solver` toisinaan (ei 1. b-painalluksen jälkeen, mutta useimmiten sen jälkeen) aiheuttaa ruutujen identifioimisen väärin, eli on osittain rikki vielä
-miinaharavassa. Joskus se muuttaa ruutuja toisiksi (`handle_opening_a_new_cell()`:in kautta)
+- [ ] vanhan frontin poistaminen CSP:tä käytettäessä on jostain syystä lähes olematonta. Ainoa varsinainen tästä seuraava ongelma on turha laskenta näitä vanhoja front-ruutuja koskien.
 - [ ] vilkuiltu Becerran kandityötä, pitää lukea lisää
 2. Miten edistynyt: melko erinomaisesti, yllä asiat
     - `Minesweeper`-luokka on tehty, ja hahmottelin lineaariyhtälöitä CSP:llä ja ilman (tiedosto `/Esim_evil_1.png`).
     - `CSP_solver`-luokka
-        - [x] kolme yksikkötestiä löytyy (kolme yhtälörypästä miinaharavan kontekstissa, eli CSP-rajoitteella että jokainen solu (eli muuttuja) on joko 0 tai 1)
+        - [x] kuusi yksikkötestiä löytyy (kuusi yhtälörypästä miinaharavan kontekstissa, eli CSP-rajoitteella että jokainen solu (eli muuttuja) on joko 0 tai 1)
 3. Mitä opin:
 - [x] Tein esimerkkitilanteen (no guessing evil-peli) jossa sekä CSP:llä että ilman saatiin ratkaisu käyttäen yhtälöryhmiä
 - [x] opin siitä että ainakin joskus monimutkaisissakin tilanteissa on mahdollista saada ratkaisu sekä CSP:llä että ilman
