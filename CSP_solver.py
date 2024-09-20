@@ -46,7 +46,7 @@ class CSP_solver:
                     self.numberOfVariables_to_equations[variable_count] = set()
                 self.numberOfVariables_to_equations[variable_count].add((variables, summa)) # same format as in 'self.unique_equations'; without (x,y) that is
 
-    # this is used in (1) 'self.add_equations_if_new()' and in (2) 'self.factor_one_solve()' (3) 'self.update_info_after_solving_new_variable'; (1) do not add 'new' equations that have been already (partially) solved; that is, take into account the fact that some variables have been solved already (2) TO-DO
+    # this is used in (1) 'self.add_equations_if_new()' and in (2) 'self.factor_one_solve()' (3) 'self.update_info_after_solving_new_variable'; (1) purpose: do not add 'new' equations that have been already (partially) solved; that is, take into account the fact that some variables have been solved already (2) TO-DO writestuffhere
     # (1) in all equations where solved variables exist, reduce for solved variables (2) update the reduced form to 'self.unique_equations' (3) update to 'self.numberOfVariables_to_equations' (4) others? TO-DO, CHECK!
     def update_equation(self, equation:tuple) -> None:                                      # equation = ( (var1, var2, ...), sum_of_variables). There's no origin (x,y) here, because all of those are unique, and irrelevant here!
         x, y, original_vars, original_summa = equation
@@ -56,23 +56,23 @@ class CSP_solver:
                 self.unique_equations.remove((original_vars, original_summa))
             if len(original_vars) in self.numberOfVariables_to_equations:
                 if (original_vars, original_summa) in self.numberOfVariables_to_equations[len(original_vars)]:
-                    self.variables_and_sum_to_DELETE_from_self_numberOfVariables_to_equations_after_iteration.add((original_vars, original_summa))
+                    self.numberOfVariables_to_equations[len(original_vars)].remove((original_vars, original_summa))
+                    # self.variables_and_sum_to_DELETE_from_self_numberOfVariables_to_equations_after_iteration.add((original_vars, original_summa))
             
-            # TO-DO: sum 0 check?
             if original_summa-sum_of_solved_vars == 0:
                 for var in unsolved_variables:
-                    self.solved_variables.add((var,0))
+                    self.mark_var_as_solved_and_update_related_info((var,0))
             if len(unsolved_variables) == 1:
-                # if original_summa-sum_of_solved_vars >= 0: # TO-DO: why does it sometimes add negative values, when used from 'botGame.py'?
-                self.solved_variables.add((unsolved_variables[0], original_summa-sum_of_solved_vars))
+                self.mark_var_as_solved_and_update_related_info((unsolved_variables[0], original_summa-sum_of_solved_vars))
             elif len(unsolved_variables) == original_summa-sum_of_solved_vars:
                 for var in unsolved_variables:
-                    self.solved_variables.add((var, 1))
+                    self.mark_var_as_solved_and_update_related_info((var,1))
             else:
-                self.unique_equations.add((unsolved_variables, original_summa-sum_of_solved_vars))
+                self.unique_equations.add((unsolved_variables, original_summa-sum_of_solved_vars))  # why 'else': we don't need 'equations' that are ({c},1) or such; these are saved to 'self.solved_variables'. So let's keep equations as actual equations.
             
             if (unsolved_variables, original_summa-sum_of_solved_vars) not in self.numberOfVariables_to_equations[len(unsolved_variables)]:      # technically this is a redundant check, since we're adding to a set, but the check is useful for showing the logic AND useful for debugging
-                self.variables_and_sum_to_ADD_to_self_numberOfVariables_to_equations_after_iteration.add((unsolved_variables, original_summa-sum_of_solved_vars))
+                self.numberOfVariables_to_equations[len(unsolved_variables)].add((unsolved_variables, original_summa-sum_of_solved_vars))
+                # self.variables_and_sum_to_ADD_to_self_numberOfVariables_to_equations_after_iteration.add((unsolved_variables, original_summa-sum_of_solved_vars))
             x = y = -1                                                                          # if information from already solved variables has been used to simplify equation, then this equation no longer has defnitivie single (x,y) origin from the minesweeper map; hence, mark it as (-1,-1).
         return [x, y, unsolved_variables, original_summa-sum_of_solved_vars]
      
@@ -93,7 +93,7 @@ class CSP_solver:
                 mark_these_as_solved_after_iteration.append((variables[0], summa))
             elif len(variables) == summa:
                 for var in variables:
-                    self.solved_variables.add((var, 1))
+                    mark_these_as_solved_after_iteration.append((var,1))
             else:                                                                               # we don't want equations like (('a','d'),0), as they would just cause more work in the 'self.factor_one_solve', as they provide no new information during subtractions with other equations
                 self.numberOfVariables_to_equations[len(variables)].add((variables, summa))      
         self.variables_and_sum_to_ADD_to_self_numberOfVariables_to_equations_after_iteration.clear()
@@ -107,7 +107,7 @@ class CSP_solver:
             # ((x,y), value). I can't know if it's 0 or 1, so I'm checking both. 'var' = (x,y) and each var is unique cell of the minesweeper map
             if (var, 0) not in self.solved_variables and (var, 1) not in self.solved_variables: # ((x,y), value), in 'self.solved_variables'
                 unsolved_vars.append(var)
-            elif (var, 1) in self.solved_variables:
+            elif (var, 1) in self.solved_variables:                                     # I don't care if a (var,0) is in the self.solved here, as it won't increment the sum.
                 sum_of_solved_vars += 1
         return tuple(unsolved_vars), sum_of_solved_vars                                 # you can't hash sets or lists (not immutable), hence a tuple is returned instead for 'unsolved_vars'. Hashing of 'unsolved_variables' is needed in 'add_equations' from where this function is used.
     
@@ -134,7 +134,7 @@ class CSP_solver:
                             result_equation = (tuple(var for var in longy_vars if var not in shorty_vars), longy_sum - shorty_sum) # since factors for all variables are 1, for all variables that were found in both shorty and longy, they are subtracted to 0. As for the sum, it's the longy_sum - shorty_sum
                             equations_to_check_for_found_solutions.append(result_equation)
         found_solutions, subtractions_done = self.find_solutions_from_single_equations(equations_to_check_for_found_solutions)
-        self.modify_iterables_after_iterations_in_factor_one()                          # this is for modifying all those variables that are part of 'self.numberOfVariables_to_equations' or other targets of iteration loops above, and which thus could not be removed during iterations above without causing an error
+        # self.modify_iterables_after_iterations_in_factor_one()                          # this is for modifying all those variables that are part of 'self.numberOfVariables_to_equations' or other targets of iteration loops above, and which thus could not be removed during iterations above without causing an error
         if not subtractions_done:                                                       # possible cases: (1) all equations were of equal length , (2) they don't share common variables -> can't be solved without guessing
             found_new_variables = self.find_solutions_from_single_equations(self.unique_equations)
             if not found_new_variables:
@@ -156,11 +156,12 @@ class CSP_solver:
                 new_solutions.append((variables[0], summa))
                 found_solutions = True
             elif len(variables) == summa:
+                found_solutions = True
                 for var in variables:
-                    self.solved_variables.add((var, 1))
+                    new_solutions.append((var, 1))
             else:
                 if (variables, summa) not in self.unique_equations:                     # if the equation is longer than 1 (e.g. if 'its a+b=1) and not =0 (not a+b=0), and if it's not already in 'self.unique_equations', then add it to 'self.unique_equations'
-                    equations_to_add.append((-1, -1, variables, summa))                 # why (-1, -1) is included in front (it's (x,y)): because 'add_equations_if_new()' will feed the equations to 'update_equations' which takes this format. Also, this (-1,-1) means that it's not an original equation originating from a single cell on the map; it means that this equation is the result of a calculation (no matter how simple the calculation is)
+                    equations_to_add.append((-1, -1, variables, summa))                 # (1) if the equation wasn't c=1 or a+b+c=3 or a+b+c+d+...=0, then add this to the set of equations (2) why (-1, -1) is included in front (it's (x,y)): because 'add_equations_if_new()' will feed the equations to 'update_equations' which takes this format. Also, this (-1,-1) means that it's not an original equation originating from a single cell on the map; it means that this equation is the result of a calculation (no matter how simple the calculation is)
                     subtractions_done = True
         for new_solution in new_solutions:
             self.mark_var_as_solved_and_update_related_info(new_solution)
@@ -169,8 +170,8 @@ class CSP_solver:
     
     def mark_var_as_solved_and_update_related_info(self, new_solution:tuple) -> None:
         solved_var, summa = new_solution
-        # if summa >= 0: # TO-DO; why does it sometimes add negative values, when used from botGame.py?
-        self.solved_variables.add((solved_var, summa))
+        
+        self.solved_variables.add((solved_var, summa))                                  # 'self.solved_variables' is the set of tuples that is utilized in 'botGame.py'! So this is the solution carrier info structure that's used by botGame.py, so to say.
         if solved_var in self.variable_to_equations:
             equations_with_the_var = self.variable_to_equations[solved_var]
             for variables, value in equations_with_the_var:
