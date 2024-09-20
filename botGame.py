@@ -146,7 +146,7 @@ class Minesweeper:
             self.game_over(x,y)
             return
         elif self.map[y][x] == unclicked:
-            self.handle_opening_a_new_cell(x, y)
+            self.handle_opening_a_new_cell(x, y)                    # this also adds the (x,y) to 'self.opened', which is needed to recognize victory, and for the 'if' clause below.
         elif (x, y) in self.opened and primary:
             # only if 'probe()' was not called from 'chord()'!
             self.handle_probing_of_already_opened_cell(x,y)         # it's possible that this is a chording, but you can't know that unless you check the number of marked flags around the cell first
@@ -167,12 +167,11 @@ class Minesweeper:
         else:
             pass
 
-    # TO-DO: not caused by this function as such, but there's a problem in the csp-solver causing some of flagged tiles and mine-containing cells to be handled through this function, as they are falsely labelled as 0 instead of as 1 by the CSP-solver. A quick patch would be to check HERE if label=flag, and return if true, but that's obviously not a real solution.
     def handle_opening_a_new_cell(self, x:int, y:int) -> None:                  # ALL NEW CELL OPENINGS GO HERE, doesn't matter how the cell was opened (player/bot/single click/chord)
         print('\nhandle_opening_of_a_new_cell()')
         self.opened.add((x, y))                                                 # why: in case a zero is clicked open, I'm using handle_click recursively to open up all the surrounding cells that are not mines. For that, this list is needed, so that an endless recursion doesn't occur.
         neighbours = self.get_neighbours_of(x, y)
-        
+
         surrounding_mines = 0
         for neighbour in neighbours:
             if neighbour in self.mine_locations:                                # NB! 'self.mine_locations' is the set of ACTUAL mine locations, so this is correct
@@ -237,10 +236,6 @@ class Minesweeper:
 
         def brain() -> None:
 
-            def update_front() -> None:
-                remove_obsolete_front()
-                add_new_front_cells_to_self_front()
-
             def remove_obsolete_front() -> None:
                 for coordinate in self.obsolete_front:                                      # why not remove them already during the 'for x,y' loop above? Because you can't remove an item from an iterable while it's being iterated over, otherwise, in this case, you'll get 'RuntimeError: Set changed size during iteration'
                     if coordinate in self.front:
@@ -252,15 +247,16 @@ class Minesweeper:
                     self.front.add(member)
                 self.new_front_members.clear()                                              # now that they are added, reset this list for the next round of bot_act()
             
-            # This is the most straightforward way of removing obsolete front cells from 'self.front'. Previously, I had this split up into chording and entering new cell, but that's complicated and doesn't really save processing (almost) at all. This is much better, universal, and clearer, and can be used by the CSP-bot too. CSP-solver is giving me trouble. This function is for ensuring that there DEFINITELY are no obsolete front cells in self.front any longer, as that has been my problem for 2 days now.
+            # NB! This is the most straightforward way of removing obsolete front cells from 'self.front' in one go. For each cell in 'self.front', it checks if it has unclicked neighbours. If not, it removes all those cells from 'self.front'. Previously, I had this whole functionality split up into subcases: chording cases and cases of entering a new cell, but that serves no actual purpose, it's too complicated, error-prone and doesn't really save processing (almost) at all. This is much better, universal, reusable and clearer, and is utilized by the CSP-bot as well too. This function is for ensuring that there DEFINITELY are no obsolete front cells in self.front any longer, as that has been my problem for days now.
             def filter_front_cells():
+                add_new_front_cells_to_self_front()                                         # I switched the order of 'add_new..' and 'remove_obsolete...' around; the only way to make absolutely sure that no obsolete front survives the filtering is to (1) FIRST add the new self.front members and (2) from THESE ALSO, filter out the unneeded ones (obsolete ones).
                 for x,y in self.front:
                     neighbours = self.get_neighbours_of(x, y)
                     n_unclicked_unflagged_neighbours = self.count_cells_of_type(unclicked, neighbours)
                     if n_unclicked_unflagged_neighbours == 0:
                         if (x,y) in self.front:
                             self.obsolete_front.add((x,y))
-                update_front()
+                remove_obsolete_front()
     
             # this function's "for x,y in self.front" loop finds SIMPLE non-CSP solutions: (1) where the number of neighbouring unflagged unclicked cells + flagged cells equals to the label -> flag all, and (2) if label = number of surrounding flags, then perform a chord. Then, I remove unnecessary cells from the front to cut unnecessary computing work for the linear equation CSP solver.
             def simple_solver() -> None:    
@@ -270,35 +266,37 @@ class Minesweeper:
                     number_of_surrounding_flags = self.count_cells_of_type(flag, neighbours)
                     unflagged_unclicked_neighbours = self.get_cells_of_type(unclicked, neighbours)              # this is indeed 'unclicked unflagged neighbours', since label 'unclicked' means exactly that; the picture for 'unclicked' is an unprobed cell. A big confusing perhaps, I know.
                     
-                    if label == labellize(len(unflagged_unclicked_neighbours) + number_of_surrounding_flags):   # If the number of surrounding ('unclicked' + 'flag') cells equals to the label of the front cell in question (for example, 1 flagged + 2 unclicked = 3 = the label of the cell),
+                    if label == labellize(len(unflagged_unclicked_neighbours) + number_of_surrounding_flags):   # If the number of surrounding ('unclicked' + 'flag') cells equals to the label of this (x,y) front cell in question (for example, 1 flagged + 2 unclicked = 3 = the label of the cell),
                         flag_these(unflagged_unclicked_neighbours)                          # then flag the remaining unflagged cells around the front cell in question (flag the remaining 2 unclicked cells in this example case).
-                    # At this point, I could update the 'number_of_surrounding_flags' again, since I just placed new flags above (potentially); if I updated the number of surrounding flags at this point, there would be a chance for the 'if' clause below to perform a chord. However, it's much better and clearer to proceed one step at a time; it helps in debugging, and ... simply looks much nicer when looking at the bot doing its job one small step at a time.
+                    
+                    # At this point, I COULD update the 'number_of_surrounding_flags' again, since I just (potentially) placed new flags above. If I updated the number of surrounding flags here, the benefit would be a chance for the 'if' clause below to enable performing a chord already during this round instead of during the next round of simple_solver(). However, it's visually much better and clearer to proceed one step at a time, instead of chording below right away; it helps in debugging, and looks a lot nicer when looking at the bot doing its job one small step at a time.
+                    
                     if label == labellize(number_of_surrounding_flags):                     # NB! 'if', not 'elif'. If the number of flagged neighbours equals to the label of the current front cell,
                         if len(unflagged_unclicked_neighbours) >= 1:                        # then if there also are unclicked cells around the current front cell,
-                            self.handle_chord(x,y)                                          # then open all of them (i.e. 'chord' at the front cell).
+                            self.handle_chord(x,y)                                          # then open all of them (i.e. 'chord' at this current front cell (x,y)).
                 filter_front_cells()
-            
+
             simple_solver()
-            
+
             # if I don't 'draw_display()' here, when using debugger, I wouldn't be able to see the map before csp-section code is executed c:
             if self.debug_csp:
                 self.draw_display()
 
             # after removing thus far redundant cells from the 'self.front' (done in 'update_front'), I'm feeding equations into my CSP linear equation solver:
             def feed_csp_solver():
-                csp_solver_input = []                                                       # a list of lists; [ [x, y, ('var_a', 'var_b', 'var_c', ...), label_of_cell], [...], ...]; each inner list represents a set of (1) (x,y), (2) variables to try to solve (cells, which can have value 0 or 1), (3) the total number of mines (sum) of those variables
+                csp_solver_input = []                                                                   # a list of lists; [ [x, y, ('var_a', 'var_b', 'var_c', ...), label_of_cell], [...], ...]; each inner list represents a set of (1) (x,y), (2) variables to try to solve (cells, which can have value 0 or 1), (3) the total number of mines (sum) of those variables
                 for x,y in self.front:
-                    surrounding_mine_count = read_number_from_label(self.map[y][x])                    # all 'self.front' cells have number labels, number = 1,...8 (not 0). It cannot be 0, since we just removed those cells from 'self.front' in the 'for...' loop above
+                    surrounding_mine_count = read_number_from_label(self.map[y][x])                     # all 'self.front' cells have number labels, number = 1,...8 (not 0). It cannot be 0, since we just removed those cells from 'self.front' in the 'for...' loop above
                     neighbours = self.get_neighbours_of(x,y)
                     unflagged_unclicked_neighbours = self.get_cells_of_type(unclicked, neighbours)
                     n_surrounding_flags = self.count_flags(neighbours)
-                    csp_solver_input_addition = format_equation_for_csp_solver(x, y, unflagged_unclicked_neighbours, surrounding_mine_count-n_surrounding_flags)    # TO-DO! What if there are flags around??? They should be removed from the minecount first, shouldn't they! HAHAAAAAAAAAAA!!!!!!!!!!!!!
+                    csp_solver_input_addition = format_equation_for_csp_solver(x, y, unflagged_unclicked_neighbours, surrounding_mine_count - n_surrounding_flags)    # NB! 'surrounding_mine_count - n_surrounding_flags' was what I was missing for two days; it caused solving of WRONG equations in the CSP_solver(). I.e.; what if there are flags around, not just unflagged neighbours? That's why there's the '- n_unflagged_neighbours' subtraction. They have to be removed from the total minecount.
                     csp_solver_input.append(csp_solver_input_addition)
                 self.solver.add_equations_if_new(csp_solver_input)
-            
+
             if self.debug_csp:
                 self.draw_display()
-    
+
             feed_csp_solver()
 
             def csp_solve():
@@ -310,10 +308,10 @@ class Minesweeper:
                     print(f'- solved {x,y} = {value}')
                     if value == 1:
                         flag_these([(x,y)])
-                    elif value == 0:                            # TO-DO: some are mislabeled as 0 -> many problems. CSP is broken still
+                    elif value == 0:                            
                         self.handle_opening_a_new_cell(x, y)    # NB! 'handle_opening_a_new_cell' adds new front members to 'self.new_front_members', NOT yet to self.front, to avoid 'Set changed size during iteration', since 'handle_opening_a_new_cell' was originally used in 'simple_solver' which iterates over 'self.front' and thus cannot directly modify 'self.front' while iterating over it without causing the error.
                         # TO-DO; now, via utilizing handle_opening_a_new_cell, obsolete front should be added from there correctly.
-                filter_front_cells()
+                filter_front_cells()                            # TO-DO: for this to work, the 'self.front' has to be kept up-to-date. That works; it's done in 'flag_these()' and in 'handle_opening_a_new_cell()' above.
                 # print('- solved_vars:', solved_vars)
             
             if self.csp_on:

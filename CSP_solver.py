@@ -1,6 +1,6 @@
 '''to-do: 
 - for solved variables, check each of them in factor_one_solve. This should be taken into account also when considering new equations; don't save unsolved bootleg duplicates as 'new' equations if in reality they are the unsolved versions of already solved equations
-- in 'factor_one_solve', an easy way to check if subtracting the subset from the larger set is correct is as follows: if you end up with a+b+.... < 0, the subtraction was WRONG - something was wrong in the code itself. Why; because x ∈{0,1} for all cells x, and because I'm always subtracting a subset from a larger or equally sized set. Therefore, as every element of each set is 0 or 1, it is not possible to end up with a negative result for the resulting equation. For example: a+b+c = 1, a+b+c+d = 2 -> d = 1. The resulting equation can never have a negative value, if every element of the subset is found in the larger set, and every element x ∈{0,1} for all cells x! Therefore, it would be good the specifically add this at some point to facilitate debugging.
+- in 'factor_one_solve', an easy way to check if subtracting the subset from the larger set is correct is as follows: if you end up with a+b+.... < 0, the subtraction was WRONG - something was wrong in the code itself. Why; because x ∈{0,1} for all cells x, and because I'm always subtracting a subset from a larger or equally sized set. Therefore, as every element of each set is 0 or 1, it is not possible to end up with a negative result for the resulting equation. For example: a+b+c = 1, a+b+c+d = 2 -> d = 1. The resulting equation can never have a negative value, if every element of the subset is found in the larger set, and every element x ∈{0,1} for all cells x. Therefore, it would be good the specifically add this at some point to facilitate debugging.
 - destructuring in case of non-tuple variable names will not work; beware in the examples! (variables like 'a', 'b' may not work, when you attempt to destructure them like '(x,y), value', for example)
 
 done:
@@ -19,7 +19,7 @@ done:
 class CSP_solver:
     def __init__(self):
 
-        self.variables = set()                              # all variables, which are in format (x,y) per variable (when talking about minesweeper variables, that is; also other formats are ok, such as letters 'a', etc.)
+        
         self.unique_equations = set()                       # { ((var1, var2, ..), sum_of_mines_in_vars), (...) }. Each var (variable) has format (x,y) of that cell's location; cell with a number label 1...8 = var. Here, I want uniqe EQUATIONS, not unique LOCATIONS, and therefore origin-(x,y) is not stored here. It's possible to get the same equation for example from two different sides, and via multiple different calculation routes, and it's of course possible to mistakenly try to add the same equation multiple times; that's another reason to use a set() here, the main reason being fast search from this hashed set.        
         self.solved_variables = set()                       # ((x,y), value); the name of the variable is (x,y) where x and y are its location in the minesweeper map (if applicable), and the value of the variable is either 0 or 1, if everything is ok (each variable is one cell in the minesweeper map, and its value is the number of mines in the cell; 0 or 1, that is)
         self.variable_to_equations = dict()                 # { variable_a : set(equation5, equation12, equation4,...), variable_b : set(equation3, equation4...)}
@@ -45,8 +45,6 @@ class CSP_solver:
                 if variable_count not in self.numberOfVariables_to_equations:
                     self.numberOfVariables_to_equations[variable_count] = set()
                 self.numberOfVariables_to_equations[variable_count].add((variables, summa)) # same format as in 'self.unique_equations'; without (x,y) that is
-                for variable in variables:
-                    self.variables.add(variable)
 
     # this is used in (1) 'self.add_equations_if_new()' and in (2) 'self.factor_one_solve()' (3) 'self.update_info_after_solving_new_variable'; (1) do not add 'new' equations that have been already (partially) solved; that is, take into account the fact that some variables have been solved already (2) TO-DO
     # (1) in all equations where solved variables exist, reduce for solved variables (2) update the reduced form to 'self.unique_equations' (3) update to 'self.numberOfVariables_to_equations' (4) others? TO-DO, CHECK!
@@ -61,6 +59,9 @@ class CSP_solver:
                     self.variables_and_sum_to_DELETE_from_self_numberOfVariables_to_equations_after_iteration.add((original_vars, original_summa))
             
             # TO-DO: sum 0 check?
+            if original_summa-sum_of_solved_vars == 0:
+                for var in unsolved_variables:
+                    self.solved_variables.add((var,0))
             if len(unsolved_variables) == 1:
                 # if original_summa-sum_of_solved_vars >= 0: # TO-DO: why does it sometimes add negative values, when used from 'botGame.py'?
                 self.solved_variables.add((unsolved_variables[0], original_summa-sum_of_solved_vars))
@@ -82,22 +83,22 @@ class CSP_solver:
         self.variables_and_sum_to_DELETE_from_self_numberOfVariables_to_equations_after_iteration.clear()
 
         # THESE CHECKS BELOW ARE NEEDED! TO-DO: it's unclear to me at this point, why equations with lengths 1 or sums 0 survive this far, not detected earlier, but anyways, these checks are necessary at the moment.
-        mark_these_as_solved_after_iteration = []                                               # (var, value). NB! I had to create this list again so that I don't run into the 'Set changed size during iteration' error. Ironically, this whole function was created to prevent that from happening!
-        for variables, summa in self.variables_and_sum_to_ADD_to_self_numberOfVariables_to_equations_after_iteration:
-            if summa == 0:                                                                      # for example, variables = (a,d), summa = 0 -> this means that a = 0, and d = 0
-                for var in variables:
-                    if (var,0) not in self.solved_variables:
-                        mark_these_as_solved_after_iteration.append((var,0))
-            elif len(variables) == 1:                                                           # TO-DO: check if this case ever happens here (is this line needed here)
-                mark_these_as_solved_after_iteration.append((variables[0], summa))
-            elif len(variables) == summa:
-                for var in variables:
-                    self.solved_variables.add((var, 1))
-            else:                                                                               # we don't want equations like (('a','d'),0), as they would just cause more work in the 'self.factor_one_solve', as they provide no new information during subtractions with other equations
-                self.numberOfVariables_to_equations[len(variables)].add((variables, summa))      
-        self.variables_and_sum_to_ADD_to_self_numberOfVariables_to_equations_after_iteration.clear()
-        for above_solved_var in mark_these_as_solved_after_iteration:
-            self.mark_var_as_solved_and_update_related_info(above_solved_var)
+        # mark_these_as_solved_after_iteration = []                                               # (var, value). NB! I had to create this list again so that I don't run into the 'Set changed size during iteration' error. Ironically, this whole function was created to prevent that from happening!
+        # for variables, summa in self.variables_and_sum_to_ADD_to_self_numberOfVariables_to_equations_after_iteration:
+        #     if summa == 0:                                                                      # for example, variables = (a,d), summa = 0 -> this means that a = 0, and d = 0
+        #         for var in variables:
+        #             if (var,0) not in self.solved_variables:
+        #                 mark_these_as_solved_after_iteration.append((var,0))
+        #     elif len(variables) == 1:                                                           # TO-DO: check if this case ever happens here (is this line needed here)
+        #         mark_these_as_solved_after_iteration.append((variables[0], summa))
+        #     elif len(variables) == summa:
+        #         for var in variables:
+        #             self.solved_variables.add((var, 1))
+        #     else:                                                                               # we don't want equations like (('a','d'),0), as they would just cause more work in the 'self.factor_one_solve', as they provide no new information during subtractions with other equations
+        #         self.numberOfVariables_to_equations[len(variables)].add((variables, summa))      
+        # self.variables_and_sum_to_ADD_to_self_numberOfVariables_to_equations_after_iteration.clear()
+        # for above_solved_var in mark_these_as_solved_after_iteration:
+        #     self.mark_var_as_solved_and_update_related_info(above_solved_var)
 
     def filter_out_solved_variables(self, variables) -> tuple:
         unsolved_vars = []
@@ -244,7 +245,7 @@ if __name__ == '__main__':
     - solved a new variable! (2, 0) = 0
     - solved a new variable! (3, 0) = 1'''
 
-    ########################## Test 1c: will it finish a partially solved equation starting from equation format? #############################################
+    ########################## Test 1c: will it finish a partially solved equation, starting with equation format? #############################################
 
     '''from the above, as c=1 is solved, we get:'''
 
@@ -265,7 +266,7 @@ if __name__ == '__main__':
     csp.factor_one_binary_solve()                          
     print_solved_variables(csp, 'test 1c: 0101 expected', '0101')
 
-    ############################## Test 3 #############################################
+    ############################## Test 2 #############################################
     '''                                             answer (which is printed also): 
     Example: solving                                a = 0
     a + b + d = 2                                   b = 1
@@ -283,11 +284,11 @@ if __name__ == '__main__':
     csp = CSP_solver()
     csp.add_equations_if_new([eq1, eq2, eq3, eq4])
     csp.factor_one_binary_solve()                          
-    print_solved_variables(csp, 'test 3, 01010 expected:', '01010')
+    print_solved_variables(csp, 'test 2, 01010 expected:', '01010')
 
     
 
-    ############################ Test 4a: letters ############################################
+    ############################ Test 3a: letters ############################################
     
     ###### a minesweeper map, where X means 'unclicked' cell, * is a 'mine' cell (not seen by the player), and 1 is a '1' cell, 3 is a '3' cell. Every # is edge of the map, essentially means nothing
     #001*#
@@ -304,12 +305,12 @@ if __name__ == '__main__':
     csp.add_equations_if_new([c01, c11, c20, c21])
     csp.factor_one_binary_solve(1)
 
-    print_solved_variables(csp, 'test 4a: expected 0101', '0101')
+    print_solved_variables(csp, 'test 3a: expected 0101', '0101')
 
     '''correct result: a,c,e=0; b,f,d = 1. This requires the constraints that each is 0 or 1
     '''
     
-    ############################ Test 4b: (x,y) ############################################
+    ############################ Test 3b: (x,y) ############################################
     
     ###### a minesweeper map, where X means 'unclicked' cell, * is a 'mine' cell (not seen by the player), and 1 is a '1' cell, 3 is a '3' cell. Every # is edge of the map, essentially means nothing
     #001*#
@@ -326,7 +327,7 @@ if __name__ == '__main__':
     csp.add_equations_if_new([c01, c11, c20, c21])
     csp.factor_one_binary_solve()
 
-    print_solved_variables(csp, 'test 4b: expected 0101', '0101')
+    print_solved_variables(csp, 'test 3b: expected 0101', '0101')
 
 
 
