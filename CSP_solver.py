@@ -83,22 +83,22 @@ class CSP_solver:
         self.variables_and_sum_to_DELETE_from_self_numberOfVariables_to_equations_after_iteration.clear()
 
         # THESE CHECKS BELOW ARE NEEDED! TO-DO: it's unclear to me at this point, why equations with lengths 1 or sums 0 survive this far, not detected earlier, but anyways, these checks are necessary at the moment.
-        # mark_these_as_solved_after_iteration = []                                               # (var, value). NB! I had to create this list again so that I don't run into the 'Set changed size during iteration' error. Ironically, this whole function was created to prevent that from happening!
-        # for variables, summa in self.variables_and_sum_to_ADD_to_self_numberOfVariables_to_equations_after_iteration:
-        #     if summa == 0:                                                                      # for example, variables = (a,d), summa = 0 -> this means that a = 0, and d = 0
-        #         for var in variables:
-        #             if (var,0) not in self.solved_variables:
-        #                 mark_these_as_solved_after_iteration.append((var,0))
-        #     elif len(variables) == 1:                                                           # TO-DO: check if this case ever happens here (is this line needed here)
-        #         mark_these_as_solved_after_iteration.append((variables[0], summa))
-        #     elif len(variables) == summa:
-        #         for var in variables:
-        #             self.solved_variables.add((var, 1))
-        #     else:                                                                               # we don't want equations like (('a','d'),0), as they would just cause more work in the 'self.factor_one_solve', as they provide no new information during subtractions with other equations
-        #         self.numberOfVariables_to_equations[len(variables)].add((variables, summa))      
-        # self.variables_and_sum_to_ADD_to_self_numberOfVariables_to_equations_after_iteration.clear()
-        # for above_solved_var in mark_these_as_solved_after_iteration:
-        #     self.mark_var_as_solved_and_update_related_info(above_solved_var)
+        mark_these_as_solved_after_iteration = []                                               # (var, value). NB! I had to create this list again so that I don't run into the 'Set changed size during iteration' error. Ironically, this whole function was created to prevent that from happening!
+        for variables, summa in self.variables_and_sum_to_ADD_to_self_numberOfVariables_to_equations_after_iteration:
+            if summa == 0:                                                                      # for example, variables = (a,d), summa = 0 -> this means that a = 0, and d = 0
+                for var in variables:
+                    if (var,0) not in self.solved_variables:
+                        mark_these_as_solved_after_iteration.append((var,0))
+            elif len(variables) == 1:                                                           # TO-DO: check if this case ever happens here (is this line needed here)
+                mark_these_as_solved_after_iteration.append((variables[0], summa))
+            elif len(variables) == summa:
+                for var in variables:
+                    self.solved_variables.add((var, 1))
+            else:                                                                               # we don't want equations like (('a','d'),0), as they would just cause more work in the 'self.factor_one_solve', as they provide no new information during subtractions with other equations
+                self.numberOfVariables_to_equations[len(variables)].add((variables, summa))      
+        self.variables_and_sum_to_ADD_to_self_numberOfVariables_to_equations_after_iteration.clear()
+        for above_solved_var in mark_these_as_solved_after_iteration:
+            self.mark_var_as_solved_and_update_related_info(above_solved_var)
 
     def filter_out_solved_variables(self, variables) -> tuple:
         unsolved_vars = []
