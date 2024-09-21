@@ -346,8 +346,7 @@ if __name__ == '__main__':
     csp.add_equations_if_new([eqi, eqiii, eqv, eqvi, eqa, eqb])
     csp.factor_one_binary_solve(3)                                  # NB! TO-DO! INTERESTING; after 3 rounds, e=0 is solved, but nothing after that! Cool! This could unlock the whole thing; complex cases like these have been the problem.
 
-    print_solved_variables(csp, 'test 3b: expected ??', '??')
-
+    print_solved_variables(csp, 'test 4a: expected 0', '0')
 
 
 '''
