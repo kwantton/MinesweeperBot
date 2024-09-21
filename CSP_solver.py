@@ -17,13 +17,15 @@ done:
 class CSP_solver:
     def __init__(self):
 
-        self.unique_equations = set()                       # { ((var1, var2, ..), sum_of_mines_in_vars), (...) }. Each var (variable) has format (x,y) of that cell's location; cell with a number label 1...8 = var. Here, I want uniqe EQUATIONS, not unique LOCATIONS, and therefore origin-(x,y) is not stored here. It's possible to get the same equation for example from two different sides, and via multiple different calculation routes, and it's of course possible to mistakenly try to add the same equation multiple times; that's another reason to use a set() here, the main reason being fast search from this hashed set.        
-        self.solved_variables = set()                       # ((x,y), value); the name of the variable is (x,y) where x and y are its location in the minesweeper map (if applicable), and the value of the variable is either 0 or 1, if everything is ok (each variable is one cell in the minesweeper map, and its value is the number of mines in the cell; 0 or 1, that is)
-        self.variable_to_equations = dict()                 # { variable_a : set(equation5, equation12, equation4,...), variable_b : set(equation3, equation4...)}. The format of 'equation' is ((variable1, variable2,...), sum_of_the_variables)
-        self.reassigned_variables = dict()                  # { variable_a : variable_b }. This is for those ~solved cases, where b=c; so every b will no be c forever, etc.
-        self.numberOfVariables_to_equations = {             # { numberOfVariables : set(equation1, equation2, ...) }; each key of this dict is integer x, and x's values are all equations with x number of variables. I want to look at those equations with low number of variables, and see for each of those variables if they can be found in equations with more variables; if all the variables in the shorter equation are found in the longer equation, then perform subtraction to get rid of those varibles in the longer equation (linear equation solving), then save the formed result equation to 'self.unique_equations' and 'self.numberOfVariables_to_equations'.
-            x:set() for x in range(0, 8+1)                  # Why up to 8? Because a single '1' cell, resulting from a forced guess in the middle of unclicked cells, has 8 neighbours, hence 8 variables in the equation for that '1' cell; some of these neighbours can be shared with other cells in case of a compulsory guess having been made (the lonely '1' in the middle would be the guess then, obviously). NB! It's possible that when all variables in a given equation have just been solved, all are canceled out, and at that point the length of the equation (i.e. the number of variables) becomes 0; that's why I'm starting from 0.
-        }                                                   # { numberOfVariables : set(equation1, equation2, ...) }; all equations with numberOfVariables = x. I want to look at those equations with low number of variables, and see for each of those variables if they can be found in equations with more variables.
+        self.unique_equations = set()                           # { ((var1, var2, ..), sum_of_mines_in_vars), (...) }. Each var (variable) has format (x,y) of that cell's location; cell with a number label 1...8 = var. Here, I want uniqe EQUATIONS, not unique LOCATIONS, and therefore origin-(x,y) is not stored here. It's possible to get the same equation for example from two different sides, and via multiple different calculation routes, and it's of course possible to mistakenly try to add the same equation multiple times; that's another reason to use a set() here, the main reason being fast search from this hashed set.        
+        self.solved_variables = set()                           # ((x,y), value); the name of the variable is (x,y) where x and y are its location in the minesweeper map (if applicable), and the value of the variable is either 0 or 1, if everything is ok (each variable is one cell in the minesweeper map, and its value is the number of mines in the cell; 0 or 1, that is)
+        self.reassigned_variables = dict()                      # { variable_a : variable_b }. This is for those ~solved cases, where b=c; so every b will no be c forever, etc.
+        self.variable_to_equations = dict()                     # { variable_a : set(equation5, equation12, equation4,...), variable_b : set(equation3, equation4...)}. The format of 'equation' is ((variable1, variable2,...), sum_of_the_variables)
+        self.numberOfVariables_to_equations = {                 # { numberOfVariables : set(equation1, equation2, ...) }; each key of this dict is integer x, and x's values are all equations with x number of variables. I want to look at those equations with low number of variables, and see for each of those variables if they can be found in equations with more variables; if all the variables in the shorter equation are found in the longer equation, then perform subtraction to get rid of those varibles in the longer equation (linear equation solving), then save the formed result equation to 'self.unique_equations' and 'self.numberOfVariables_to_equations'.
+            x:set() for x in range(0, 8+1)                      # Why up to 8? Because a single '1' cell, resulting from a forced guess in the middle of unclicked cells, has 8 neighbours, hence 8 variables in the equation for that '1' cell; some of these neighbours can be shared with other cells in case of a compulsory guess having been made (the lonely '1' in the middle would be the guess then, obviously). NB! It's possible that when all variables in a given equation have just been solved, all are canceled out, and at that point the length of the equation (i.e. the number of variables) becomes 0; that's why I'm starting from 0.
+        }                                                       # { numberOfVariables : set(equation1, equation2, ...) }; all equations with numberOfVariables = x. I want to look at those equations with low number of variables, and see for each of those variables if they can be found in equations with more variables.
+        self.var_to_equations_updated_equations_to_add = []     # during iteration of these, these cannot be directly changed -> gather a list, modify after iteration is over
+        self.var_to_equations_obsolete_equations_to_remove = [] # same as above comment
 
     # NB! This is called, when adding new equations for the first time, AND after finding new variables IF the related equations are (1) new and (2) do not become single solved variables as well (i.e. if the related equations are not reduced from equations like a+b=1 to just solved single variables like b=1). Hence, sometimes the 'self.update_equation(equation)' is necessary.
     def add_equations_if_new(self, equations:list) -> None:                             # equations = [(x, y, ((x1, y1), (x2, y2), ...), summa), ...]; so each equation is a tuple of of x, y, unflagged unclicked neighbours (coordinates; unique variables, that is!), and the label of the cell (1,2,...8)
@@ -55,8 +57,7 @@ class CSP_solver:
                     self.numberOfVariables_to_equations[len(original_vars)].remove((original_vars, original_summa))
             
             # TO-DO: Update self.variable_to_equations! This is quite an arduous process. However, it's not very unefficient thanks to sets, and due to the limited length of vars per equation (usually 2-5 per equation, max is 8)
-            self.updated_equations_to_add = []
-            self.obsolete_equations_to_remove = []
+            
             for solved_var, solved_value in solved_variables:
                 immediate_equations = self.variable_to_equations[solved_var]    # NB! This alone is not enough; we need to check the need for updating for all the equations for all the variables in all the equations. Yeah, can be dozens of them in total - but not too bad in reality! Also, this is done only when needed, and the below checks ensure that only ACTUAL equations are updated, not the ones summing up to 0, or where the number of variables equals to the sum.
                 for vars, value in immediate_equations:
@@ -69,8 +70,8 @@ class CSP_solver:
                                     if updated_value != 0:                          # if the updated_value == 0, then it's not an equation anymore, it's a solved variable, saved in self.solved_variables elsewhere already.
                                         if updated_value != len(old_vars)-1:        # we know already that 'solved_var' is in 'old_vars' (because of the if clause above checked it to be the case already). Then, if the number of the remaining variables (-1) equals to the updated value, they all have to be one -> that shouldn't be in the 'self.variable_to_equations' either, as that too is a solved case where all the variables are 1, and this is handled elsewhere (no need to add an equation here). I know this is complicated!
                                             updated_variables = tuple(var for var in old_vars if var != solved_var)
-                                            self.updated_equations_to_add.append((var, updated_variables, updated_value))
-                                    self.obsolete_equations_to_remove.append((var, old_vars, old_value))
+                                            self.var_to_equations_updated_equations_to_add.append((var, updated_variables, updated_value))
+                                    self.var_to_equations_obsolete_equations_to_remove.append((var, old_vars, old_value))
                 
             if original_summa-sum_of_solved_vars == 0:                          # old equation sum - (minus) the new, updated equation sum. If this is zero, then all the remaining variables are 0!
                 for var in unsolved_variables:
@@ -104,37 +105,38 @@ class CSP_solver:
             else:  # ((x,y), value), in 'self.solved_variables'
                 unsolved_vars.append(var)
         return tuple(unsolved_vars), sum_of_solved_vars, solved_vars                    # you can't hash sets or lists (not immutable), hence a tuple is returned instead for 'unsolved_vars'. Hashing of 'unsolved_variables' is needed in 'add_equations' from where this function is used.
-    
-    
+
+
     # TO-DO: if a+b+c = x and a+b+d = y, then subtract => c-d=x-y ∈ {-1,0,1}. If -1, then c-d=-1, so d-c=1, so d=1, c=0. If 0, then c-d=0, so c=d; if 1, then c-d=1, so c=d+1, so c=1 and d=0.
     def equal_length_solver(self):
         for s in range (2, 8+1):                                                        # this is for EQUATION lengths, from 2 to 8; in my case I'm defining an equation as something that has at least 2 different (unsolved) variables (a variable being the minecount in the surrounding 8 cells of a given cell). So, no need to start from 1; those are handled elsewhere already, this is not for those cases. Also; they should not be in 'self.numberOfVariables_to_equations' anyways c:
             equal_length_equations = list(self.numberOfVariables_to_equations[s])
-            differing_variable_count = 0
             for a in range (0, len(equal_length_equations)):
+                differing_variable_count = 0
                 vars1, summa1 = equal_length_equations[a]
                 for b in range (a+1, len(equal_length_equations)):
                     vars2, summa2 = equal_length_equations[b]
-                    for variable in vars1:
-                        if variable not in vars2:
+                    for var1 in vars1:
+                        if var1 not in vars2:
                             differing_variable_count += 1
                             if differing_variable_count > 1:
                                 break
-            if differing_variable_count == 1:               # this was explained above this equation. c=the same as there, d=the same as there.
-                c = variable
-                for var in eq2:
-                    if var not in eq1:
-                        d = var
-                result_value = summa1-summa2
-                if result_value == -1:
-                    self.mark_var_as_solved_and_update_related_info((c, 0))
-                    self.mark_var_as_solved_and_update_related_info((d, 1))
-                elif result_value == 0:
-                    self.reassign_variable(c,d)             # c = d; reassign every c as d, and do this in all data structures. However! I have very vigilant bookkeeping, so this is not a huge task computationally.
-                    # c = d. This, of course, sucks a lot. I have to update aaaaaall information according to this new piece of information. TO-DO.
-                elif result_value == 1:
-                    self.mark_var_as_solved_and_update_related_info((c, 1))
-                    self.mark_var_as_solved_and_update_related_info((d, 0))
+                            c = var1
+                    if differing_variable_count == 1:               # this was explained above this equation. c=the same as there, d=the same as there.
+                        for var2 in vars2:
+                            if var2 not in vars1:
+                                d = var2
+                                break
+                        result_value = summa1-summa2
+                        if result_value == -1:
+                            self.mark_var_as_solved_and_update_related_info((c, 0))
+                            self.mark_var_as_solved_and_update_related_info((d, 1))
+                        elif result_value == 0:
+                            self.reassign_variable(c,d)             # c = d; reassign every c as d, and do this in all data structures. However! I have very vigilant bookkeeping, so this is not a huge task computationally.
+                            # c = d. This, of course, sucks a lot. I have to update aaaaaall information according to this new piece of information. TO-DO.
+                        elif result_value == 1:
+                            self.mark_var_as_solved_and_update_related_info((c, 1))
+                            self.mark_var_as_solved_and_update_related_info((d, 0))
     
     # NB! the 'how_many_rounds=1' is arbitrary, and is illustrative for testing (why: because it has never solved more variables after multiple rounds than after just 1 round! Adding rounds doesn't affect the result.). In 'botGame.py' I am calling one 'bot_move' per one press of key 'b' by the person running the program, and a part of each of these 'bot_move's is this 'factor_one_solve()' here. Therefore, for visualization and debugging purposes, I want to make it possible to advance one small step at a time; that's why I have the 'rounds=1' set by default. Also, performance-wise, there is no obvious way to tell if performing one or multiple of these rounds in a row is faster or not (on average; this depends on so many things, including the map itself!) without considering first if the simpler logic in 'bot_move' before this 'CSP_solver' has anything more to offer before this 'CSP_solver' is performed or not; so performance-wise, it's a bit of a (micro)mystery, at least yet, whether one should let this run for a longer time or not by default.
     # TO-DO: if a+b+c = x and a+b+d = y, then subtract => c-d=x-y ∈ {-1,0,1}. If -1, then c-d=-1, so d-c=1, so d=1, c=0. If 0, then c-d=0, so c=d; if 1, then c-d=1, so c=d+1, so c=1 and d=0.
@@ -208,12 +210,14 @@ class CSP_solver:
                 self.update_equation_and_related_info((-1,-1, (variables), value))      # NB! (1) This also adds to 'self.to_add' and 'self.to_remove'; hence, only AFTER completion of this loop, can I remove and/or add to 'self.variable_to_equations'. (2) This updates all equations with the newly solved variable, for example if a=1 was solved, then for a+b+e=2 -> b+e=1, etc.
                 #self.variable_to_equations[solved_var].remove((variables, value))      # set changed size during iteration if you uncomment this
             
-            for var, updated_vars, updated_value in self.updated_equations_to_add:
+            for var, updated_vars, updated_value in self.var_to_equations_updated_equations_to_add:
                 if (updated_vars, updated_value) not in self.variable_to_equations[var]:    # to show the logic and to facilitate debugging. Technically, this is not needed (for adding to set; not needed, technically speaking)
                     self.variable_to_equations[var].add((updated_vars, updated_value))
-            for var, old_vars, old_value in self.obsolete_equations_to_remove:
+            self.var_to_equations_updated_equations_to_add.clear()
+            for var, old_vars, old_value in self.var_to_equations_obsolete_equations_to_remove:
                 if (old_vars, old_value) in self.variable_to_equations[var]:                 # needed. Sometimes, this would cause 'key_error' without checking.
                     self.variable_to_equations[var].remove((old_vars, old_value))
+            self.var_to_equations_obsolete_equations_to_remove.clear()
             self.variable_to_equations[solved_var] = set()                              # ONLY clearing for the solved var is not enough, that's why above, every set of obsolete equations (i.e. containing variables that have been solved, now in 'self.solved_variables') that was marked for removal is removed, while the corresponding updated equations are added above. I did the updating in 'self.update_equation_and_related_info', because that's where we're calculating the updated value for the partially solved equations already anyways, having the necessary updating information available. So, in short: I should update for new, already-solved variables, not ONLY clear the whole thing does this occur prematurily??? Anyways: now that all info regarding this solved variable and the equations containing this solved variable has been updated above, I can empty the set of equations containing this variable (i.e., they no longer should contain this variable, as its value has been set as 0 or 1 in those equations)
 
     # TO-DO; (1) reassign everywhere (all data structures), (2) in 'add_equations_if_new', check for incoming variables, if they have been reassigned. This should be extremely simple.
@@ -245,7 +249,7 @@ if __name__ == '__main__':
 
     ################################# Test 1a (using letters instead of (x,y) format for variables) ##########################################
 
-    '''                                             answer (printed also): 
+    '''                                             answer: 
     Example: solving                                a = 0
     a + b = 1                                       b = 1
     a + c + d = 1                                   c = 1
@@ -396,7 +400,7 @@ if __name__ == '__main__':
     
     csp = CSP_solver()
     csp.add_equations_if_new([eq1, eq2, eq3, eq4, eq5])
-    csp.factor_one_binary_solve(3)                                  # NB! after 3 rounds, e=0 is solved. A smaller number of rounds is not enough. This is ok and expected given the functions above, of course; also, the purpose is not to be able to solve everything in one go, as that would also mean that pressing 'b' in 'botGame.py' would proceed a huge number of steps at a time, AND this has nothing to do, as such, with efficiency either; so I want to divide this into small(ish) steps whenever possible, facilitating visualization and debugging that way, as there's no real reason not to do this.
+    csp.factor_one_binary_solve(2)                                  # NB! after 3 rounds, e=0 is solved. A smaller number of rounds is not enough. This is ok and expected given the functions above, of course; also, the purpose is not to be able to solve everything in one go, as that would also mean that pressing 'b' in 'botGame.py' would proceed a huge number of steps at a time, AND this has nothing to do, as such, with efficiency either; so I want to divide this into small(ish) steps whenever possible, facilitating visualization and debugging that way, as there's no real reason not to do this.
     # Through this case, I noticed that it's not possible to solve it by performing just the 'factor_one_solve()'; instead, even more CSP condition checking is needed, and for this, we need at least (a) subtraction so that we get a x=y equation, and/or (b) subtraction so that we get a x=1+y equation (solution by CSP: x=1, y=0, as every variable is 0 or 1!)
 
     print_solved_variables(csp, 'test 5a: expected 00110', '00110') # expected: cdefg 00110
