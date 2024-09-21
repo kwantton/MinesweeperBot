@@ -342,9 +342,24 @@ if __name__ == '__main__':
     eqb     = [3, 5, ('e', 'f', 'g', 'h', 'i'), 2]
     csp = CSP_solver()
     csp.add_equations_if_new([eqi, eqiii, eqv, eqvi, eqa, eqb])
-    csp.factor_one_binary_solve(3)                                  # NB! TO-DO! INTERESTING; after 3 rounds, e=0 is solved, but nothing after that! Cool! This could unlock the whole thing; complex cases like these have been the problem.
+    csp.factor_one_binary_solve(3)                                  # NB! after 3 rounds, e=0 is solved. A smaller number of rounds is not enough. This is ok and expected given the functions above, of course; also, the purpose is not to be able to solve everything in one go, as that would also mean that pressing 'b' in 'botGame.py' would proceed a huge number of steps at a time, AND this has nothing to do, as such, with efficiency either; so I want to divide this into small(ish) steps whenever possible, facilitating visualization and debugging that way, as there's no real reason not to do this.
 
     print_solved_variables(csp, 'test 4a: expected 0', '0')
+
+    ########################## Test 5a: letters. Based on 'Esim_expert_1.png', which wasn't solved by pressing 'b' (i.e., this test is for actual debugging) #
+    
+    eq1     = [-1, -1, ('a', 'b'), 1]                         
+    eq2     = [-1, -1, ('a', 'b', 'c', 'd', 'e'), 2]
+    eq3     = [-1, -1, ('d', 'e', 'f'), 2]
+    eq4     = [-1, -1, ('e', 'f', 'g'), 2]
+    eq5     = [-1, -1, ('f', 'g', 'h', 'i', 'j'), 1]
+    
+    csp = CSP_solver()
+    csp.add_equations_if_new([eq1, eq2, eq3, eq4, eq5])
+    csp.factor_one_binary_solve(3)                                  # NB! after 3 rounds, e=0 is solved. A smaller number of rounds is not enough. This is ok and expected given the functions above, of course; also, the purpose is not to be able to solve everything in one go, as that would also mean that pressing 'b' in 'botGame.py' would proceed a huge number of steps at a time, AND this has nothing to do, as such, with efficiency either; so I want to divide this into small(ish) steps whenever possible, facilitating visualization and debugging that way, as there's no real reason not to do this.
+    # Through this case, I noticed that it's not possible to solve it by performing just the 'factor_one_solve()'; instead, even more CSP condition checking is needed, and for this, we need at least (a) subtraction so that we get a x=y equation, and/or (b) subtraction so that we get a x=1+y equation (solution by CSP: x=1, y=0, as every variable is 0 or 1!)
+
+    print_solved_variables(csp, 'test 5a: expected 00110', '00110') # expected: cdefg 00110
 
 
 '''
