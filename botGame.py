@@ -128,7 +128,7 @@ class Minesweeper:
         self.timer_active = True
         self.generate_map(x, y)
         self.probe(x, y, primary=True)
-    
+
     # based on the coordinates of the first clicked cell (mouse_x, mouse_y), place the mines elsewhere
     def generate_map(self, mouse_x:int, mouse_y:int) -> None:
         print('\ngenerate_map()')
@@ -201,7 +201,7 @@ class Minesweeper:
             if self.map[c[1]][c[0]] == counted_cell_type:
                 count += 1
         return count
-    
+
     def get_cells_of_type(self, wanted_cell_type:str, coordinates:list, negative=False) -> list:
         print(f'\nget_cells_of_type({wanted_cell_type})')
         l = []
@@ -241,12 +241,12 @@ class Minesweeper:
                     if coordinate in self.front:
                         self.front.remove(coordinate)
                 self.obsolete_front.clear()
-            
+
             def add_new_front_cells_to_self_front() -> None:
                 for member in self.new_front_members:
                     self.front.add(member)
                 self.new_front_members.clear()                                              # now that they are added, reset this list for the next round of bot_act()
-            
+
             # NB! This is the most straightforward way of removing obsolete front cells from 'self.front' in one go. For each cell in 'self.front', it checks if it has unclicked neighbours. If not, it removes all those cells from 'self.front'. Previously, I had this whole functionality split up into subcases: chording cases and cases of entering a new cell, but that serves no actual purpose, it's too complicated, error-prone and doesn't really save processing (almost) at all. This is much better, universal, reusable and clearer, and is utilized by the CSP-bot as well too. This function is for ensuring that there DEFINITELY are no obsolete front cells in self.front any longer, as that has been my problem for days now.
             def filter_front_cells():
                 add_new_front_cells_to_self_front()                                         # I switched the order of 'add_new..' and 'remove_obsolete...' around; the only way to make absolutely sure that no obsolete front survives the filtering is to (1) FIRST add the new self.front members and (2) from THESE ALSO, filter out the unneeded ones (obsolete ones).
@@ -257,7 +257,7 @@ class Minesweeper:
                         if (x,y) in self.front:
                             self.obsolete_front.add((x,y))
                 remove_obsolete_front()
-    
+
             # this function's "for x,y in self.front" loop finds SIMPLE non-CSP solutions: (1) where the number of neighbouring unflagged unclicked cells + flagged cells equals to the label -> flag all, and (2) if label = number of surrounding flags, then perform a chord. Then, I remove unnecessary cells from the front to cut unnecessary computing work for the linear equation CSP solver.
             def simple_solver() -> None:    
                 for x,y in self.front:
@@ -268,9 +268,9 @@ class Minesweeper:
 
                     if label == labellize(len(unflagged_unclicked_neighbours) + number_of_surrounding_flags):   # If the number of surrounding ('unclicked' + 'flag') cells equals to the label of this (x,y) front cell in question (for example, 1 flagged + 2 unclicked = 3 = the label of the cell),
                         flag_these(unflagged_unclicked_neighbours)                          # then flag the remaining unflagged cells around the front cell in question (flag the remaining 2 unclicked cells in this example case).
-                    
+
                     # At this point, I COULD update the 'number_of_surrounding_flags' again, since I just (potentially) placed new flags above. If I updated the number of surrounding flags here, the benefit would be a chance for the 'if' clause below to enable performing a chord already during this round instead of during the next round of simple_solver(). However, it's visually much better and clearer to proceed one step at a time, instead of chording below right away; it helps in debugging, and looks a lot nicer when looking at the bot doing its job one small step at a time.
-                    
+
                     if label == labellize(number_of_surrounding_flags):                     # NB! 'if', not 'elif'. If the number of flagged neighbours equals to the label of the current front cell,
                         if len(unflagged_unclicked_neighbours) >= 1:                        # then if there also are unclicked cells around the current front cell,
                             self.handle_chord(x,y)                                          # then open all of them (i.e. 'chord' at this current front cell (x,y)).
