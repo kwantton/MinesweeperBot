@@ -1,8 +1,5 @@
 '''to-do: 
-- in self.variable_to_equations, it's never updated for already-solved variables! Because of this, unnecessary calculations will be done!
-- for solved variables, check each of them in factor_one_solve. This should be taken into account also when considering new equations; don't save unsolved bootleg duplicates as 'new' equations if in reality they are the unsolved versions of already solved equations
 - in 'factor_one_solve', an easy way to check if subtracting the subset from the larger set is correct is as follows: if you end up with a+b+.... < 0, the subtraction was WRONG - something was wrong in the code itself. Why; because x ∈{0,1} for all cells x, and because I'm always subtracting a subset from a larger or equally sized set. Therefore, as every element of each set is 0 or 1, it is not possible to end up with a negative result for the resulting equation. For example: a+b+c = 1, a+b+c+d = 2 -> d = 1. The resulting equation can never have a negative value, if every element of the subset is found in the larger set, and every element x ∈{0,1} for all cells x. Therefore, it would be good the specifically add this at some point to facilitate debugging.
-- destructuring in case of non-tuple variable names will not work; beware in the examples! (variables like 'a', 'b' may not work, when you attempt to destructure them like '(x,y), value', for example)
 
 done:
 - 'filter_out_solved_variables' was faulty
@@ -11,6 +8,7 @@ done:
 - update 'variable_to_equations' after solving
 - update self.numberOfVariables_to_equations, as you update old equations to ones with solved variables taken into account
 - create a function for updating all necessary info ('update_info...', 'update_equation...')
+- updating 'self.variable_to_equations' for already-solved variables, then clearing out for the solved variables
 
 '''
 
@@ -47,7 +45,7 @@ class CSP_solver:
     def update_equation_and_related_info(self, equation:tuple) -> None:                                      # equation = ( (var1, var2, ...), sum_of_variables). There's no origin (x,y) here, because all of those are unique, and irrelevant here!
         x, y, original_vars, original_summa = equation
         unsolved_variables, sum_of_solved_vars, solved_variables = self.filter_out_solved_variables(original_vars)
-        if len(unsolved_variables) != len(original_vars):                                   # if one or more variables in 'original_vars' had indeed been solved already; in that case we need to update all related information: (1) 'self.unique_equations', (2) 'self.numberOfVariables_to_equations', (3) DONE AT THE END OF 'factor_one_solve': 'self.variable_to_equations'. Otherwise 'factor_one_solve' will have old info and will not work.
+        if len(unsolved_variables) != len(original_vars):                                   # if one or more variables in 'original_vars' had indeed been solved already; in that case we need to update all related information: (1) 'self.unique_equations', (2) 'self.numberOfVariables_to_equations', (3) 'self.variable_to_equations'. Otherwise 'factor_one_solve' will have old info and will not work.
             if (original_vars, original_summa) in self.unique_equations:
                 self.unique_equations.remove((original_vars, original_summa))
             # Remove the old equation from self.numberOfVariables_to_equations; the new one is either (1) a shorter equation, or (2) a (bunch of) new solved variable(s), which will be sorted out further below
@@ -56,8 +54,8 @@ class CSP_solver:
                     self.numberOfVariables_to_equations[len(original_vars)].remove((original_vars, original_summa))
             
             # TO-DO: Update self.variable_to_equations! This is quite an arduous process. However, it's not very unefficient thanks to sets, and due to the limited length of vars per equation (usually 2-5 per equation, max is 8)
-            self.to_add = []
-            self.to_remove = []
+            self.updated_equations_to_add = []
+            self.obsolete_equations_to_remove = []
             for solved_var, solved_value in solved_variables:
                 immediate_equations = self.variable_to_equations[solved_var]    # NB! This alone is not enough; we need to check the need for updating for all the equations for all the variables in all the equations. Yeah, can be dozens of them in total - but not too bad in reality! Also, this is done only when needed, and the below checks ensure that only ACTUAL equations are updated, not the ones summing up to 0, or where the number of variables equals to the sum.
                 for vars, value in immediate_equations:
@@ -70,14 +68,14 @@ class CSP_solver:
                                     if updated_value != 0:                          # if the updated_value == 0, then it's not an equation anymore, it's a solved variable, saved in self.solved_variables elsewhere already.
                                         if updated_value != len(old_vars)-1:        # we know already that 'solved_var' is in 'old_vars' (because of the if clause above checked it to be the case already). Then, if the number of the remaining variables (-1) equals to the updated value, they all have to be one -> that shouldn't be in the 'self.variable_to_equations' either, as that too is a solved case where all the variables are 1, and this is handled elsewhere (no need to add an equation here). I know this is complicated!
                                             updated_variables = tuple(var for var in old_vars if var != solved_var)
-                                            self.to_add.append((var, updated_variables, updated_value))
-                                    self.to_remove.append((var, old_vars, old_value))
+                                            self.updated_equations_to_add.append((var, updated_variables, updated_value))
+                                    self.obsolete_equations_to_remove.append((var, old_vars, old_value))
                 
             if original_summa-sum_of_solved_vars == 0:                          # old equation sum - (minus) the new, updated equation sum. If this is zero, then all the remaining variables are 0!
                 for var in unsolved_variables:
                     self.solved_variables.add((var,0))
                     # self.mark_var_as_solved_and_update_related_info((var,0))  # set changed size during iteration; because, that function is calling this function, and in that function 'self.variable_to_equations' is directly changed...?
-            if len(unsolved_variables) == 1:
+            if len(unsolved_variables) == 1:                                    # NB! NOT 'elif'!
                 self.solved_variables.add((unsolved_variables[0], original_summa-sum_of_solved_vars))
                 # self.mark_var_as_solved_and_update_related_info((unsolved_variables[0], original_summa-sum_of_solved_vars))
             elif len(unsolved_variables) == original_summa-sum_of_solved_vars:
@@ -86,8 +84,8 @@ class CSP_solver:
                     # self.mark_var_as_solved_and_update_related_info((var,1))
             else:
                 self.unique_equations.add((unsolved_variables, original_summa-sum_of_solved_vars))  # why 'else': we don't need 'equations' that are ({c},1) or such; these are saved to 'self.solved_variables'. So let's keep equations as actual equations.
-            if (unsolved_variables, original_summa-sum_of_solved_vars) not in self.numberOfVariables_to_equations[len(unsolved_variables)]:      # technically this is a redundant check, since we're adding to a set, but the check is useful for showing the logic AND useful for debugging
-                self.numberOfVariables_to_equations[len(unsolved_variables)].add((unsolved_variables, original_summa-sum_of_solved_vars))
+                if (unsolved_variables, original_summa-sum_of_solved_vars) not in self.numberOfVariables_to_equations[len(unsolved_variables)]:      # technically this is a redundant check, since we're adding to a set, but the check is useful for showing the logic AND useful for debugging
+                    self.numberOfVariables_to_equations[len(unsolved_variables)].add((unsolved_variables, original_summa-sum_of_solved_vars))
             x = y = -1                                                                          # if information from already solved variables has been used to simplify equation, then this equation no longer has defnitivie single (x,y) origin from the minesweeper map; hence, mark it as (-1,-1).
         return [x, y, unsolved_variables, original_summa-sum_of_solved_vars]
 
@@ -174,13 +172,13 @@ class CSP_solver:
                 self.update_equation_and_related_info((-1,-1, (variables), value))      # NB! (1) This also adds to 'self.to_add' and 'self.to_remove'; hence, only AFTER completion of this loop, can I remove and/or add to 'self.variable_to_equations'. (2) This updates all equations with the newly solved variable, for example if a=1 was solved, then for a+b+e=2 -> b+e=1, etc.
                 #self.variable_to_equations[solved_var].remove((variables, value))      # set changed size during iteration if you uncomment this
             
-            for var, updated_vars, updated_value in self.to_add:
+            for var, updated_vars, updated_value in self.updated_equations_to_add:
                 if (updated_vars, updated_value) not in self.variable_to_equations[var]:    # to show the logic and to facilitate debugging. Technically, this is not needed (for adding to set; not needed, technically speaking)
                     self.variable_to_equations[var].add((updated_vars, updated_value))
-            for var, old_vars, old_value in self.to_remove:
-                if (old_vars, old_vars) in self.variable_to_equations[var]:                 # needed. Sometimes, this would cause 'key_error' without checking.
+            for var, old_vars, old_value in self.obsolete_equations_to_remove:
+                if (old_vars, old_value) in self.variable_to_equations[var]:                 # needed. Sometimes, this would cause 'key_error' without checking.
                     self.variable_to_equations[var].remove((old_vars, old_value))
-            self.variable_to_equations[solved_var] = set()                              # TO-DO: ONLY clearing for the solved var is not enough! Let's do the updating in 'self.update_equation_and_related_info', because that's where we're calculating the updated value for the partially solved equations already anyways! So, in short: I should update for new, already-solved variables, not ONLY clear the whole thing! does this occur prematurily??? now that all info regarding this solved variable and the equations containing this solved variable has been updated, I can empty the set of equations containing this variable (i.e., they no longer should contain this variable, as its value has been set as 0 or 1 in those equations)
+            self.variable_to_equations[solved_var] = set()                              # ONLY clearing for the solved var is not enough, that's why above, every set of obsolete equations (i.e. containing variables that have been solved, now in 'self.solved_variables') that was marked for removal is removed, while the corresponding updated equations are added above. I did the updating in 'self.update_equation_and_related_info', because that's where we're calculating the updated value for the partially solved equations already anyways, having the necessary updating information available. So, in short: I should update for new, already-solved variables, not ONLY clear the whole thing does this occur prematurily??? Anyways: now that all info regarding this solved variable and the equations containing this solved variable has been updated above, I can empty the set of equations containing this variable (i.e., they no longer should contain this variable, as its value has been set as 0 or 1 in those equations)
 
 def format_equation_for_csp_solver(x:int, y:int, variables:tuple, surrounding_mine_count:int) -> list:
     # NB! 'variables' has to be a tuple OR something that can be converted to a tuple
