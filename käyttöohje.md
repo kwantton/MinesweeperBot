@@ -63,3 +63,5 @@ Jos pelaat `expert`-pelimuotoa (se on defaulttina menossa; esim. vaihda pelimuot
 
 
 <h2>Minkä muotoisia syötteitä ohjelma hyväksyy</h2>
+
+Esimerkit näkyvät tiedostojen `botGame.py` ja `CSP_solver.py` alalaidoissa, `if __name__ == __main__`-osioissa. Ja kuten huomaat, selittäviä kommentteja löytyy!
