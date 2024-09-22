@@ -1,14 +1,6 @@
 '''to-do:
+- why is the last test flaky? most probable reason; iteration through sets varies in order, and through this, sometimes all variables are solved (yep) and sometimes NONE (YEP - I know! Amazing, right?)
 - in 'factor_one_solve', an easy way to check if subtracting the subset from the larger set is correct is as follows: if you end up with a+b+.... < 0, the subtraction was WRONG - something was wrong in the code itself. Why; because x ∈{0,1} for all cells x, and because I'm always subtracting a subset from a larger or equally sized set. Therefore, as every element of each set is 0 or 1, it is not possible to end up with a negative result for the resulting equation. For example: a+b+c = 1, a+b+c+d = 2 -> d = 1. The resulting equation can never have a negative value, if every element of the subset is found in the larger set, and every element x ∈{0,1} for all cells x. Therefore, it would be good the specifically add this at some point to facilitate debugging.
-
-done:
-- 'filter_out_solved_variables' was faulty
-- If you end up with 'a+b+c+... = 0' as the result equation, assign every one of those variables as 0 (this is CSP where the constraint is that x ∈{0,1} for all cells x)
-- at the end of 'factor_one_solve', update all equations with the variables that were solved ('update_info...')
-- update 'variable_to_equations' after solving
-- update self.numberOfVariables_to_equations, as you update old equations to ones with solved variables taken into account
-- create a function for updating all necessary info ('update_info...', 'update_equation...')
-- updating 'self.variable_to_equations' for already-solved variables, then clearing out for the solved variables
 
 '''
 
@@ -106,7 +98,7 @@ class CSP_solver:
                 unsolved_vars.append(var)
         return tuple(unsolved_vars), sum_of_solved_vars, solved_vars                    # you can't hash sets or lists (not immutable), hence a tuple is returned instead for 'unsolved_vars'. Hashing of 'unsolved_variables' is needed in 'add_equations' from where this function is used.
 
-    # TO-DO: if a+b+c = x and a+b+d = y, then subtract => c-d=x-y ∈ {-1,0,1}. If -1, then c-d=-1, so d-c=1, so d=1, c=0. If 0, then c-d=0, so c=d; if 1, then c-d=1, so c=d+1, so c=1 and d=0.
+    # if a+b+c = x and a+b+d = y, then subtract => c-d=x-y ∈ {-1,0,1}. If -1, then c-d=-1, so d-c=1, so d=1, c=0. If 0, then c-d=0, so c=d; if 1, then c-d=1, so c=d+1, so c=1 and d=0.
     def equal_length_solver(self):
         for s in range (2, 8+1):                                                        # this is for EQUATION lengths, from 2 to 8; in my case I'm defining an equation as something that has at least 2 different (unsolved) variables (a variable being the minecount in the surrounding 8 cells of a given cell). So, no need to start from 1; those are handled elsewhere already, this is not for those cases. Also; they should not be in 'self.numberOfVariables_to_equations' anyways c:
             equal_length_equations = list(self.numberOfVariables_to_equations[s])
@@ -176,7 +168,7 @@ class CSP_solver:
         if how_many_rounds > 1:
             self.factor_one_binary_solve(how_many_rounds-1)
 
-    def find_solutions_from_single_equations(self, equations:list) -> bool:                    # this checks if (1) a+b+...=0 -> then a,b,... = 0, since every variable is 0 or 1, (2) if the length of the variables is 1, then there's only one variable x with value y -> mark variable x as y, (3) if a new equation is found, then check it and mark all variables associated with it
+    def find_solutions_from_single_equations(self, equations:list) -> bool:             # this checks if (1) a+b+...=0 -> then a,b,... = 0, since every variable is 0 or 1, (2) if the length of the variables is 1, then there's only one variable x with value y -> mark variable x as y, (3) if a new equation is found, then check it and mark all variables associated with it
         new_solutions = []
         equations_to_add = []
         found_solutions = False
@@ -207,7 +199,7 @@ class CSP_solver:
     def update_related_info_for_solved_var(self, new_solution:tuple) -> None:
         solved_var, value = new_solution
         
-        # why am I not performing this commented-out line below here??? BECAUSE: if there are multiple solved vars, this creates multiple times the work (unnecessary computation)! In English: ALL the newly solved variables should be added to 'self.solved_variables' first, THEN update the info regarding those solved variables, so that partially obsolete equations are not created in the process! For example; imagine a loop that solves 3 variables. If I start updating all the info regarding ONE solved variable, I have to do that 3 times, compared to if I mark all 3 as solved, THEN update all related info ONE time c:
+        # why am I not performing this commented-out line below here? BECAUSE: if there are multiple solved vars, this creates multiple times the work (unnecessary computation)! In English: ALL the newly solved variables should be added to 'self.solved_variables' first, THEN update the info regarding those solved variables, so that partially obsolete equations are not created in the process! For example; imagine a loop that solves 3 variables. If I start updating all the info regarding ONE solved variable, I have to do that 3 times, compared to if I mark all 3 as solved, THEN update all related info ONE time c:
         # self.solved_variables.add((solved_var, value))                                # 'self.solved_variables' is the set of tuples that is utilized in 'botGame.py'! So this is the solution carrier info structure that's used by botGame.py, so to say.
         if solved_var in self.variable_to_equations:                                    # then update all those equations, then clear the now-obsolete list of equations mapped for this variable
             equations_with_the_var = self.variable_to_equations[solved_var]             # all of these have to be updated!
@@ -229,9 +221,18 @@ class CSP_solver:
             self.var_to_equations_obsolete_equations_to_remove.clear()                  # clear for the next round of 'self.factor_one_binary-solve()'
             self.variable_to_equations[solved_var] = set()                              # ONLY clearing for the solved var is not enough, that's why above, every set of obsolete equations (i.e. containing variables that have been solved, now in 'self.solved_variables') that was marked for removal is removed, while the corresponding updated equations are added above. I did the updating in 'self.update_equation_and_related_info', because that's where we're calculating the updated value for the partially solved equations already anyways, having the necessary updating information available. So, in short: I should update for new, already-solved variables, not ONLY clear the whole thing does this occur prematurily??? Anyways: now that all info regarding this solved variable and the equations containing this solved variable has been updated above, I can empty the set of equations containing this variable (i.e., they no longer should contain this variable, as its value has been set as 0 or 1 in those equations)
 
-    # TO-DO; (1) reassign everywhere (all data structures), (2) in 'add_equations_if_new', check for incoming variables, if they have been reassigned. This should be extremely simple.
-    def reassign_variable(self, c:tuple, d:tuple) -> None:
+    # TO-DO; only if needed - I have to first fix the last flaky unit test here. (1) reassign everywhere (all data structures), (2) in 'add_equations_if_new', check for incoming variables, if they have been reassigned. This should be extremely simple.
+    def reassign_variable(self, old:tuple, new:tuple) -> None:                          # when using characters instead of (x,y), this is not actually a tuple, but a string (single character)
         pass
+        # if self.variable_to_equations[old]:                                             # if instead this is just {} (empty set), then don't go through every self.unique_equations, etc etc..
+        #     for vars, summa in self.variable_to_equations[old]:                         # (var1, var2, ...), summa
+        #         count_of_each_var = {}                                                  # for example: in case a+b+f+g, if 'old'=g and 'new'=a, then 'a+b+f+g' becomes 'a+b+f+a' = '2a+b+f'; for this, I need the COUNT of each variable!
+        #         for var in vars:
+        #             if var == old:
+        #                 var = new
+        #             if var not in count_of_each_var:
+        #                 count_of_each_var[var] = 0
+        #             count_of_each_var[var] += 1
 
 def format_equation_for_csp_solver(x:int, y:int, variables:tuple, surrounding_mine_count:int) -> list:
     # NB! 'variables' has to be a tuple OR something that can be converted to a tuple
@@ -289,7 +290,7 @@ if __name__ == '__main__':
     eq4 = [3, 1, ((2,0), (3,0)), 1]
     csp = CSP_solver()
     csp.add_equations_if_new([eq1, eq2, eq3, eq4])
-    csp.factor_one_binary_solve(10)
+    csp.factor_one_binary_solve()
 
     print_solved_variables(csp, 'test 1b: (x,y): (0,0)=0, (0,1)=1, (1,0)=1, (2,0)=0, (3,0)=1 expected:', '01101')
 
@@ -358,7 +359,7 @@ if __name__ == '__main__':
     eq4 = [2, 1, ('d', 'e', 'f', 'b'), 3]
     csp = CSP_solver()
     csp.add_equations_if_new([eq1, eq2, eq3, eq4])
-    csp.factor_one_binary_solve(1)
+    csp.factor_one_binary_solve()
 
     print_solved_variables(csp, 'test 3a, letters. 0101 expected', '0101')
 
@@ -394,7 +395,7 @@ if __name__ == '__main__':
     eqb     = [3, 5, ('e', 'f', 'g', 'h', 'i'), 2]
     csp = CSP_solver()
     csp.add_equations_if_new([eqi, eqiii, eqv, eqvi, eqa, eqb])
-    csp.factor_one_binary_solve(3)                                  # NB! after 3 rounds, e=0 is solved. A smaller number of rounds is not enough. This is ok and expected given the functions above, of course; also, the purpose is not to be able to solve everything in one go, as that would also mean that pressing 'b' in 'botGame.py' would proceed a huge number of steps at a time, AND this has nothing to do, as such, with efficiency either; so I want to divide this into small(ish) steps whenever possible, facilitating visualization and debugging that way, as there's no real reason not to do this.
+    csp.factor_one_binary_solve(3)                                  # NB! after 3 rounds minimum, e=0 is solved! A smaller number of rounds is not enough. This is ok and expected given the functions written in the class, as not everything is recursively updated until the end of the world (as this would complicate things even more!); also, nb! The purpose is not to be able to solve everything in one go, as that would also mean that pressing 'b' once in 'botGame.py' would proceed a huge number of steps at a time, AND this has nothing to do, as such, with efficiency either; so I want to divide this into small(ish) steps whenever possible, facilitating visualization and debugging that way, as there's no real reason not to do this. In fact, efficiency-wise, it's better to run as little as CSP_solver as possible, instead relying on the much simpler 'simple_solver' in 'botGame.py' as possible
 
     print_solved_variables(csp, 'test 4a, letters. 0 expected', '0')
 
@@ -408,10 +409,10 @@ if __name__ == '__main__':
     
     csp = CSP_solver()
     csp.add_equations_if_new([eq1, eq2, eq3, eq4, eq5])
-    csp.factor_one_binary_solve(2)                                  # NB! after 3 rounds, e=0 is solved. A smaller number of rounds is not enough. This is ok and expected given the functions above, of course; also, the purpose is not to be able to solve everything in one go, as that would also mean that pressing 'b' in 'botGame.py' would proceed a huge number of steps at a time, AND this has nothing to do, as such, with efficiency either; so I want to divide this into small(ish) steps whenever possible, facilitating visualization and debugging that way, as there's no real reason not to do this.
-    # Through this case, I noticed that it's not possible to solve it by performing just the 'factor_one_solve()'; instead, even more CSP condition checking is needed, and for this, we need at least (a) subtraction so that we get a x=y equation, and/or (b) subtraction so that we get a x=1+y equation (solution by CSP: x=1, y=0, as every variable is 0 or 1!)
+    csp.factor_one_binary_solve(2)                                  # NB! This needs 2 rounds!
+    # TO-DO: Thanks to this, I added more CSP conditions -> now it's sometimes ENTIRELY solved, sometimes NOT AT ALL (0 variables solved!)
 
-    print_solved_variables(csp, 'test 5a, letters. c=0, d=0, e=1, f=1, g=0 expected', '00110') # expected: cdefg 00110
+    print_solved_variables(csp, 'test 5a, letters. c0, d0, e1, f1, g0, h0, i0, j0 expected', '00110000') # expected: cdefg 00110
 
 
 '''
@@ -429,4 +430,6 @@ All the operations I need for handling these equations are (1) subtraction betwe
 '''What is done:
 - sort equations by length. Start with the shortest one, and see which of the longer equations has all its terms -> subtract -> see if the new equation is unique. Efficient
 - save all solved variables
+- bookkeeping of equations (this could be flaky, to-do partly still)
+
 '''
