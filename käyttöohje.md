@@ -29,6 +29,7 @@ Vaihda pelimoodia tämän tiedoston alalaidasta (`if __name__ == __main__`-osast
 Kun ajat koodin `botGame.py`:ssä, niin peli alkaa. Ohjeet ovat pelin alapalkissa (q lopettaa, b pelaa botilla (joka käyttää `simple_solver()`:ia ja `CSP_solver`-luokkaa))
 
 <h3>"TEKOÄLYN" käyttäminen: Mitä b-painallus siis tekee?</h3>
+
 b-painallus ajaa <b>yhden</b> rundin `simple_solver()`:ia, ja jos `csp_on == True` niinkuin se defaulttina on, niin samalla yhden rundin `CSP_solver`:ia. 
   
   - jos siis haluat ajaa <b>monta</b> rundia tekoälyä, paina toistuvasti peräkkäin b-näppäintä!
