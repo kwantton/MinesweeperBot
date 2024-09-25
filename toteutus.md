@@ -2,7 +2,7 @@
 
 <h2> Ohjelman yleisrakenne </h2>
 
-Graafinen käyttöliittymä on toteutetty `pygame`:ä käyttäen.
+Graafinen käyttöliittymä on toteutettu `pygame`:ä käyttäen.
 
 Botti aloittaa vasemmasta yläkulmasta, ja etenee `self.front`:ia, jota se tällä hetkellä (24.9.24) onnistuneesti ylläpitää (poistaa `self.front`:ista joka kierroksen jälkeen ruudut, jotka eivät tarjoa enää informaatiota jota voidaan hyödyntää ratkaisun kannalta, ja lisää `self.front`:iin sellaiset avatut ruudut, jotka tarjoavat informaatiota. Tämän 'hyödyllisyyden' määritelmä on yksinkertaisesti se, onko kyseisen avatun ruudun ympärillä enää avaamattomia ruutuja vai ei; jos on, ruutu on `self.front`:issa)
 
