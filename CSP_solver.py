@@ -58,16 +58,14 @@ class CSP_solver:
             return common
         
         # for each group (group=alternative solutions for an equation), find at least one solution that's compatible with AT LEAST one alternative solution from every other group (i.e. from every other equation that MUST be satisfied). Then continue from that!
-        def restrict_solution_space_as_equation_pairs_with_common_variables(possible_solutions) -> None:
+        def restrict_solution_space_as_equation_pairs_with_common_variables(possible_solutions:list) -> dict:
             n_groups = len(possible_solutions)
-            possible_alt_solutions = []                                             # I'll gather every compatible solution from every altB here with this altA that each altB is compatible with
             compatibility_groups = dict()                                           # { possible solution : all related possible solutions (i.e. those which share variables and do not disagree for any variable value for those variables that are present in both the key and each of the values in this dictionary for that key!) }. There's no need for explicit bookkeeping regarding which of the value solutions belong to which original equation, because the variables included themselves are enough to identify the origin.
             for a in range(n_groups):
                 groupA = possible_solutions[a]                                      # e.g. (('a',0), ('b',1)), (('a',1),('b',0)) would constitute one 'group' (length 2) for the equation 'a+b=1' which is stored as ((a,b),1) in 'self.unique_variables'; that is, all the possible solutions for that equation constitute a 'group'
                 for altA in groupA:                                                 # e.g. altA = (('a', 0), ('b', 1)); alt = alternative = one alternative solution for a single equation, that might or might not be possible (i.e. might or might not be compatible with B)
                     if altA not in compatibility_groups:
                         compatibility_groups[altA] = set()
-                    altA_viable_and_connected = True                                # if all the other groups have at least ONE equation that is compatible with altA AND shares common variables with altA, then altA is compatible, and that means that it goes together with the altBs below. If just one of the other groups has NO compatibility, then 'altA_is_viable'=False!
                     for b in range(n_groups):
                         if a==b:
                             continue
@@ -92,12 +90,44 @@ class CSP_solver:
                         else:                                                       # if there are no shared variables between groupA (including altA) and groupB (including altB), then groups A and B ARE compatible (they don't restrict each other in any way) -> move on to next groupB
                             groupB_compatible = True
                             continue                                                # this means that entire groupA and groupB are compatible -> move on to the next altA (moving on to next GROUP A would be even better though)
-            for possible_solution in possible_alt_solutions:                        # each possible solution
-                pass
             return compatibility_groups                                             # remember! There's only ONE interpretation for those keys that have empty value set; they are NOT limited at all, that is, all alternatives (all 1-combinations, i.e. all mine combinations) are still possible for them!
-        AB_comparison_results = restrict_solution_space_as_equation_pairs_with_common_variables(possible_solutions = self.possible_mine_combo_groups)
-        second_comparison_results = restrict_solution_space_as_equation_pairs_with_common_variables(possible_solutions = AB_comparison_results)
-        pass
+        restricted_solutions = restrict_solution_space_as_equation_pairs_with_common_variables(possible_solutions = self.possible_mine_combo_groups)
+
+        def solution_finder_from_compatibility_groups(compatibility_groups:dict) -> dict:
+            def simple_inspection():
+                new_solutions = set()
+                keyVars_to_key = dict()
+                for key in compatibility_groups.keys():                        # e.g. key = (('a',0),('b',1),('c',1)), values are similar, AND each value for each key shares at least one variable (like 'a') with the key (which is also an equation, just like the values)
+                    key_vars = tuple(proposed_value[0] for proposed_value in key)    # NB! THese still are in alphabetic order, thanks to 'itertools.combinations' in 'find_and_group_possible_answers_per_single_equation' which sorted the answers alphabetically
+                    if key_vars not in keyVars_to_key:
+                        keyVars_to_key[key_vars] = []
+                    keyVars_to_key[key_vars].append(key)
+                for keyVars, proposed_values in keyVars_to_key.items():
+                    if len(proposed_values) == 1:
+                        for var, value in proposed_values[0]:
+                            self.solved_variables.add((var,value))
+                            new_solutions.add((var,value))
+                            # self.update_related_info_for_solved_var(((var, value)))
+                    else:
+                        values_of_vars = dict()
+                        for proposed_vector in proposed_values:
+                            for var,value in proposed_vector:
+                                if var not in values_of_vars:
+                                    values_of_vars[var] = set()
+                                values_of_vars[var].add(value)
+                        for var,values in values_of_vars.items():
+                            if len(values) == 1:
+                                self.solved_variables.add((var, value))
+                                new_solutions.add((var,value))
+                return new_solutions
+            
+            def update_compatibility_groups():
+                compatibility_groups
+                
+            new_solutions = simple_inspection()
+            if new_solutions:
+                update_compatibility_groups(new_solutions)
+        solution_finder_from_compatibility_groups(restricted_solutions)
  
 
     # NB! This is called, when adding new equations for the first time, AND after finding new variables IF the related equations are (1) new and (2) do not become single solved variables as well (i.e. if the related equations are not reduced from equations like a+b=1 to just solved single variables like b=1). Hence, sometimes the 'self.update_equation(equation)' is necessary.
