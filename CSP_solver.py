@@ -12,7 +12,7 @@ class CSP_solver:
         self.unique_equations = set()                               # { ((var1, var2, ..), sum_of_mines_in_vars), (...) }. Each var (variable) has format (x,y) of that cell's location; cell with a number label 1...8 = var. Here, I want uniqe EQUATIONS, not unique LOCATIONS, and therefore origin-(x,y) is not stored here. It's possible to get the same equation for example from two different sides, and via multiple different calculation routes, and it's of course possible to mistakenly try to add the same equation multiple times; that's another reason to use a set() here, the main reason being fast search from this hashed set.        
         self.solved_variables = set()                               # ((x,y), value); the name of the variable is (x,y) where x and y are its location in the minesweeper map (if applicable), and the value of the variable is either 0 or 1, if everything is ok (each variable is one cell in the minesweeper map, and its value is the number of mines in the cell; 0 or 1, that is)
         self.impossible_mine_combos = set()
-        self.possible_mine_combo_groups = set()
+        self.possible_mine_combo_groups = []
         
         self.variable_to_equations = dict()                         # { variable_a : set(equation5, equation12, equation4,...), variable_b : set(equation3, equation4...)}. The format of 'equation' is ((variable1, variable2,...), sum_of_the_variables)
         self.numberOfVariables_to_equations = {                     # { numberOfVariables : set(equation1, equation2, ...) }; each key of this dict is integer x, and x's values are all equations with x number of variables. I want to look at those equations with low number of variables, and see for each of those variables if they can be found in equations with more variables; if all the variables in the shorter equation are found in the longer equation, then perform subtraction to get rid of those varibles in the longer equation (linear equation solving), then save the formed result equation to 'self.unique_equations' and 'self.numberOfVariables_to_equations'.
@@ -22,38 +22,83 @@ class CSP_solver:
         self.var_to_equations_obsolete_equations_to_remove = set()  # same as above comment
 
     # 100% solution: try all combinations of ones (=mines), and see if it satisfies all equations where that variable is. From all of these combinations that DO satisfy all the equations, find columns where a variable is always 0 or 1 -> it HAS to be 0 or 1.
-    def absolut_brut(self, rounds=1):
-        all_possible_combinations_of_mines = set()
-        for variables, summa in self.unique_equations:
-            mine_location_combinations = combinations(variables, summa)         # all possible combinations of mines for this equation
-            this_eq_group = []                                                  # NB! All the possible solutions for THIS equation ('variables', 'summa' constitutes an equation in 'self.unique_equations') are gathered here; in the end, I have to solve each of these 'individual' equations, AND find a solution that satisfies all the other equations as well.
-            for mine_location_combination in mine_location_combinations:
-                combo = []                                                      # for all vars a,b,c,... {a:1, b:0, c:0, ....}
-                for var in variables:
-                    if var in mine_location_combination:
-                        combo.append((var, 1))                                  # it's entirely possible to just add the 1s, if the definition is that all others are 0
-                    else:
-                        combo.append((var, 0))
-                combo = tuple(combo)
+    def absolut_brut(self, rounds=1) -> None:
 
-                if combo not in self.impossible_mine_combos:
-                    this_eq_group.append(combo)
-                    all_possible_combinations_of_mines.add(combo)
-                    
-            self.possible_mine_combo_groups.add(tuple(this_eq_group))
-        pass
+        def find_and_group_possible_answers_per_single_equation():                  # for each equation, given that each variable is 0 or 1, find all possible combinations of 1s and 0s that can satisfy that equation GIVEN THAT it has sum = k (some integer number!)
+            all_possible_combinations_of_mines = set()
+            for variables, summa in self.unique_equations:
+                mine_location_combinations = combinations(variables, summa)         # all possible combinations of mines for this equation
+                this_eq_group = []                                                  # NB! All the possible solutions for THIS equation ('variables', 'summa' constitutes an equation in 'self.unique_equations') are gathered here; in the end, I have to solve each of these 'individual' equations, AND find a solution that satisfies all the other equations as well.
+                for mine_location_combination in mine_location_combinations:
+                    combo = []                                                      # for all vars a,b,c,... {a:1, b:0, c:0, ....}
+                    for var in variables:
+                        if var in mine_location_combination:
+                            combo.append((var, 1))                                  # I could add only the 1s as all the others are 0, BUT then I'd have to also gather a set of all the variables present. Instead, I like to keep it more visually clear here; also each 'combo' is short, so using a set vs. iterating through all (usually 2-4) items makes no big difference performance-wise
+                        else:
+                            combo.append((var, 0))
 
-    def inter(self):
-        all_vars = set(self.variable_to_equations.keys())
-        for variables, summa in self.possible_mine_combo_groups:
+                    combo = tuple(combo)
+
+                    if combo not in self.impossible_mine_combos:
+                        this_eq_group.append(combo)
+                        all_possible_combinations_of_mines.add(combo)
+                        
+                self.possible_mine_combo_groups.append(tuple(this_eq_group))
             pass
+        find_and_group_possible_answers_per_single_equation()
 
-                
-
-
+        # used in function below; are there common variables between two alternative single equation answers?
+        def common_vars(vars1, vars2) -> bool:
+            common = False
+            varsB = set(twople[0] for twople in vars2)                              # twople = (var, value), but obviously I can't name it 'tuple' since that's taken in Python
+            for twople in vars1:
+                if twople[0] in varsB:
+                    common = True
+                    break
+            return common
         
-
-        
+        # for each group (group=alternative solutions for an equation), find at least one solution that's compatible with AT LEAST one alternative solution from every other group (i.e. from every other equation that MUST be satisfied). Then continue from that!
+        def restrict_solution_space_as_equation_pairs_with_common_variables(possible_solutions) -> None:
+            n_groups = len(possible_solutions)
+            possible_alt_solutions = []                                             # I'll gather every compatible solution from every altB here with this altA that each altB is compatible with
+            compatibility_groups = dict()                                           # { possible solution : all related possible solutions (i.e. those which share variables and do not disagree for any variable value for those variables that are present in both the key and each of the values in this dictionary for that key!) }. There's no need for explicit bookkeeping regarding which of the value solutions belong to which original equation, because the variables included themselves are enough to identify the origin.
+            for a in range(n_groups):
+                groupA = possible_solutions[a]                                      # e.g. (('a',0), ('b',1)), (('a',1),('b',0)) would constitute one 'group' (length 2) for the equation 'a+b=1' which is stored as ((a,b),1) in 'self.unique_variables'; that is, all the possible solutions for that equation constitute a 'group'
+                for altA in groupA:                                                 # e.g. altA = (('a', 0), ('b', 1)); alt = alternative = one alternative solution for a single equation, that might or might not be possible (i.e. might or might not be compatible with B)
+                    if altA not in compatibility_groups:
+                        compatibility_groups[altA] = set()
+                    altA_viable_and_connected = True                                # if all the other groups have at least ONE equation that is compatible with altA AND shares common variables with altA, then altA is compatible, and that means that it goes together with the altBs below. If just one of the other groups has NO compatibility, then 'altA_is_viable'=False!
+                    for b in range(n_groups):
+                        if a==b:
+                            continue
+                        groupB = possible_solutions[b]
+                        common_variables = common_vars(groupA[0], groupB[0])        # I only want coupled subsets; there's no point in constructing entities where a=0 or a=1 and b=0 or b=1 and f=0 or f=1; so I'm only looking for those pairs that share a variable, hopefully finding such pairs where a variable becomes restricted
+                        if common_variables:
+                            groupB_compatible = False                               # NB! groupB needs to be compatible for altA to be viable! That is: if altA is to be viable, it has to satisfy at least one altB from every groupB! (2) this ALSO checks if there are
+                            for altB in groupB:                                     # NB! ONE at least needs to be compatible with altA, OR altA is not 'viable_and_connected'. e.g. (('a', 0), ('b', 1)); alt = alternative = one alternative solution for a single equation, that might or might not be possible (i.e. might or might not be compatible with A)
+                                altA_altB_compatible = True                                                                    
+                                for var1, val1 in altA:                             # e.g. 'a', 0. Each var1, val1 has to be compatible with at least ONE alt2 from every other group, so that 'altA_is_viable'!
+                                    opposite_value = (var1, int(not val1))          # val1 = 1 or 0; if 1, opposite = (var1, 0). This is so I can avoid if-clause below, making it shorter.
+                                    if opposite_value in altB:
+                                        altA_altB_compatible = False
+                                        break
+                                if altA_altB_compatible:
+                                    groupB_compatible = True
+                                    compatibility_groups[altA].add(altB)            # I don't need to add this into a separate 'group' for this key; I know that those values here which share the same variables, belong to the same group! So there's no need for a separate grouping here.
+                            if not groupB_compatible:                               # if altA from groupA is viable, it will have added groups of viable altBs from every other group
+                                altA_viable_and_connected = False                   # so, for every groupB, you need to have at least one compatibility_group_addition from that groupB so that altA is viable
+                                del compatibility_groups[altA]                      # currently, there are only even if some previous groups passed, if just ONE group (this current one in question!!) fails, then the WHOLE altA has failed, it cannot be true; this means altA cannot satisfy any possible solution of one or more other equation groups' possible solutions - so it cannot be true, since we know that a true version must exist, as it's based on actual irl count of mines, meaning that all these equations (derived from those accurate counts) HAVE to be true, that is, satisfied one way or another.
+                                break                                               # move on to inspect the next altA, if the current altA is not viable!
+                        else:                                                       # if there are no shared variables between groupA (including altA) and groupB (including altB), then groups A and B ARE compatible (they don't restrict each other in any way) -> move on to next groupB
+                            groupB_compatible = True
+                            continue                                                # this means that entire groupA and groupB are compatible -> move on to the next altA (moving on to next GROUP A would be even better though)
+            for possible_solution in possible_alt_solutions:                        # each possible solution
+                pass
+            return compatibility_groups                                             # remember! There's only ONE interpretation for those keys that have empty value set; they are NOT limited at all, that is, all alternatives (all 1-combinations, i.e. all mine combinations) are still possible for them!
+        AB_comparison_results = restrict_solution_space_as_equation_pairs_with_common_variables(possible_solutions = self.possible_mine_combo_groups)
+        second_comparison_results = restrict_solution_space_as_equation_pairs_with_common_variables(possible_solutions = AB_comparison_results)
+        pass
+ 
 
     # NB! This is called, when adding new equations for the first time, AND after finding new variables IF the related equations are (1) new and (2) do not become single solved variables as well (i.e. if the related equations are not reduced from equations like a+b=1 to just solved single variables like b=1). Hence, sometimes the 'self.update_equation(equation)' is necessary.
     def add_equations_if_new(self, equations:list) -> None:                             # equations = [(x, y, ((x1, y1), (x2, y2), ...), summa), ...]; so each equation is a tuple of of x, y, unflagged unclicked neighbours (coordinates; unique variables, that is!), and the label of the cell (1,2,...8)
