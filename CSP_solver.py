@@ -113,17 +113,18 @@ class CSP_solver:
                         for proposed_vector in proposed_values:
                             for var,value in proposed_vector:
                                 if var not in values_of_vars:
-                                    values_of_vars[var] = set()
-                                values_of_vars[var].add(value)
+                                    values_of_vars[var] = []
+                                if var not in values_of_vars[var]:
+                                    values_of_vars[var].append(value)
                         for var,values in values_of_vars.items():
                             if len(values) == 1:
-                                self.solved_variables.add((var, value))
-                                new_solutions.add((var,value))
+                                self.solved_variables.add((var, values[0]))
+                                new_solutions.add((var,values[0]))
                 return new_solutions
             
-            def update_compatibility_groups():
+            def update_compatibility_groups(new_solutions:set) -> dict:
                 compatibility_groups
-                
+
             new_solutions = simple_inspection()
             if new_solutions:
                 update_compatibility_groups(new_solutions)
