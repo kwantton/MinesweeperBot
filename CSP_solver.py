@@ -12,7 +12,6 @@ class CSP_solver:
         self.unique_equations = set()                               # { ((var1, var2, ..), sum_of_mines_in_vars), (...) }. Each var (variable) has format (x,y) of that cell's location; cell with a number label 1...8 = var. Here, I want uniqe EQUATIONS, not unique LOCATIONS, and therefore origin-(x,y) is not stored here. It's possible to get the same equation for example from two different sides, and via multiple different calculation routes, and it's of course possible to mistakenly try to add the same equation multiple times; that's another reason to use a set() here, the main reason being fast search from this hashed set.        
         self.solved_variables = set()                               # ((x,y), value); the name of the variable is (x,y) where x and y are its location in the minesweeper map (if applicable), and the value of the variable is either 0 or 1, if everything is ok (each variable is one cell in the minesweeper map, and its value is the number of mines in the cell; 0 or 1, that is)
         self.impossible_mine_combos = set()
-        self.possible_mine_combo_groups = []
         
         self.variable_to_equations = dict()                         # { variable_a : set(equation5, equation12, equation4,...), variable_b : set(equation3, equation4...)}. The format of 'equation' is ((variable1, variable2,...), sum_of_the_variables)
         self.numberOfVariables_to_equations = {                     # { numberOfVariables : set(equation1, equation2, ...) }; each key of this dict is integer x, and x's values are all equations with x number of variables. I want to look at those equations with low number of variables, and see for each of those variables if they can be found in equations with more variables; if all the variables in the shorter equation are found in the longer equation, then perform subtraction to get rid of those varibles in the longer equation (linear equation solving), then save the formed result equation to 'self.unique_equations' and 'self.numberOfVariables_to_equations'.
@@ -21,17 +20,18 @@ class CSP_solver:
         self.var_to_equations_updated_equations_to_add = set()      # during iteration of these, these cannot be directly changed -> gather a list, modify after iteration is over
         self.var_to_equations_obsolete_equations_to_remove = set()  # same as above comment
 
-    # 100% solution: try all combinations of ones (=mines), and see if it satisfies all equations where that variable is. From all of these combinations that DO satisfy all the equations, find columns where a variable is always 0 or 1 -> it HAS to be 0 or 1.
+    # 100% solution: (1) PER EACH EQUATION that MUST be satisfied (i.e. each number cell on the minesweeper map), try all combinations of ones (=mines). That's what THIS function does. (2) After this function below, from all of the alternative combinations of 1s and 0s that DO satisfy the CURRENT equation, find those alternatives that are incompatible with all other equations (i.e. "groups", i.e. incompatible with ALL the alternative solutions of at least one other group) (3) from the remaining alt equations per group (i.e. PER original equation), find columns where a variable is always 0 or 1 -> it HAS to be 0 or 1. Then see these new solutions, inspect the remaining equations for untrue alternatives now that we've solved a new variable (or many new variables), and keep repeating the whole loop (1),(2),(3) as long as new solutions keep coming. Stop iteration when there are no longer new solutions produced by the whole loop.
     def absolut_brut(self, rounds=1) -> None:
+        
+        # for each equation (i.e. each number cell on the minesweeper map), given that each variable (= each unopened cell) is 0 or 1 (no mine or a mine), find all possible combinations of 1s and 0s that can satisfy that SINGLE equation GIVEN THAT it has sum = k (some integer number = the number of mines in those unopened surrounding cells in total!)
+        def find_and_group_possible_answers_per_single_equation(alt_answers_per_equation:list) -> list:                  
 
-        def find_and_group_possible_answers_per_single_equation():                  # for each equation, given that each variable is 0 or 1, find all possible combinations of 1s and 0s that can satisfy that equation GIVEN THAT it has sum = k (some integer number!)
-            all_possible_combinations_of_mines = set()
             for variables, summa in self.unique_equations:
                 mine_location_combinations = combinations(variables, summa)         # all possible combinations of mines for this equation
                 this_eq_group = []                                                  # NB! All the possible solutions for THIS equation ('variables', 'summa' constitutes an equation in 'self.unique_equations') are gathered here; in the end, I have to solve each of these 'individual' equations, AND find a solution that satisfies all the other equations as well.
                 for mine_location_combination in mine_location_combinations:
                     combo = []                                                      # for all vars a,b,c,... {a:1, b:0, c:0, ....}
-                    for var in variables:
+                    for var in sorted(variables):                                   # I want to always handle variables in alphabetical order so that I can be sure that when I read/write into data structures according to combinations of variables, then for example a dict key (a,b,c) is always (a,b,c), not (b,c,a) or something else. This is to reduce unnecessary computing and to keep things overall as simple and reliable as possible.
                         if var in mine_location_combination:
                             combo.append((var, 1))                                  # I could add only the 1s as all the others are 0, BUT then I'd have to also gather a set of all the variables present. Instead, I like to keep it more visually clear here; also each 'combo' is short, so using a set vs. iterating through all (usually 2-4) items makes no big difference performance-wise
                         else:
@@ -41,11 +41,11 @@ class CSP_solver:
 
                     if combo not in self.impossible_mine_combos:
                         this_eq_group.append(combo)
-                        all_possible_combinations_of_mines.add(combo)
                         
-                self.possible_mine_combo_groups.append(tuple(this_eq_group))
-            pass
-        find_and_group_possible_answers_per_single_equation()
+                alt_answers_per_equation.append(tuple(this_eq_group))               # each list in this list is a list of alternative answers for that equation in question
+            return alt_answers_per_equation
+        alternative_answers_per_equation = []                                       # this is used above in 'find_and_group_possible_answers_per_single_equation()'. The reason that it's a list is that I need groups of alternative answers; each group represents the answers for a single equation derived from a single number cell on the minesweeper map.
+        find_and_group_possible_answers_per_single_equation(alternative_answers_per_equation)
 
         # used in function below; are there common variables between two alternative single equation answers?
         def common_vars(vars1, vars2) -> bool:
@@ -91,7 +91,7 @@ class CSP_solver:
                             groupB_compatible = True
                             continue                                                # this means that entire groupA and groupB are compatible -> move on to the next altA (moving on to next GROUP A would be even better though)
             return compatibility_groups                                             # remember! There's only ONE interpretation for those keys that have empty value set; they are NOT limited at all, that is, all alternatives (all 1-combinations, i.e. all mine combinations) are still possible for them!
-        restricted_solutions = restrict_solution_space_as_equation_pairs_with_common_variables(possible_solutions = self.possible_mine_combo_groups)
+        restricted_solutions = restrict_solution_space_as_equation_pairs_with_common_variables(possible_solutions = alternative_answers_per_equation)
 
         def solution_finder_from_compatibility_groups(compatibility_groups:dict) -> dict:
             def simple_inspection():
@@ -109,7 +109,7 @@ class CSP_solver:
                             if (var, value) not in self.solved_variables:
                                 self.solved_variables.add((var,value))
                                 new_solutions.add((var,value))                      # I need to know if it ACTUALLY solved something new!
-                                # self.update_related_info_for_solved_var(((var, value)))
+                                self.update_related_info_for_solved_var(((var, value)))
                     else:
                         var_to_possibleValues = dict()
                         for proposed_vector in proposed_values:
@@ -123,7 +123,7 @@ class CSP_solver:
                                 if (var, value) not in self.solved_variables:
                                     self.solved_variables.add((var, values[0]))
                                     new_solutions.add((var,values[0]))
-                                    # self.update_related_info_for_solved_var(((var, value)))
+                                    self.update_related_info_for_solved_var(((var, value)))
                 return new_solutions
             # for the remaining compatibility_groups equations, all those that have propositions about wrong values for the newly solved variables are now known to not be true. Find those wrong equations and remove them (after iteration) from 'compatibility_groups'. Then, once again feed the now-updated 'compatibilty_groups' to the solver, 'solution_finder_from_compatibility_groups'
             def update_compatibility_groups(new_solutions:set) -> dict:
@@ -136,6 +136,7 @@ class CSP_solver:
                             if (var,0) in self.solved_variables or (var,1) in self.solved_variables:
                                 if (var,value) not in self.solved_variables:                            # (a) if the proposed value is not the solved value, then this 'proposed_vector' (the whole line, with multiple variables and their proposed values) is untrue, and should be discarded
                                     untrue_equations.add(proposed_vector)
+                                    self.impossible_mine_combos.add(proposed_vector)
                                 else:                                                                   # (b) if the proposed value is the solved value, then ....
                                     pass
                 pass
@@ -151,11 +152,36 @@ class CSP_solver:
             new_solutions = simple_inspection()
             if new_solutions:
                 updated_compatibility_groups = update_compatibility_groups(new_solutions)
-                solution_finder_from_compatibility_groups(updated_compatibility_groups)                 # RECURSION
+                solution_finder_from_compatibility_groups(updated_compatibility_groups)                 # RECURSION. The thing preventing infinite recursion is the check 'return new_solutions' from 'simple_inspection()'; it only returns those variables that were not already in 'self.solved_variables' previously. Hence, if the loop returns nothing new, it's stopped at that point.
                 pass
 
         solution_finder_from_compatibility_groups(restricted_solutions)
- 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     # NB! This is called, when adding new equations for the first time, AND after finding new variables IF the related equations are (1) new and (2) do not become single solved variables as well (i.e. if the related equations are not reduced from equations like a+b=1 to just solved single variables like b=1). Hence, sometimes the 'self.update_equation(equation)' is necessary.
     def add_equations_if_new(self, equations:list) -> None:                             # equations = [(x, y, ((x1, y1), (x2, y2), ...), summa), ...]; so each equation is a tuple of of x, y, unflagged unclicked neighbours (coordinates; unique variables, that is!), and the label of the cell (1,2,...8)
