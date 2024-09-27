@@ -1,6 +1,5 @@
 '''to-do:
-- why is the last test flaky? most probable reason; iteration through sets varies in order, and through this, sometimes all variables are solved (yep) and sometimes NONE (YEP - I know! Amazing, right?)
-- in 'factor_one_solve', an easy way to check if subtracting the subset from the larger set is correct is as follows: if you end up with a+b+.... < 0, the subtraction was WRONG - something was wrong in the code itself. Why; because x ∈{0,1} for all cells x, and because I'm always subtracting a subset from a larger or equally sized set. Therefore, as every element of each set is 0 or 1, it is not possible to end up with a negative result for the resulting equation. For example: a+b+c = 1, a+b+c+d = 2 -> d = 1. The resulting equation can never have a negative value, if every element of the subset is found in the larger set, and every element x ∈{0,1} for all cells x. Therefore, it would be good the specifically add this at some point to facilitate debugging.
+- fix 'update_compatibility_groups': it causes infinite recursion, which should NOT be possible without erroneous deduction!
 '''
 from itertools import combinations
 
@@ -9,6 +8,7 @@ from itertools import combinations
 class CSP_solver:
     def __init__(self):
 
+        self.unsolved_groups = set()
         self.unique_equations = set()                               # { ((var1, var2, ..), sum_of_mines_in_vars), (...) }. Each var (variable) has format (x,y) of that cell's location; cell with a number label 1...8 = var. Here, I want uniqe EQUATIONS, not unique LOCATIONS, and therefore origin-(x,y) is not stored here. It's possible to get the same equation for example from two different sides, and via multiple different calculation routes, and it's of course possible to mistakenly try to add the same equation multiple times; that's another reason to use a set() here, the main reason being fast search from this hashed set.        
         self.solved_variables = set()                               # ((x,y), value); the name of the variable is (x,y) where x and y are its location in the minesweeper map (if applicable), and the value of the variable is either 0 or 1, if everything is ok (each variable is one cell in the minesweeper map, and its value is the number of mines in the cell; 0 or 1, that is)
         self.impossible_mine_combos = set()
@@ -22,10 +22,10 @@ class CSP_solver:
 
     # 100% solution: (1) PER EACH EQUATION that MUST be satisfied (i.e. each number cell on the minesweeper map), try all combinations of ones (=mines). That's what THIS function does. (2) After this function below, from all of the alternative combinations of 1s and 0s that DO satisfy the CURRENT equation, find those alternatives that are incompatible with all other equations (i.e. "groups", i.e. incompatible with ALL the alternative solutions of at least one other group) (3) from the remaining alt equations per group (i.e. PER original equation), find columns where a variable is always 0 or 1 -> it HAS to be 0 or 1. Then see these new solutions, inspect the remaining equations for untrue alternatives now that we've solved a new variable (or many new variables), and keep repeating the whole loop (1),(2),(3) as long as new solutions keep coming. Stop iteration when there are no longer new solutions produced by the whole loop.
     def absolut_brut(self, rounds=1) -> None:
-        
-        # for each equation (i.e. each number cell on the minesweeper map), given that each variable (= each unopened cell) is 0 or 1 (no mine or a mine), find all possible combinations of 1s and 0s that can satisfy that SINGLE equation GIVEN THAT it has sum = k (some integer number = the number of mines in those unopened surrounding cells in total!)
-        def find_and_group_possible_answers_per_single_equation(alt_answers_per_equation:list) -> list:                  
 
+        # for each equation (i.e. each number cell on the minesweeper map), given that each variable (= each unopened cell) is 0 or 1 (no mine or a mine), find all possible combinations of 1s and 0s that can satisfy that SINGLE equation GIVEN THAT it has sum = k (some integer number = the number of mines in those unopened surrounding cells in total!)
+        def find_and_group_possible_answers_per_single_equation() -> list:                  
+            alt_answers_per_equation = []
             for variables, summa in self.unique_equations:
                 mine_location_combinations = combinations(variables, summa)         # all possible combinations of mines for this equation
                 this_eq_group = []                                                  # NB! All the possible solutions for THIS equation ('variables', 'summa' constitutes an equation in 'self.unique_equations') are gathered here; in the end, I have to solve each of these 'individual' equations, AND find a solution that satisfies all the other equations as well.
@@ -37,20 +37,19 @@ class CSP_solver:
                         else:
                             combo.append((var, 0))
 
-                    combo = tuple(combo)
+                    combo = tuple(combo)                                            # (('a',1),('c',0),...) is the format of combo
 
-                    if combo not in self.impossible_mine_combos:
+                    if combo not in self.impossible_mine_combos:                    # (('a',1),('c',0),...) is the format of each combo in 'self.impossible_mine_combos', obviously, as well
                         this_eq_group.append(combo)
                         
                 alt_answers_per_equation.append(tuple(this_eq_group))               # each list in this list is a list of alternative answers for that equation in question
             return alt_answers_per_equation
-        alternative_answers_per_equation = []                                       # this is used above in 'find_and_group_possible_answers_per_single_equation()'. The reason that it's a list is that I need groups of alternative answers; each group represents the answers for a single equation derived from a single number cell on the minesweeper map.
-        find_and_group_possible_answers_per_single_equation(alternative_answers_per_equation)
+        alternative_answers_per_equation = find_and_group_possible_answers_per_single_equation()    # each group represents the answers for a single equation derived from a single number cell on the minesweeper map.
 
-        # used in function below; are there common variables between two alternative single equation answers?
+        # used in 'restrict_solution_space_as_equation_pairs_with_common_variables()' below; are there common variables between two equations (i.e. groups)?
         def common_vars(vars1, vars2) -> bool:
             common = False
-            varsB = set(twople[0] for twople in vars2)                              # twople = (var, value), but obviously I can't name it 'tuple' since that's taken in Python
+            varsB = set(twople[0] for twople in vars2)                              # twople = (var, value), but obviously I can't name it 'tuple' since that's reserved in Python
             for twople in vars1:
                 if twople[0] in varsB:
                     common = True
@@ -58,23 +57,19 @@ class CSP_solver:
             return common
         
         # for each group (group=alternative solutions for an equation), find at least one solution that's compatible with AT LEAST one alternative solution from every other group (i.e. from every other equation that MUST be satisfied). Then continue from that!
-        compatibility_groups = dict()                                           # { possible solution : all related possible solutions (i.e. those which share variables and do not disagree for any variable value for those variables that are present in both the key and each of the values in this dictionary for that key!) }. There's no need for explicit bookkeeping regarding which of the value solutions belong to which original equation, because the variables included themselves are enough to identify the origin.
-        def restrict_solution_space_as_equation_pairs_with_common_variables(possible_solutions:list) -> dict:
-            n_groups = len(possible_solutions)
-            for a in range(n_groups):
-                groupA = possible_solutions[a]                                      # e.g. (('a',0), ('b',1)), (('a',1),('b',0)) would constitute one 'group' (length 2) for the equation 'a+b=1' which is stored as ((a,b),1) in 'self.unique_variables'; that is, all the possible solutions for that equation constitute a 'group'
-                for altA in groupA:                                                 # e.g. altA = (('a', 0), ('b', 1)); alt = alternative = one alternative solution for a single equation, that might or might not be possible (i.e. might or might not be compatible with B)
-                    if altA not in compatibility_groups:
-                        compatibility_groups[altA] = set()
-                    for b in range(n_groups):
-                        if a==b:
+        def restrict_solution_space_as_equation_pairs_with_common_variables(alternative_answers_per_eq:list) -> dict:
+            compatibility_groups = dict()                                           # { possible solution : all related possible solutions (i.e. those which share variables and do not disagree for any variable value for those variables that are present in both the key and each of the values in this dictionary for that key!) }. There's no need for explicit bookkeeping regarding which of the value solutions belong to which original equation, because the variables included themselves are enough to identify the origin.
+            for groupA in alternative_answers_per_eq:                               # e.g. ( (('a',0), ('b',1)), (('a',1),('b',0)) ) would constitute one 'group' (length 2) for the equation 'a+b=1' which is stored as ((a,b),1) in 'self.unique_variables'; that is, all the possible solutions for that equation constitute a 'group'
+                for altA in groupA:                                                 # e.g. altA = (('a', 0), ('b', 1)); altA = alternative solution (i.e. ONE theoretically POSSIBLE solution) to the equation whose possible answers are members of groupA; altA = one alternative solution for a single equation, that might or might not be possible (i.e. might or might not be compatible with each groupB (i.e., with at least one possible answer of each other equation))
+                    compatibility_groups[altA] = set()
+                    for groupB in alternative_answers_per_eq:
+                        if groupA==groupB:                                          # (1) this looks cooler than 'if groupA!=groupB -> yet_another_indentation_here....', (2) to avoid comparison of each group to itself, which we absolutely do not want
                             continue
-                        groupB = possible_solutions[b]
                         common_variables = common_vars(groupA[0], groupB[0])        # I only want coupled subsets; there's no point in constructing entities where a=0 or a=1 and b=0 or b=1 and f=0 or f=1; so I'm only looking for those pairs that share a variable, hopefully finding such pairs where a variable becomes restricted
                         if common_variables:
-                            groupB_compatible = False                               # NB! groupB needs to be compatible for altA to be viable! That is: if altA is to be viable, it has to satisfy at least one altB from every groupB! (2) this ALSO checks if there are
+                            groupB_compatible = False                               # default. NB! groupB needs to be compatible for altA to be viable! That is: if altA is to be viable, it has to satisfy at least one altB from every groupB! (2) this ALSO checks if there are
                             for altB in groupB:                                     # NB! ONE at least needs to be compatible with altA, OR altA is not 'viable_and_connected'. e.g. (('a', 0), ('b', 1)); alt = alternative = one alternative solution for a single equation, that might or might not be possible (i.e. might or might not be compatible with A)
-                                altA_altB_compatible = True                                                                    
+                                altA_altB_compatible = True                         # default                                                                  
                                 for var1, val1 in altA:                             # e.g. 'a', 0. Each var1, val1 has to be compatible with at least ONE alt2 from every other group, so that 'altA_is_viable'!
                                     opposite_value = (var1, int(not val1))          # val1 = 1 or 0; if 1, opposite = (var1, 0). This is so I can avoid if-clause below, making it shorter.
                                     if opposite_value in altB:
@@ -82,28 +77,27 @@ class CSP_solver:
                                         break
                                 if altA_altB_compatible:
                                     groupB_compatible = True
-                                    compatibility_groups[altA].add(altB)            # I don't need to add this into a separate 'group' for this key; I know that those values here which share the same variables, belong to the same group! So there's no need for a separate grouping here.
+                                    compatibility_groups[altA].add(altB)            # I don't need to explicitly group this altB for this key; I know that those values which share the same variables belong to the same group (i.e. they originate from the same equation)!
                             if not groupB_compatible:                               # if altA from groupA is viable, it will have added groups of viable altBs from every other group
-                                altA_viable_and_connected = False                   # so, for every groupB, you need to have at least one compatibility_group_addition from that groupB so that altA is viable
-                                del compatibility_groups[altA]                      # currently, there are only even if some previous groups passed, if just ONE group (this current one in question!!) fails, then the WHOLE altA has failed, it cannot be true; this means altA cannot satisfy any possible solution of one or more other equation groups' possible solutions - so it cannot be true, since we know that a true version must exist, as it's based on actual irl count of mines, meaning that all these equations (derived from those accurate counts) HAVE to be true, that is, satisfied one way or another.
+                                del compatibility_groups[altA]                      # do not keep lonely equations in the dict 'compatibility_groups'
                                 break                                               # move on to inspect the next altA, if the current altA is not viable!
                         else:                                                       # if there are no shared variables between groupA (including altA) and groupB (including altB), then groups A and B ARE compatible (they don't restrict each other in any way) -> move on to next groupB
                             groupB_compatible = True
                             continue                                                # this means that entire groupA and groupB are compatible -> move on to the next altA (moving on to next GROUP A would be even better though)
             return compatibility_groups                                             # remember! There's only ONE interpretation for those keys that have empty value set; they are NOT limited at all, that is, all alternatives (all 1-combinations, i.e. all mine combinations) are still possible for them!
-        restricted_solutions = restrict_solution_space_as_equation_pairs_with_common_variables(possible_solutions = alternative_answers_per_equation)
+        compatibility_groups = restrict_solution_space_as_equation_pairs_with_common_variables(alternative_answers_per_equation)
 
         def solution_finder_from_compatibility_groups(compatibility_groups:dict) -> dict:
             def simple_inspection():
                 new_solutions = set()
                 keyVars_to_key = dict()
                 marked_solved = []
-                for key in compatibility_groups.keys():                        # e.g. key = (('a',0),('b',1),('c',1)), values are similar, AND each value for each key shares at least one variable (like 'a') with the key (which is also an equation, just like the values)
-                    key_vars = tuple(proposed_value[0] for proposed_value in key)    # NB! THese still are in alphabetic order, thanks to 'itertools.combinations' in 'find_and_group_possible_answers_per_single_equation' which sorted the answers alphabetically
+                for key in compatibility_groups.keys():                             # e.g. key = (('a',0),('b',1),('c',1)), values are similar, AND each value for each key shares at least one variable (like 'a') with the key (which is also an equation, just like the values)
+                    key_vars = tuple(proposed_value[0] for proposed_value in key)   # NB! THese still are in alphabetic order, thanks to 'itertools.combinations' in 'find_and_group_possible_answers_per_single_equation' which sorted the answers alphabetically
                     if key_vars not in keyVars_to_key:
                         keyVars_to_key[key_vars] = []
                     keyVars_to_key[key_vars].append(key)
-                for keyVars, proposed_values in keyVars_to_key.items():
+                for keyVars, proposed_values in keyVars_to_key.items():             # each item in 'keyVars' represent a unique equation from the minesweeper map; so each item in 'keyVars' MUST be satisfied one way or another.
                     if len(proposed_values) == 1:
                         for var, value in proposed_values[0]:
                             if (var, value) not in self.solved_variables:
@@ -111,12 +105,12 @@ class CSP_solver:
                                 new_solutions.add((var,value))                      # I need to know if it ACTUALLY solved something new!
                                 self.update_related_info_for_solved_var(((var, value)))
                     else:
-                        var_to_possibleValues = dict()
+                        var_to_possibleValues = dict()                              # for each proposed ((var1,value1), (var2,value2), ...), here called a 'vector', record the value. Since all these vectors now inspected derive from a single equation that MUST be solved, then if all the suggested values are equal for a variable, it MUST be solved as that value, as otherwise the equation could not be solved. Please use debugger if this is unclear, it shows very clearly what's happening here c:
                         for proposed_vector in proposed_values:
                             for var,value in proposed_vector:
                                 if var not in var_to_possibleValues:
                                     var_to_possibleValues[var] = []
-                                if var not in var_to_possibleValues[var]:
+                                if value not in var_to_possibleValues[var]:         # I wanted to use a list instead of a set because [can't-remember-why!]. That's why I HAVE to check if the value is already in the list.
                                     var_to_possibleValues[var].append(value)
                         for var,values in var_to_possibleValues.items():
                             if len(values) == 1:
@@ -126,11 +120,11 @@ class CSP_solver:
                                     self.update_related_info_for_solved_var(((var, value)))
                 return new_solutions
             # for the remaining compatibility_groups equations, all those that have propositions about wrong values for the newly solved variables are now known to not be true. Find those wrong equations and remove them (after iteration) from 'compatibility_groups'. Then, once again feed the now-updated 'compatibilty_groups' to the solver, 'solution_finder_from_compatibility_groups'
-            def update_compatibility_groups(new_solutions:set) -> dict:
+            def update_compatibility_groups(new_solutions:set, compatibility_groups:dict) -> dict:
                 untrue_equations = set()                                                                # set(), so it's faster to check the 'compatibility_groups' for presence of one of these after the loop below
                 solved_equations = []
-                updated_compatibility_groups = dict()
-                for key, values in compatibility_groups.items():
+                updated_compatibility_groups = dict()                                                   # rebuild this according to the previous, 'new_solutions'
+                for key, values in compatibility_groups.items():                                        # the old 'compatibility_groups' to be updated; check for (1) solved variables, (2) untrue alternative solutions (do not add those to the 'updated_compatibility_groups')
                     for proposed_vector in values:
                         for var, value in proposed_vector:
                             if (var,0) in self.solved_variables or (var,1) in self.solved_variables:
@@ -150,12 +144,11 @@ class CSP_solver:
                             updated_compatibility_groups[key].add(proposed_vector)                      # only add the non-obsolete vectors (var,value -pair tuples) to the 'updated_compatibility_groups'
                 return updated_compatibility_groups                  
             new_solutions = simple_inspection()
-            if new_solutions:
-                updated_compatibility_groups = update_compatibility_groups(new_solutions)
-                solution_finder_from_compatibility_groups(updated_compatibility_groups)                 # RECURSION. The thing preventing infinite recursion is the check 'return new_solutions' from 'simple_inspection()'; it only returns those variables that were not already in 'self.solved_variables' previously. Hence, if the loop returns nothing new, it's stopped at that point.
-                pass
-
-        solution_finder_from_compatibility_groups(restricted_solutions)
+            # if new_solutions:
+            #     updated_compatibility_groups = update_compatibility_groups(new_solutions, compatibility_groups)   # TO-DO: this causes problems
+            #     solution_finder_from_compatibility_groups(updated_compatibility_groups)                 # RECURSION. The thing preventing infinite recursion is the check 'return new_solutions' from 'simple_inspection()'; it only returns those variables that were not already in 'self.solved_variables' previously. Hence, if the loop returns nothing new, it's stopped at that point.
+            #     pass
+        solution_finder_from_compatibility_groups(compatibility_groups)
 
 
 
@@ -187,6 +180,7 @@ class CSP_solver:
     def add_equations_if_new(self, equations:list) -> None:                             # equations = [(x, y, ((x1, y1), (x2, y2), ...), summa), ...]; so each equation is a tuple of of x, y, unflagged unclicked neighbours (coordinates; unique variables, that is!), and the label of the cell (1,2,...8)
         for equation in equations:                                                      # (x,y,(variables),sum_of_variables)
             x, y, variables, summa = self.update_equation_and_related_info(equation)    # both updates, IF NECESSARY, 'self.unique_equations' (removes the old one, adds the shorter one), AND returns the new one here right away. NB: this small sidetrack is very short in cases where an equation is truly added for the first time (such as in 'botGame.py' from where this 'CSP_solver' class is used)
+            variables = tuple(sorted(variables))
             if (variables, summa) not in self.unique_equations:                         # TO-DO; why are the old equations, with already-solved variables, still in self.variable_to_equations? can't hash sets; 'variables' has to be a tuple!
                 variable_count = 0
                 for variable in variables:
