@@ -8,10 +8,10 @@ from itertools import combinations
 class CSP_solver:
     def __init__(self):
 
-        self.unsolved_groups = set()
+        self.unsolved_groups = set()                                # add here all those equations (i.e. groups = alternative answers for an equation derived from the minesweeper map) that could not be solved
         self.unique_equations = set()                               # { ((var1, var2, ..), sum_of_mines_in_vars), (...) }. Each var (variable) has format (x,y) of that cell's location; cell with a number label 1...8 = var. Here, I want uniqe EQUATIONS, not unique LOCATIONS, and therefore origin-(x,y) is not stored here. It's possible to get the same equation for example from two different sides, and via multiple different calculation routes, and it's of course possible to mistakenly try to add the same equation multiple times; that's another reason to use a set() here, the main reason being fast search from this hashed set.        
         self.solved_variables = set()                               # ((x,y), value); the name of the variable is (x,y) where x and y are its location in the minesweeper map (if applicable), and the value of the variable is either 0 or 1, if everything is ok (each variable is one cell in the minesweeper map, and its value is the number of mines in the cell; 0 or 1, that is)
-        self.impossible_mine_combos = set()
+        self.impossible_combinations = set()
         
         self.variable_to_equations = dict()                         # { variable_a : set(equation5, equation12, equation4,...), variable_b : set(equation3, equation4...)}. The format of 'equation' is ((variable1, variable2,...), sum_of_the_variables)
         self.numberOfVariables_to_equations = {                     # { numberOfVariables : set(equation1, equation2, ...) }; each key of this dict is integer x, and x's values are all equations with x number of variables. I want to look at those equations with low number of variables, and see for each of those variables if they can be found in equations with more variables; if all the variables in the shorter equation are found in the longer equation, then perform subtraction to get rid of those varibles in the longer equation (linear equation solving), then save the formed result equation to 'self.unique_equations' and 'self.numberOfVariables_to_equations'.
@@ -21,7 +21,7 @@ class CSP_solver:
         self.var_to_equations_obsolete_equations_to_remove = set()  # same as above comment
 
     # 100% solution: (1) PER EACH EQUATION that MUST be satisfied (i.e. each number cell on the minesweeper map), try all combinations of ones (=mines). That's what THIS function does. (2) After this function below, from all of the alternative combinations of 1s and 0s that DO satisfy the CURRENT equation, find those alternatives that are incompatible with all other equations (i.e. "groups", i.e. incompatible with ALL the alternative solutions of at least one other group) (3) from the remaining alt equations per group (i.e. PER original equation), find columns where a variable is always 0 or 1 -> it HAS to be 0 or 1. Then see these new solutions, inspect the remaining equations for untrue alternatives now that we've solved a new variable (or many new variables), and keep repeating the whole loop (1),(2),(3) as long as new solutions keep coming. Stop iteration when there are no longer new solutions produced by the whole loop.
-    def absolut_brut(self, rounds=1) -> None:
+    def absolut_brut(self) -> None:
 
         # for each equation (i.e. each number cell on the minesweeper map), given that each variable (= each unopened cell) is 0 or 1 (no mine or a mine), find all possible combinations of 1s and 0s that can satisfy that SINGLE equation GIVEN THAT it has sum = k (some integer number = the number of mines in those unopened surrounding cells in total!)
         def find_and_group_possible_answers_per_single_equation() -> list:                  
@@ -39,7 +39,7 @@ class CSP_solver:
 
                     combo = tuple(combo)                                            # (('a',1),('c',0),...) is the format of combo
 
-                    if combo not in self.impossible_mine_combos:                    # (('a',1),('c',0),...) is the format of each combo in 'self.impossible_mine_combos', obviously, as well
+                    if combo not in self.impossible_combinations:                    # (('a',1),('c',0),...) is the format of each combo in 'self.impossible_mine_combos', obviously, as well
                         this_eq_group.append(combo)
                         
                 alt_answers_per_equation.append(tuple(this_eq_group))               # each list in this list is a list of alternative answers for that equation in question
@@ -86,7 +86,8 @@ class CSP_solver:
                             continue                                                # this means that entire groupA and groupB are compatible -> move on to the next altA (moving on to next GROUP A would be even better though)
             return compatibility_groups                                             # remember! There's only ONE interpretation for those keys that have empty value set; they are NOT limited at all, that is, all alternatives (all 1-combinations, i.e. all mine combinations) are still possible for them!
         compatibility_groups = restrict_solution_space_as_equation_pairs_with_common_variables(alternative_answers_per_equation)
-
+        
+        # every key in 'compatibility_groups' is an alt solution for one equation that must be solved one way or another. The same goes to all equation groups in each of those keys' values, BUT I'm first looking at the keys before looking at their values.
         def solution_finder_from_compatibility_groups(compatibility_groups:dict) -> dict:
             def simple_inspection():
                 new_solutions = set()
@@ -97,7 +98,7 @@ class CSP_solver:
                     if key_vars not in keyVars_to_key:
                         keyVars_to_key[key_vars] = []
                     keyVars_to_key[key_vars].append(key)
-                for keyVars, proposed_values in keyVars_to_key.items():             # each item in 'keyVars' represent a unique equation from the minesweeper map; so each item in 'keyVars' MUST be satisfied one way or another.
+                for keyVars, proposed_values in keyVars_to_key.items():             # each item in 'keyVars' represents a unique equation from the minesweeper map; so each item in 'keyVars' MUST be satisfied one way or another.
                     if len(proposed_values) == 1:
                         for var, value in proposed_values[0]:
                             if (var, value) not in self.solved_variables:
@@ -105,7 +106,7 @@ class CSP_solver:
                                 new_solutions.add((var,value))                      # I need to know if it ACTUALLY solved something new!
                                 self.update_related_info_for_solved_var(((var, value)))
                     else:
-                        var_to_possibleValues = dict()                              # for each proposed ((var1,value1), (var2,value2), ...), here called a 'vector', record the value. Since all these vectors now inspected derive from a single equation that MUST be solved, then if all the suggested values are equal for a variable, it MUST be solved as that value, as otherwise the equation could not be solved. Please use debugger if this is unclear, it shows very clearly what's happening here c:
+                        var_to_possibleValues = dict()                              # for each proposed ((var1,value1), (var2,value2), ...), here called a 'vector', record the value. Since all these vectors now inspected are derived from a single equation that MUST be solved, then if all the suggested values are equal for a variable, it MUST be solved as that value, as otherwise the equation could not be solved. Use debugger if this is unclear, it shows very clearly what's happening here c:
                         for proposed_vector in proposed_values:
                             for var,value in proposed_vector:
                                 if var not in var_to_possibleValues:
@@ -119,35 +120,52 @@ class CSP_solver:
                                     new_solutions.add((var,values[0]))
                                     self.update_related_info_for_solved_var(((var, value)))
                 return new_solutions
+            
             # for the remaining compatibility_groups equations, all those that have propositions about wrong values for the newly solved variables are now known to not be true. Find those wrong equations and remove them (after iteration) from 'compatibility_groups'. Then, once again feed the now-updated 'compatibilty_groups' to the solver, 'solution_finder_from_compatibility_groups'
-            def update_compatibility_groups(new_solutions:set, compatibility_groups:dict) -> dict:
-                untrue_equations = set()                                                                # set(), so it's faster to check the 'compatibility_groups' for presence of one of these after the loop below
-                solved_equations = []
-                updated_compatibility_groups = dict()                                                   # rebuild this according to the previous, 'new_solutions'
-                for key, values in compatibility_groups.items():                                        # the old 'compatibility_groups' to be updated; check for (1) solved variables, (2) untrue alternative solutions (do not add those to the 'updated_compatibility_groups')
-                    for proposed_vector in values:
-                        for var, value in proposed_vector:
-                            if (var,0) in self.solved_variables or (var,1) in self.solved_variables:
-                                if (var,value) not in self.solved_variables:                            # (a) if the proposed value is not the solved value, then this 'proposed_vector' (the whole line, with multiple variables and their proposed values) is untrue, and should be discarded
-                                    untrue_equations.add(proposed_vector)
-                                    self.impossible_mine_combos.add(proposed_vector)
-                                else:                                                                   # (b) if the proposed value is the solved value, then ....
-                                    pass
-                pass
-                for key, values in compatibility_groups.items():
-                    for proposed_vector in values:
-                        if proposed_vector in untrue_equations:
-                            pass
-                        else:
-                            if key not in updated_compatibility_groups:
-                                updated_compatibility_groups[key] = set()                               # I don't want empty sets - don't add those keys at all
-                            updated_compatibility_groups[key].add(proposed_vector)                      # only add the non-obsolete vectors (var,value -pair tuples) to the 'updated_compatibility_groups'
+            def update_compatibility_groups(compatibility_groups:dict) -> dict:
+
+                def all_variables_solved(keys) -> bool:
+                    for key in keys:
+                        for var, proposed_value in key:
+                            if not ((var,0) in self.solved_variables or (var,1) in self.solved_variables):
+                                return False
+                    return True
+
+                def check_proposed_value(var, proposed_value):
+                    ok = True
+                    opposite = (var, int(not(proposed_value)))
+                    if opposite in self.solved_variables:
+                        self.impossible_combinations.add(key)                               # the key is an equation like (('a',1), ('b',0)) just like each its equations (values)! The key can become outdated just like its values!
+                        ok = False
+                    return ok
+
+                # if all_variables_solved(compatibility_groups.keys()):                     # TO-DO! NB! This should be uncommented after you find the problem with the below/something else regarding the updating/the whole loop...
+                #     return None
+                # else:
+                updated_compatibility_groups = dict()                                       # rebuild this according to the previous, 'new_solutions'
+                for key, values in compatibility_groups.items():                            # the old 'compatibility_groups' to be updated; check for (1) solved variables, (2) untrue alternative solutions (do not add those to the 'updated_compatibility_groups')
+                    key_ok = True
+                    for var, proposed_value in key:
+                        key_ok = check_proposed_value(var, proposed_value)                  # the key is an equation like (('a',1), ('b',0)) just like each its equations (values)! The key can become outdated just like its values!
+                        if not key_ok:
+                            break
+                    if key_ok:
+                        if key not in updated_compatibility_groups:
+                            updated_compatibility_groups[key] = set()                       # I don't want empty sets - don't add those keys at all
+                        for proposed_vector in values:                                      # (a) if the proposed value is not the solved value, then this 'proposed_vector' (the whole line, with multiple variables and their proposed values) is untrue, and should be discarded
+                            all_values_ok = True
+                            for var, value in proposed_vector:
+                                all_values_ok = check_proposed_value(var, value)
+                                if not all_values_ok:
+                                    break
+                            if all_values_ok:
+                                updated_compatibility_groups[key].add(proposed_vector)      # only add the non-obsolete vectors (var,value -pair tuples) to the 'updated_compatibility_groups'
                 return updated_compatibility_groups                  
             new_solutions = simple_inspection()
-            # if new_solutions:
-            #     updated_compatibility_groups = update_compatibility_groups(new_solutions, compatibility_groups)   # TO-DO: this causes problems
-            #     solution_finder_from_compatibility_groups(updated_compatibility_groups)                 # RECURSION. The thing preventing infinite recursion is the check 'return new_solutions' from 'simple_inspection()'; it only returns those variables that were not already in 'self.solved_variables' previously. Hence, if the loop returns nothing new, it's stopped at that point.
-            #     pass
+            if new_solutions:
+                updated_compatibility_groups = update_compatibility_groups(compatibility_groups)    # TO-DO: this causes problems
+                if updated_compatibility_groups:
+                    solution_finder_from_compatibility_groups(updated_compatibility_groups)             # RECURSION. The thing preventing infinite recursion is the check 'return new_solutions' from 'simple_inspection()'; it only returns those variables that were not already in 'self.solved_variables' previously. Hence, if the loop returns nothing new, it's stopped at that point.
         solution_finder_from_compatibility_groups(compatibility_groups)
 
 
@@ -476,9 +494,9 @@ if __name__ == '__main__':
     eqb     = [3, 5, ('e', 'f', 'g', 'h', 'i'), 2]
     csp = CSP_solver()
     csp.add_equations_if_new([eqi, eqiii, eqv, eqvi, eqa, eqb])
-    csp.absolut_brut(3)                                  # NB! after 3 rounds minimum, e=0 is solved! A smaller number of rounds is not enough. This is ok and expected given the functions written in the class, as not everything is recursively updated until the end of the world (as this would complicate things even more!); also, nb! The purpose is not to be able to solve everything in one go, as that would also mean that pressing 'b' once in 'botGame.py' would proceed a huge number of steps at a time, AND this has nothing to do, as such, with efficiency either; so I want to divide this into small(ish) steps whenever possible, facilitating visualization and debugging that way, as there's no real reason not to do this. In fact, efficiency-wise, it's better to run as little as CSP_solver as possible, instead relying on the much simpler 'simple_solver' in 'botGame.py' as possible
+    csp.absolut_brut()                                  # NB! after 3 rounds minimum, e=0 is solved! A smaller number of rounds is not enough. This is ok and expected given the functions written in the class, as not everything is recursively updated until the end of the world (as this would complicate things even more!); also, nb! The purpose is not to be able to solve everything in one go, as that would also mean that pressing 'b' once in 'botGame.py' would proceed a huge number of steps at a time, AND this has nothing to do, as such, with efficiency either; so I want to divide this into small(ish) steps whenever possible, facilitating visualization and debugging that way, as there's no real reason not to do this. In fact, efficiency-wise, it's better to run as little as CSP_solver as possible, instead relying on the much simpler 'simple_solver' in 'botGame.py' as possible
 
-    print_solved_variables(csp, 'test 4a, letters. 0 expected', '0')
+    print_solved_variables(csp, 'test 4a, letters. e=0 expected', '0')
 
     ########################## Test 5a: letters. Based on 'Esim_expert_1.png', which wasn't solved by pressing 'b' (i.e., this test is for actual debugging) #
     
@@ -490,7 +508,7 @@ if __name__ == '__main__':
     
     csp = CSP_solver()
     csp.add_equations_if_new([eq1, eq2, eq3, eq4, eq5])
-    csp.absolut_brut(2)                                  # NB! This needs 2 rounds!
+    csp.absolut_brut()                                  # NB! This needs 2 rounds!
     # TO-DO: Thanks to this, I added more CSP conditions -> now it's sometimes ENTIRELY solved, sometimes NOT AT ALL (0 variables solved!)
 
     print_solved_variables(csp, 'test 5a, letters. c0, d0, e1, f1, g0, h0, i0, j0 expected', '00110000') # expected: cdefg 00110
