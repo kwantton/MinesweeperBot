@@ -58,9 +58,9 @@ class CSP_solver:
             return common
         
         # for each group (group=alternative solutions for an equation), find at least one solution that's compatible with AT LEAST one alternative solution from every other group (i.e. from every other equation that MUST be satisfied). Then continue from that!
+        compatibility_groups = dict()                                           # { possible solution : all related possible solutions (i.e. those which share variables and do not disagree for any variable value for those variables that are present in both the key and each of the values in this dictionary for that key!) }. There's no need for explicit bookkeeping regarding which of the value solutions belong to which original equation, because the variables included themselves are enough to identify the origin.
         def restrict_solution_space_as_equation_pairs_with_common_variables(possible_solutions:list) -> dict:
             n_groups = len(possible_solutions)
-            compatibility_groups = dict()                                           # { possible solution : all related possible solutions (i.e. those which share variables and do not disagree for any variable value for those variables that are present in both the key and each of the values in this dictionary for that key!) }. There's no need for explicit bookkeeping regarding which of the value solutions belong to which original equation, because the variables included themselves are enough to identify the origin.
             for a in range(n_groups):
                 groupA = possible_solutions[a]                                      # e.g. (('a',0), ('b',1)), (('a',1),('b',0)) would constitute one 'group' (length 2) for the equation 'a+b=1' which is stored as ((a,b),1) in 'self.unique_variables'; that is, all the possible solutions for that equation constitute a 'group'
                 for altA in groupA:                                                 # e.g. altA = (('a', 0), ('b', 1)); alt = alternative = one alternative solution for a single equation, that might or might not be possible (i.e. might or might not be compatible with B)
@@ -97,6 +97,7 @@ class CSP_solver:
             def simple_inspection():
                 new_solutions = set()
                 keyVars_to_key = dict()
+                marked_solved = []
                 for key in compatibility_groups.keys():                        # e.g. key = (('a',0),('b',1),('c',1)), values are similar, AND each value for each key shares at least one variable (like 'a') with the key (which is also an equation, just like the values)
                     key_vars = tuple(proposed_value[0] for proposed_value in key)    # NB! THese still are in alphabetic order, thanks to 'itertools.combinations' in 'find_and_group_possible_answers_per_single_equation' which sorted the answers alphabetically
                     if key_vars not in keyVars_to_key:
@@ -105,29 +106,54 @@ class CSP_solver:
                 for keyVars, proposed_values in keyVars_to_key.items():
                     if len(proposed_values) == 1:
                         for var, value in proposed_values[0]:
-                            self.solved_variables.add((var,value))
-                            new_solutions.add((var,value))
-                            # self.update_related_info_for_solved_var(((var, value)))
+                            if (var, value) not in self.solved_variables:
+                                self.solved_variables.add((var,value))
+                                new_solutions.add((var,value))                      # I need to know if it ACTUALLY solved something new!
+                                # self.update_related_info_for_solved_var(((var, value)))
                     else:
-                        values_of_vars = dict()
+                        var_to_possibleValues = dict()
                         for proposed_vector in proposed_values:
                             for var,value in proposed_vector:
-                                if var not in values_of_vars:
-                                    values_of_vars[var] = []
-                                if var not in values_of_vars[var]:
-                                    values_of_vars[var].append(value)
-                        for var,values in values_of_vars.items():
+                                if var not in var_to_possibleValues:
+                                    var_to_possibleValues[var] = []
+                                if var not in var_to_possibleValues[var]:
+                                    var_to_possibleValues[var].append(value)
+                        for var,values in var_to_possibleValues.items():
                             if len(values) == 1:
-                                self.solved_variables.add((var, values[0]))
-                                new_solutions.add((var,values[0]))
+                                if (var, value) not in self.solved_variables:
+                                    self.solved_variables.add((var, values[0]))
+                                    new_solutions.add((var,values[0]))
+                                    # self.update_related_info_for_solved_var(((var, value)))
                 return new_solutions
-            
+            # for the remaining compatibility_groups equations, all those that have propositions about wrong values for the newly solved variables are now known to not be true. Find those wrong equations and remove them (after iteration) from 'compatibility_groups'. Then, once again feed the now-updated 'compatibilty_groups' to the solver, 'solution_finder_from_compatibility_groups'
             def update_compatibility_groups(new_solutions:set) -> dict:
-                compatibility_groups
-
+                untrue_equations = set()                                                                # set(), so it's faster to check the 'compatibility_groups' for presence of one of these after the loop below
+                solved_equations = []
+                updated_compatibility_groups = dict()
+                for key, values in compatibility_groups.items():
+                    for proposed_vector in values:
+                        for var, value in proposed_vector:
+                            if (var,0) in self.solved_variables or (var,1) in self.solved_variables:
+                                if (var,value) not in self.solved_variables:                            # (a) if the proposed value is not the solved value, then this 'proposed_vector' (the whole line, with multiple variables and their proposed values) is untrue, and should be discarded
+                                    untrue_equations.add(proposed_vector)
+                                else:                                                                   # (b) if the proposed value is the solved value, then ....
+                                    pass
+                pass
+                for key, values in compatibility_groups.items():
+                    for proposed_vector in values:
+                        if proposed_vector in untrue_equations:
+                            pass
+                        else:
+                            if key not in updated_compatibility_groups:
+                                updated_compatibility_groups[key] = set()                               # I don't want empty sets - don't add those keys at all
+                            updated_compatibility_groups[key].add(proposed_vector)                      # only add the non-obsolete vectors (var,value -pair tuples) to the 'updated_compatibility_groups'
+                return updated_compatibility_groups                  
             new_solutions = simple_inspection()
             if new_solutions:
-                update_compatibility_groups(new_solutions)
+                updated_compatibility_groups = update_compatibility_groups(new_solutions)
+                solution_finder_from_compatibility_groups(updated_compatibility_groups)                 # RECURSION
+                pass
+
         solution_finder_from_compatibility_groups(restricted_solutions)
  
 
@@ -275,6 +301,7 @@ def format_equation_for_csp_solver(x:int, y:int, variables:tuple, surrounding_mi
 #####################################################################################################################################
 
 if __name__ == '__main__':
+    
     def print_solved_variables(csp:CSP_solver, name='random test', expected_result='') -> None:
         print(f'\nSolving "{name}"')
         concat = ''
