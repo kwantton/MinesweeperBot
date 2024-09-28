@@ -115,49 +115,73 @@ class CSP_solver:
                     origins = [key for key in keys]
                     break
             return origins
-
         
+        def identify_group(proposed_match) -> set:
+            vars = set()
+            for var, value in proposed_match:
+                vars.add(var)
+            return vars
+               
         def join_comp_groups_into_solutions(compatibility_groups:dict) -> None:
             possible_whole_solutions = []
-            alternative_origins = alt_origin_builder()                                      # if there's only a single origin and there has been no check if it's connected to all other groups, there'd be no quarantee of finding a solution (which encompasses all groups, as is necessary!). I want to keep things clear and force starting at least 2 or more times, using 2 or more origins if possible. If there's only 1, then that should work too in the 'traverse()' (or, I have to make it work, no big deal)
+            # alternative_origins = alt_origin_builder()                                      # if there's only a single origin and there has been no check if it's connected to all other groups, there'd be no quarantee of finding a solution (which encompasses all groups, as is necessary!). I want to keep things clear and force starting at least 2 or more times, using 2 or more origins if possible. If there's only 1, then that should work too in the 'traverse()' (or, I have to make it work, no big deal)
             all_variables = set(self.variable_to_equations.keys())
-            origin_dict = {alt_origin:compatibility_groups[alt_origin] for alt_origin in alternative_origins}
-
-            def traverse(proposed_origin, proposed_matches_for_the_key, seen_proposed_vectors, solution_proposition_build): # I'm keeping 'proposed_origin' solely for debugging purposes!
+            # origin_dict = {alt_origin:compatibility_groups[alt_origin] for alt_origin in alternative_origins}
+            # TO-DO! Check group recognition. Group comparison works, but is everything else ok as well?
+            def traverse(proposed_origin, proposed_matches_for_the_key, seen_proposed_vectors, 
+                solution_proposition_build, seen_groups): # I'm keeping 'proposed_origin' solely for debugging purposes!
+                
                 for proposed_match in proposed_matches_for_the_key:
-                    if proposed_match in compatibility_groups:                              # do NOT handle (or add to possible solutions) those that are not present as keys of 'compatibility_groups' as THEY ARE NOT COMPATIBLE WITH ONE OR MORE GROUP c:
-                        new_matches = []
-                        if proposed_match not in seen_proposed_vectors:
-                            new_matches = compatibility_groups[proposed_match]
-                            for var, value in proposed_match:
-                                if var not in solution_proposition_build:
-                                    solution_proposition_build[var] = set()                 # only one per each!
-                                    solution_proposition_build[var].add(value)              # there can be 1 or 2 per variable. If 2, it means that there is not enough information (yet) for solving this variable. If only 1 value, great, that means the value is now solved.
-                            seen_proposed_vectors.add(proposed_match)
-                        if len(solution_proposition_build.keys()) == len(all_variables):    # if the addition done above was the last one that completes a possible solution,
-                            possible_whole_solutions.append(solution_proposition_build)
-                        else:
-                            for new_match in new_matches:
-                                if new_match not in seen_proposed_vectors:
-                                    traverse(proposed_origin, new_matches, seen_proposed_vectors, solution_proposition_build)
+                    this_group = identify_group(proposed_match)                                          # this 'proposed_match' is an alt answer for a group - 'group(proposed_match)' tells me WHICH group it belongs to. I want EXACTLY ONE alt answer for EACH group, as each group represents an original equation from the minesweeper map (a number cell, the equation of which is always true, so MUST be satisfied and MUST be compatible with all other groups!)
+                    if this_group not in seen_groups:                                           # comparison of sets works in python like this; if the values are the same, then the sets are 'equal'
+                        seen_groups.append(this_group)
+                        if proposed_match in compatibility_groups:                              # do NOT handle (or add to possible solutions) those that are not present as keys of 'compatibility_groups' as THEY ARE NOT COMPATIBLE WITH ONE OR MORE GROUP c:
+                            new_matches = []
+                            if proposed_match not in seen_proposed_vectors:
+                                for var, value in proposed_match:
+                                    if var not in solution_proposition_build:
+                                        solution_proposition_build[var] = value              # there can be 1 or 2 per variable. If 2, it means that there is not enough information (yet) for solving this variable. If only 1 value, great, that means the value is now solved.
+                                new_matches = compatibility_groups[proposed_match]
+                                seen_proposed_vectors.add(proposed_match)
+                            if len(solution_proposition_build.keys()) == len(all_variables):    # if the addition done above was the last one that completes a possible solution,
+                                if n_groups == len(seen_groups):
+                                    possible_whole_solutions.append(solution_proposition_build)
+                                else:
+                                    return                                                      # not correct answer!
+                            else:
+                                for new_match in new_matches:
+                                    if new_match not in seen_proposed_vectors:
+                                        traverse(proposed_origin, new_matches, 
+                                            seen_proposed_vectors, solution_proposition_build, seen_groups)
                         
            
             # if I just pick one origin (origin = key in the map = ONE random alternative solution vector for one group), it may be a non-ok alternative meaning that it may never become connected with ALL other groups, never finding any whole solution. This is because the origins (key equations) are SINGLE ALTERNATIVES, and as we know, only ONE alternative may provide a possible answer for every group (depends on the case!)
-            for proposed_origin, proposed_matches_for_the_key in origin_dict.items(): # ('d', 'e'), [(('d',1),('e',0)), (('d',0),('e',1))] for example. This quarantees that they are separate
+            for random_origin, proposed_matches_for_the_random_origin in compatibility_groups.items(): # ('d', 'e'), [(('d',1),('e',0)), (('d',0),('e',1))] for example. This quarantees that they are separate
                 seen_proposed_vectors = set()                                               # PER alt answer, of course - that's why it's initialized here and not at the top of this 'join_groups_into_solutions'
                 seen_seen_proposed_vectors = set()                                          # this is for bookkeeping which combinations have been seen before; this ensures that no infinite loops occur
+                seen_groups = [set(identify_group(random_origin))]                          # a list of sets of variables; there's never a big number of groups (at the very most, roughly 20 in Expert), so it's ok to look through that short list every time in 'traverse' for checking. So, TO-DO! This bookkeeping is necessary for recognizing valid solutions. So, not only does one need to have a value for every variable, but ALSO the origin for each of them has to be specific, namely ONE alt anser from EACH group only, AND do not permit entry to another alt from same group ever again!
                 solution_proposition_build = dict()                                         # save all var values here. Most importantly: each variable (var) has to be found in this dict for the assembled solution to be even considered viable (because, each GROUP, i.e., each original EQUATION from the minesweeper map has to be satisfied, as there HAS to exist at least ONE solution where none of the equations disagree, i.e., a combination of alt-equations (one per group) that agree with each other, and since all the equations combined DO include all the variables, AND because each group was connected to each other using 'compatibility_groups' dict earlier, I will consider afterwards only those equations that contain all the variables! So we DO know that all equations must be satisfied by some combination of alt solutions (one alt from each group!))
-                seen_proposed_vectors.add(proposed_origin)
-                traverse(proposed_origin, proposed_matches_for_the_key, seen_proposed_vectors, solution_proposition_build)   # 'traverse' builds the 'possible_whole_solutions' 
+                seen_proposed_vectors.add(random_origin)
+                keyVars_to_keys = keyVars_to_keys_builder(compatibility_groups)
+                n_groups = len(keyVars_to_keys.keys())
+                traverse(random_origin, proposed_matches_for_the_random_origin, seen_proposed_vectors, solution_proposition_build, seen_groups)   # 'traverse' builds the 'possible_whole_solutions' 
                 
-            pass
-            for dictionary in possible_whole_solutions:
-                for var, vals in dictionary.items():
-                    if len(vals) == 1:
-                        self.solved_variables.add((var, tuple(vals)[0]))
-                for var, vals in dictionary.items():
-                    if len(vals) == 1:
-                        self.update_related_info_for_solved_var((var, tuple(vals)[0]))
+            def handle_possible_whole_solutions():
+                final_answers = dict()
+                for dictionary in possible_whole_solutions:
+                    for var, val in dictionary.items():
+                        if var not in final_answers:
+                            final_answers[var] = val
+                        elif final_answers[var] != val:
+                            final_answers[var] = 'either or'                                    # either this was 'either or' was here or not, the result is the same - 'either or'
+                        
+                    for var, val in final_answers.items():
+                        if val != 'either or':
+                            self.solved_variables.add((var, val))                               # reduces redundant work in 'update_related_info...' if ALL of these are added first, before the loop below calling that function for all of those newly solved variables.
+                    for var, val in final_answers.items():
+                        if val != 'either or':
+                            self.update_related_info_for_solved_var((var, val))
+            handle_possible_whole_solutions()
             pass
                 
 
@@ -167,7 +191,7 @@ class CSP_solver:
             def key_altSolution_inspector():
                 new_solutions = set()
                 keyVars_to_keys = keyVars_to_keys_builder(compatibility_groups)
-                for keyVars, proposed_values in keyVars_to_keys.items():             # each item in 'keyVars' represents a unique equation from the minesweeper map; so each item in 'keyVars' MUST be satisfied one way or another.
+                for keyVars, proposed_values in keyVars_to_keys.items():            # each item in 'keyVars' represents a unique equation from the minesweeper map; so each item in 'keyVars' MUST be satisfied one way or another.
                     if len(proposed_values) == 1:
                         for var, value in proposed_values[0]:
                             if (var, value) not in self.solved_variables:
@@ -410,20 +434,55 @@ def format_equation_for_csp_solver(x:int, y:int, variables:tuple, surrounding_mi
 #####################################################################################################################################
 
 if __name__ == '__main__':
+
+    test_info_dict = {}
+
+    def print_multiple_results(test_info:dict) -> None:
+        number_of_tests = len(test_info.keys())
+        n_passed = 0
+        passed_tests = []
+        n_failed = 0
+        failed_tests = []
+        failed_results = []
+        for name, (csp, expected_result) in test_info.items():
+            name, result, actual_result = print_solved_variables(csp, name, expected_result)
+            if result == 'passed':
+                n_passed += 1
+                passed_tests.append(name)
+            else:
+                n_failed += 1
+                failed_tests.append(name)
+                failed_results.append(actual_result)
+        if n_failed != 0:
+            print(f'''
+TOTAL:
+tests      {number_of_tests} 
+passed     {n_passed}
+failed     {n_failed}
+FAILED tests:''')        
+            for i in range(len(failed_tests)):
+                print(f'{failed_tests[i]}, instead got: {failed_results[i]}')
+        else:
+            print("\nALL TESTS PASSED!")
+
     
     def print_solved_variables(csp:CSP_solver, name='random test', expected_result='') -> None:
         print(f'\nSolving "{name}"')
-        concat = ''
+        concat = 'NOTHING'
         if len(csp.solved_variables) >= 1:
+            concat = ''
             for variable, value in sorted(csp.solved_variables):
                 print("- solved a new variable!", variable , "=", value)
                 concat += str(value)
         elif len(csp.solved_variables) == 0:
             print('- NO SOLVED VARIABLES!')
+            return(name, 'failed', concat)
         if concat == expected_result:
             print('test passed!')
+            return(name, 'passed', concat)
         else:
             print('TEST FAILED')
+            return(name, 'failed', concat)
 
 
     ################################# Test 1a (using letters instead of (x,y) format for variables) ##########################################
@@ -444,7 +503,10 @@ if __name__ == '__main__':
     csp = CSP_solver()
     csp.add_equations_if_new([eq1, eq2, eq3, eq4])
     csp.absolut_brut()       # TO-DO; fails sometimes, even if 2 ... 10 rounds! (why sometimes; because sets can be handled in undeterministic order relative to each other)     # PRINT: see answer above in orange
-    print_solved_variables(csp, 'test 1a: letters. a0, b1, c1, d0, e1 expected:', '01101')
+    name = 'test 1a: letters. a0, b1, c1, d0, e1 expected'
+    expected_result = '01101'
+    test_info_dict[name] = [csp, expected_result]
+    # print_solved_variables(csp, name, expected_result)
 
     ############################ Test 1b: same as 1a, but using (x,y) format for variables instead of letters ############################################
     
@@ -461,8 +523,11 @@ if __name__ == '__main__':
     csp = CSP_solver()
     csp.add_equations_if_new([eq1, eq2, eq3, eq4])
     csp.absolut_brut()
+    name = 'test 1b: (x,y): (0,0)=0, (0,1)=1, (1,0)=1, (2,0)=0, (3,0)=1 expected'
+    expected_result = '01101'
+    test_info_dict[name] = [csp, expected_result]
 
-    print_solved_variables(csp, 'test 1b: (x,y): (0,0)=0, (0,1)=1, (1,0)=1, (2,0)=0, (3,0)=1 expected:', '01101')
+    # print_solved_variables(csp, name, expected_result)
 
     '''correct result:
     - solved a new variable! (0, 0) = 0
@@ -481,7 +546,7 @@ if __name__ == '__main__':
     a + d = 0
     d + e = 1
     d + e = 1
-    expected: a=0, b=1, d=0, e=1
+    expected a=0, b=1, d=0, e=1
     '''
     eq1 = [0, 1, ('a', 'b'), 1]
     eq2 = [1, 1, ('a', 'd'), 0]
@@ -489,10 +554,15 @@ if __name__ == '__main__':
     eq4 = [3, 1, ('d', 'e'), 1]
     csp = CSP_solver()
     csp.add_equations_if_new([eq1, eq2, eq3, eq4])
-    csp.absolut_brut()                          
-    print_solved_variables(csp, 'test 1c: letters. 0101 expected', '0101')
+    csp.absolut_brut() 
 
-    ############################## Test 2 #############################################
+    name = 'test 1c: letters. a0, b1, d0, e1 expected'
+    expected_result = '0101'
+    test_info_dict[name] = [csp, expected_result]        
+                     
+    # print_solved_variables(csp, name, expected_result)
+
+    ############################## Test 2, letters #############################################
     '''                                             answer (which is printed also): 
     Example: solving                                a = 0
     a + b + d = 2                                   b = 1
@@ -509,10 +579,12 @@ if __name__ == '__main__':
     eq4 = [1, 2, ('d', 'e'), 1]
     csp = CSP_solver()
     csp.add_equations_if_new([eq1, eq2, eq3, eq4])
-    csp.absolut_brut()                          
-    print_solved_variables(csp, 'test 2, letters. a0,b1,c0,d1,e0 expected:', '01010')
+    csp.absolut_brut() 
 
-    
+    name = 'test 2, letters. a0,b1,c0,d1,e0 expected'
+    expected_result = '01010'
+    test_info_dict[name] = [csp, expected_result]                         
+    # print_solved_variables(csp, name, expected_result)
 
     ############################ Test 3a: letters ############################################
     
@@ -531,7 +603,11 @@ if __name__ == '__main__':
     csp.add_equations_if_new([eq1, eq2, eq3, eq4])
     csp.absolut_brut()
 
-    print_solved_variables(csp, 'test 3a, letters. a0,b1,c0,f1 expected', '0101')
+    name = 'test 3a, letters. a0,b1,c0,f1 expected'
+    expected_result = '0101'
+    test_info_dict[name] = [csp, expected_result]
+
+    # print_solved_variables(csp, name, expected_result)
 
     '''correct result: a0,b1,c0,f1 (AND d = not e). This requires the constraints that each is 0 or 1 (to solve b+f=2 -> b=f=1)
     '''
@@ -553,7 +629,11 @@ if __name__ == '__main__':
     csp.add_equations_if_new([c01, c11, c20, c21])
     csp.absolut_brut()
 
-    print_solved_variables(csp, 'test 3b, (x,y). 0101 expected', '0101')
+    name = 'test 3b, (x,y). (0,2)=0, (1,2)=1, (2,2)=0, (3,2)=1 (AND (3,0) = not (3,1))'
+    expected_result = '0101'
+    test_info_dict[name] = [csp, expected_result]
+
+    # print_solved_variables(csp, name, expected_result)
 
     ############################ Test 4a: letters ############################################
     
@@ -567,7 +647,11 @@ if __name__ == '__main__':
     csp.add_equations_if_new([eqi, eqiii, eqv, eqvi, eqa, eqb])
     csp.absolut_brut()                                  # NB! after 3 rounds minimum, e=0 is solved! A smaller number of rounds is not enough. This is ok and expected given the functions written in the class, as not everything is recursively updated until the end of the world (as this would complicate things even more!); also, nb! The purpose is not to be able to solve everything in one go, as that would also mean that pressing 'b' once in 'botGame.py' would proceed a huge number of steps at a time, AND this has nothing to do, as such, with efficiency either; so I want to divide this into small(ish) steps whenever possible, facilitating visualization and debugging that way, as there's no real reason not to do this. In fact, efficiency-wise, it's better to run as little as CSP_solver as possible, instead relying on the much simpler 'simple_solver' in 'botGame.py' as possible
 
-    print_solved_variables(csp, 'test 4a, letters. e=0 expected', '0')
+    name = 'test 4a, letters. e=0 expected'
+    expected_result = '0'
+    test_info_dict[name] = [csp, expected_result]
+
+    # print_solved_variables(csp, name, expected_result)
 
     ########################## Test 5a: letters. Based on 'Esim_expert_1.png', which wasn't solved by pressing 'b' (i.e., this test is for actual debugging) #
     
@@ -582,7 +666,12 @@ if __name__ == '__main__':
     csp.absolut_brut()                                  # NB! This needs 2 rounds!
     # TO-DO: Thanks to this, I added more CSP conditions -> now it's sometimes ENTIRELY solved, sometimes NOT AT ALL (0 variables solved!)
 
-    print_solved_variables(csp, 'test 5a, letters. c0, d0, e1, f1, g0, h0, i0, j0 expected', '00110000') # expected: cdefg 00110
+    name = 'test 5a, letters. c0, d0, e1, f1, g0, h0, i0, j0 expected'
+    expected_result = '00110000'
+    test_info_dict[name] = [csp, expected_result]
+    # print_solved_variables(csp, name, expected_result) # expected cdefg 00110
+
+    print_multiple_results(test_info_dict)
 
 
 '''
