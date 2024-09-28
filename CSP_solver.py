@@ -87,11 +87,46 @@ class CSP_solver:
             return compatibility_groups                                             # remember! There's only ONE interpretation for those keys that have empty value set; they are NOT limited at all, that is, all alternatives (all 1-combinations, i.e. all mine combinations) are still possible for them!
         compatibility_groups = restrict_solution_space_as_equation_pairs_with_common_variables(alternative_answers_per_equation)
         
-        # every key in 'compatibility_groups' is an alt solution for one equation that must be solved one way or another. The same goes to all equation groups in each of those keys' values, BUT I'm first looking at the keys before looking at their values.
+        def join_comp_groups_into_solutions(compatibility_groups:dict) -> None:
+            possible_whole_solutions = []
+            all_variables = set(self.variable_to_equations.keys())
+
+            # def traverse(proposed_match):
+            
+           
+            for proposed_key, proposed_matches_for_the_key in compatibility_groups.items():             # ('d', 'e'), [(('d',1),('e',0)), (('d',0),('e',1))] for example. This quarantees that they are separate
+                solution_proposition_build = dict()                                         # save all var values here. Most importantly: each variable (var) has to be found in this dict for the assembled solution to be even considered viable (because, each GROUP, i.e., each original EQUATION from the minesweeper map has to be satisfied, as there HAS to exist at least ONE solution where none of the equations disagree, i.e., a combination of alt-equations (one per group) that agree with each other, and since all the equations combined DO include all the variables, AND because each group was connected to each other using 'compatibility_groups' dict earlier, I will consider afterwards only those equations that contain all the variables! So we DO know that all equations must be satisfied by some combination of alt solutions (one alt from each group!))
+                seen_proposed_vectors = set()
+                seen_proposed_vectors.add(proposed_key)
+                for proposed_match in proposed_matches_for_the_key:
+                    if proposed_match in compatibility_groups:                              # do NOT add those that are not present as keys of 'compatibility_groups' as THEY ARE NOT COMPATIBLE WITH ONE OR MORE GROUP c:
+                        if proposed_match not in seen_proposed_vectors:
+                            for var, value in proposed_match:
+                                if var not in solution_proposition_build:
+                                    solution_proposition_build[var] = set()
+                                solution_proposition_build[var].add(value)                  # there can be 1 or 2 per variable. If 2, it means that there is not enough information (yet) for solving this variable. If only 1 value, great, that means the value is now solved.
+                            seen_proposed_vectors.add(proposed_match)
+                if len(solution_proposition_build.keys()) == len(all_variables):
+                    possible_whole_solutions.append(solution_proposition_build)
+            pass
+            for dictionary in possible_whole_solutions:
+                for var, vals in dictionary.items():
+                    if len(vals) == 1:
+                        self.solved_variables.add((var, tuple(vals)[0]))
+                for var, vals in dictionary.items():
+                    if len(vals) == 1:
+                        self.update_related_info_for_solved_var((var, tuple(vals)[0]))
+            pass
+                
+
+        join_comp_groups_into_solutions(compatibility_groups)
+
+        # every key in 'compatibility_groups' is an alt solution for one equation that must be solved one way or another. The same goes for all equation groups in each of those keys' values, BUT here I'm just looking at the keys before looking at their values.
         def solution_finder_from_compatibility_groups(compatibility_groups:dict) -> dict:
-            def simple_inspection():
+            def key_altSolution_inspector():
                 new_solutions = set()
-                keyVars_to_key = dict()
+                keyVars_to_key = dict()                                             # let's say there are 2 alt versions (two possible ALTERNATIVE solution vectors, e.g. (a) a=1, b=0, c=1 and (b) a=1, b=1, c=0, that survived the previous handling in 'restrict_solution_space_as_equation_pairs_with_common_variables()') for an equation (a+b+c=2 in this example). These 2 alternative solution vectors share all the same keyVars (a,b,c). We know that ONE of these alt vectors has to be true. So, if in both alt versions, a variable has value 0, then that variable MUST be 0. If both have a variable value 1 (a=1 in both alt solutions in my example!), then that variable MUST be 1. This is because this equation, as well as every other equation originating from a cell in the minesweeper map, has to be satisfied (because all of them are true!), so exactly one of its alt vectors has to be true.
+                keyVars_to_solutions = dict()                                       # for all alt keys, gather all the possible answers for both here. However, I've never noticed a situation where looking at alt keys doesn't lead to a solution, but looking at all the possible answers (more unlikely to begin with) for ALL the alts for an equation would agree regarding one or more variables. So, currently, I'm not gathering anything here.
                 marked_solved = []
                 for key in compatibility_groups.keys():                             # e.g. key = (('a',0),('b',1),('c',1)), values are similar, AND each value for each key shares at least one variable (like 'a') with the key (which is also an equation, just like the values)
                     key_vars = tuple(proposed_value[0] for proposed_value in key)   # NB! THese still are in alphabetic order, thanks to 'itertools.combinations' in 'find_and_group_possible_answers_per_single_equation' which sorted the answers alphabetically
@@ -107,7 +142,7 @@ class CSP_solver:
                                 self.update_related_info_for_solved_var(((var, value)))
                     else:
                         var_to_possibleValues = dict()                              # for each proposed ((var1,value1), (var2,value2), ...), here called a 'vector', record the value. Since all these vectors now inspected are derived from a single equation that MUST be solved, then if all the suggested values are equal for a variable, it MUST be solved as that value, as otherwise the equation could not be solved. Use debugger if this is unclear, it shows very clearly what's happening here c:
-                        for proposed_vector in proposed_values:
+                        for proposed_vector in proposed_values:                     # NB! This gathers all possible values for each variable (i.e., 0, or 1, or 0 and 1 per variable!) for ALL the proposed vectors per key; so
                             for var,value in proposed_vector:
                                 if var not in var_to_possibleValues:
                                     var_to_possibleValues[var] = []
@@ -139,34 +174,36 @@ class CSP_solver:
                         ok = False
                     return ok
 
-                # if all_variables_solved(compatibility_groups.keys()):                     # TO-DO! NB! This should be uncommented after you find the problem with the below/something else regarding the updating/the whole loop...
-                #     return None
-                # else:
-                updated_compatibility_groups = dict()                                       # rebuild this according to the previous, 'new_solutions'
-                for key, values in compatibility_groups.items():                            # the old 'compatibility_groups' to be updated; check for (1) solved variables, (2) untrue alternative solutions (do not add those to the 'updated_compatibility_groups')
-                    key_ok = True
-                    for var, proposed_value in key:
-                        key_ok = check_proposed_value(var, proposed_value)                  # the key is an equation like (('a',1), ('b',0)) just like each its equations (values)! The key can become outdated just like its values!
-                        if not key_ok:
-                            break
-                    if key_ok:
-                        if key not in updated_compatibility_groups:
-                            updated_compatibility_groups[key] = set()                       # I don't want empty sets - don't add those keys at all
-                        for proposed_vector in values:                                      # (a) if the proposed value is not the solved value, then this 'proposed_vector' (the whole line, with multiple variables and their proposed values) is untrue, and should be discarded
-                            all_values_ok = True
-                            for var, value in proposed_vector:
-                                all_values_ok = check_proposed_value(var, value)
-                                if not all_values_ok:
-                                    break
-                            if all_values_ok:
-                                updated_compatibility_groups[key].add(proposed_vector)      # only add the non-obsolete vectors (var,value -pair tuples) to the 'updated_compatibility_groups'
+                if all_variables_solved(compatibility_groups.keys()):                           # TO-DO! NB! This should be uncommented after you find the problem with the below/something else regarding the updating/the whole loop...
+                    return 'all variables solved'
+                else:
+                    updated_compatibility_groups = dict()                                       # rebuild this according to the previous, 'new_solutions'
+                    for key, values in compatibility_groups.items():                            # the old 'compatibility_groups' to be updated; check for (1) solved variables, (2) untrue alternative solutions (do not add those to the 'updated_compatibility_groups')
+                        key_ok = True
+                        for var, proposed_value in key:
+                            key_ok = check_proposed_value(var, proposed_value)                  # the key is an equation like (('a',1), ('b',0)) just like each its equations (values)! The key can become outdated just like its values!
+                            if not key_ok:
+                                break
+                        if key_ok:
+                            if key not in updated_compatibility_groups:
+                                updated_compatibility_groups[key] = set()                       # I don't want empty sets - don't add those keys at all
+                            for proposed_vector in values:                                      # (a) if the proposed value is not the solved value, then this 'proposed_vector' (the whole line, with multiple variables and their proposed values) is untrue, and should be discarded
+                                all_values_ok = True
+                                for var, value in proposed_vector:
+                                    all_values_ok = check_proposed_value(var, value)
+                                    if not all_values_ok:
+                                        break
+                                if all_values_ok:
+                                    updated_compatibility_groups[key].add(proposed_vector)      # only add the non-obsolete vectors (var,value -pair tuples) to the 'updated_compatibility_groups'
                 return updated_compatibility_groups                  
-            new_solutions = simple_inspection()
+            new_solutions = key_altSolution_inspector()
             if new_solutions:
-                updated_compatibility_groups = update_compatibility_groups(compatibility_groups)    # TO-DO: this causes problems
-                if updated_compatibility_groups:
-                    solution_finder_from_compatibility_groups(updated_compatibility_groups)             # RECURSION. The thing preventing infinite recursion is the check 'return new_solutions' from 'simple_inspection()'; it only returns those variables that were not already in 'self.solved_variables' previously. Hence, if the loop returns nothing new, it's stopped at that point.
-        solution_finder_from_compatibility_groups(compatibility_groups)
+                updated_compatibility_groups = update_compatibility_groups(compatibility_groups)        
+                if updated_compatibility_groups == 'all variables solved':
+                    return
+                elif updated_compatibility_groups:
+                    solution_finder_from_compatibility_groups(updated_compatibility_groups)             # RECURSION. TO-DO: last test is infinite; how is it even possible? The thing preventing infinite recursion is the check 'return new_solutions' from 'simple_inspection()'; it only returns those variables that were not already in 'self.solved_variables' previously. Hence, if the loop returns nothing new, it's stopped at that point.
+        # solution_finder_from_compatibility_groups(compatibility_groups)
 
 
 
@@ -439,7 +476,7 @@ if __name__ == '__main__':
     csp = CSP_solver()
     csp.add_equations_if_new([eq1, eq2, eq3, eq4])
     csp.absolut_brut()                          
-    print_solved_variables(csp, 'test 2, letters. 01010 expected:', '01010')
+    print_solved_variables(csp, 'test 2, letters. a0,b1,c0,d1,e0 expected:', '01010')
 
     
 
@@ -460,9 +497,9 @@ if __name__ == '__main__':
     csp.add_equations_if_new([eq1, eq2, eq3, eq4])
     csp.absolut_brut()
 
-    print_solved_variables(csp, 'test 3a, letters. 0101 expected', '0101')
+    print_solved_variables(csp, 'test 3a, letters. a0,b1,c0,f1 expected', '0101')
 
-    '''correct result: a,c,e=0; b,f,d = 1. This requires the constraints that each is 0 or 1
+    '''correct result: a0,b1,c0,f1 (AND d = not e). This requires the constraints that each is 0 or 1 (to solve b+f=2 -> b=f=1)
     '''
 
     ############################ Test 3b: (x,y) ############################################
