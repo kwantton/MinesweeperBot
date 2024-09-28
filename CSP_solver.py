@@ -97,6 +97,7 @@ class CSP_solver:
                 keyVars_to_key[key_vars].append(key)
             return keyVars_to_key
         
+        # TO-DO; this should preferably find terminal alt solutions; those that have only one connection, and use those. PROBLEM: it's not quaranteed that such alt solutions even exist! If all alt solutions share variables, they can form a ring with bilateral connections between each adjacent member -> no 'terminal' alt solution found, that would otherwise be handy as origin to start answer compilation from
         def alt_origin_builder() -> list:
             keyVars_to_keys = keyVars_to_keys_builder(compatibility_groups)
             min_length = 8
@@ -116,55 +117,71 @@ class CSP_solver:
                     break
             return origins
         
-        def identify_group(proposed_match) -> set:
+        def identify_group(proposed_matching_alt_solution:tuple) -> set:        # the 'vars' set is a set of the variables present in the 'alt_solution'; this is for bookkeeping of which groups (i.e. equations, with one or more alt answers) have already been handled and which not. All groups must be found exactly one alt solution for!
             vars = set()
-            for var, value in proposed_match:
+            for var, value in proposed_matching_alt_solution:
                 vars.add(var)
             return vars
+
+        def check_for_disagreements(proposed_matching_alt_solution:tuple, possible_solution_build:dict) -> tuple:
+            incompatible_pma = False
+            for var, value in proposed_matching_alt_solution:                       # (('a',0), ('b',1), ...) a 'proposed_matching_alt' has this format. It's one alt solution to an equation that's derived from the minesweeper map and which has to have ONE alt solution, the other ones being untrue.
+                if var in possible_solution_build:
+                    if possible_solution_build[var] != value:
+                        incompatible_pma = True
+                        break                                                       # it's possible that one or more variable values from an alt answer (the current one) disagree with one or more alt answers that are INDIRECTLY connected to the current alt answer. Hence, they are in this case 'incompatible' (they directly disagree with each other), and the handling of this current alt solution should be prevented altogether
+            return incompatible_pma, possible_solution_build
                
         def join_comp_groups_into_solutions(compatibility_groups:dict) -> None:
             possible_whole_solutions = []
             # alternative_origins = alt_origin_builder()                                      # if there's only a single origin and there has been no check if it's connected to all other groups, there'd be no quarantee of finding a solution (which encompasses all groups, as is necessary!). I want to keep things clear and force starting at least 2 or more times, using 2 or more origins if possible. If there's only 1, then that should work too in the 'traverse()' (or, I have to make it work, no big deal)
             all_variables = set(self.variable_to_equations.keys())
             # origin_dict = {alt_origin:compatibility_groups[alt_origin] for alt_origin in alternative_origins}
+            
             # TO-DO! Check group recognition. Group comparison works, but is everything else ok as well?
-            def traverse(proposed_origin, proposed_matches_for_the_key, seen_proposed_vectors, 
-                solution_proposition_build, seen_groups): # I'm keeping 'proposed_origin' solely for debugging purposes!
+            def traverse(proposed_origin, proposed_matches_for_the_key, seen_proposed_alts, 
+                possible_solution_build, already_handled_groups): # I'm keeping 'proposed_origin' solely for debugging purposes!
                 
-                for proposed_match in proposed_matches_for_the_key:
-                    this_group = identify_group(proposed_match)                                          # this 'proposed_match' is an alt answer for a group - 'group(proposed_match)' tells me WHICH group it belongs to. I want EXACTLY ONE alt answer for EACH group, as each group represents an original equation from the minesweeper map (a number cell, the equation of which is always true, so MUST be satisfied and MUST be compatible with all other groups!)
-                    if this_group not in seen_groups:                                           # comparison of sets works in python like this; if the values are the same, then the sets are 'equal'
-                        seen_groups.append(this_group)
-                        if proposed_match in compatibility_groups:                              # do NOT handle (or add to possible solutions) those that are not present as keys of 'compatibility_groups' as THEY ARE NOT COMPATIBLE WITH ONE OR MORE GROUP c:
+                for proposed_matching_alt in proposed_matches_for_the_key:
+                    incompatible_pma = False                                                # is this 'proposed_matching_alt' incompatible with the values already present in 'possible_solution_build'? This incompatibility is possible if earlier-than-previous 'proposed_matching_alt's have added values that are incompatible with this current 'proposed_matching_alt'. It means that this current alt solution should not even be considered, BUT I'll still add it to 'seen_proposed_alts' below.
+                    group_of_this_alt = identify_group(proposed_matching_alt)               # this 'proposed_matching_alt' is an alt answer for a group - 'group(proposed_match)' tells me WHICH group it belongs to. I want EXACTLY ONE alt answer for EACH group, as each group represents an original equation from the minesweeper map (a number cell, the equation of which is always true, so MUST be satisfied and MUST be compatible with all other groups!)
+                    if group_of_this_alt not in already_handled_groups:                     # NB! So, I only want EXACTLY ONE alt solution per group. If an alt solution has already been handled, DO NOT HANDLE ANOTHER; that another alt solution will be handled in a whole another iteration of this 'traverse()'. (2) Comparison of sets in python; if the values in the set are the same, then the sets are 'equal' in the == comparison. Nice.
+                        if proposed_matching_alt in compatibility_groups:                   # If this alt solution is not a key in 'compatibility_groups', then IT IS UNTRUE; then do NOT handle this alt (do not (1) mark its variables' proposed values as possible solutions, and do not (2) mark the group that it presents as handled); if the current alt is NOT present as a key of 'compatibility_groups', IT IS INCOMPATIBLE WITH AT LEAST ONE OTHER GROUP. In English, if the current alt solution is not present as a key in 'compatibility_groups', it CANNOT EVER SATISFY ALL THE EQUATIONS that we know MUST be true using at least one combination of alt solutions.
                             new_matches = []
-                            if proposed_match not in seen_proposed_vectors:
-                                for var, value in proposed_match:
-                                    if var not in solution_proposition_build:
-                                        solution_proposition_build[var] = value              # there can be 1 or 2 per variable. If 2, it means that there is not enough information (yet) for solving this variable. If only 1 value, great, that means the value is now solved.
-                                new_matches = compatibility_groups[proposed_match]
-                                seen_proposed_vectors.add(proposed_match)
-                            if len(solution_proposition_build.keys()) == len(all_variables):    # if the addition done above was the last one that completes a possible solution,
-                                if n_groups == len(seen_groups):
-                                    possible_whole_solutions.append(solution_proposition_build)
+                            if proposed_matching_alt not in seen_proposed_alts:             # (1) prevents infinite loop by 'new_matches', (2) also saves a bunch of other unnecessary computation
+                                incompatible_pma, possible_solution_build = check_for_disagreements(
+                                    proposed_matching_alt, possible_solution_build)
+                                if not incompatible_pma:
+                                    for var, value in proposed_matching_alt:                # (('a',0), ('b',1), ...) a 'proposed_matching_alt' has this format. It's one alt solution to an equation that's derived from the minesweeper map and which has to have ONE alt solution, the other ones being untrue.
+                                        possible_solution_build[var] = value                # there can be 1 or 2 per variable. If 2, it means that there is not enough information (yet) for solving this variable. If only 1 value, great, that means the value is now solved.
+                                seen_proposed_alts.add(proposed_matching_alt)               # incompatible or not, I shouldn't re-enter an alt solution later again; just mark it as seen, and that's it.
+                                if incompatible_pma:                                        # if this alt solution disagrees i.e. is incompatible with already-recorded alt solutions (one from each met group so far), then move on to the next 'proposed_matching_alt' (which may be of the same OR of different group!) NB! Do NOT mark the group of the current alt solution as handled if it's incompatible; this means that we still need to wait for a compatible alt to come by from this group, so I must NOT mark it as handled yet!
+                                    continue                                                # move on to the next 'proposed_matching_alt' for the current key equation, if the current 'proposed_matching_alt' is incompatible with one or more value recorded in 'possible_solution_build'. So, incompatibility here means that one or more values of the proposed_matching_alt variables' disagree with an already-recorded value in 'possible_solution_build' that has been built until this point in the loop, for this origin in question. If that disagreement happens, it's because even though every key:value-pair in 'compatibility_groups' are DIRECTLY compatible with each other, they are not necessarily INDIRECTLY compatible with each other through traversing other alt solutions from other groups in-between; these alt answers can disagree, and if such an alt answer is come across, then it must be bypassed altogether, not added to solutions (it's a direct unimpossibility to have two values for one variabls). NB! This depends on what alt answers have been previously come across, of course. So there's no such thing as an universally incompatible alt answer remaining in 'compatibility_groups' keys at this point; they were got rid of earlier. As for the values, they are universally incompatible if they are not found in keys, but I'm already checking that elswehere in this loop c:
+                                already_handled_groups.append(group_of_this_alt)            # NB! Below, 'if possible_solution_build[var] != value' checks if this 
+                                new_matches = compatibility_groups[proposed_matching_alt]   # do this ONLY if none of the values disagree with values that have already been recorded in 'possible_solution_build'
+                                
+                            if len(possible_solution_build.keys()) == len(all_variables):   # if the addition done above was the last one that completes a possible solution,
+                                if n_groups == len(already_handled_groups):
+                                    possible_whole_solutions.append(possible_solution_build)
                                 else:
-                                    return                                                      # not correct answer!
+                                    return                                                  # not correct answer in this case! In that case, it makes absolutely no sense to continue, as every round of this 'traverse()' can only ADD to 'possible_solution_build', not remove from it; it's not possible to recover and turn this 'possible_solution_build' into a viable one by continuing, and continuing will not add any info that's usable for other iteration loops of 'traverse()' either.
                             else:
                                 for new_match in new_matches:
-                                    if new_match not in seen_proposed_vectors:
+                                    if new_match not in seen_proposed_alts:
                                         traverse(proposed_origin, new_matches, 
-                                            seen_proposed_vectors, solution_proposition_build, seen_groups)
+                                            seen_proposed_alts, possible_solution_build, already_handled_groups)
                         
            
             # if I just pick one origin (origin = key in the map = ONE random alternative solution vector for one group), it may be a non-ok alternative meaning that it may never become connected with ALL other groups, never finding any whole solution. This is because the origins (key equations) are SINGLE ALTERNATIVES, and as we know, only ONE alternative may provide a possible answer for every group (depends on the case!)
             for random_origin, proposed_matches_for_the_random_origin in compatibility_groups.items(): # ('d', 'e'), [(('d',1),('e',0)), (('d',0),('e',1))] for example. This quarantees that they are separate
                 seen_proposed_vectors = set()                                               # PER alt answer, of course - that's why it's initialized here and not at the top of this 'join_groups_into_solutions'
                 seen_seen_proposed_vectors = set()                                          # this is for bookkeeping which combinations have been seen before; this ensures that no infinite loops occur
-                seen_groups = [set(identify_group(random_origin))]                          # a list of sets of variables; there's never a big number of groups (at the very most, roughly 20 in Expert), so it's ok to look through that short list every time in 'traverse' for checking. So, TO-DO! This bookkeeping is necessary for recognizing valid solutions. So, not only does one need to have a value for every variable, but ALSO the origin for each of them has to be specific, namely ONE alt anser from EACH group only, AND do not permit entry to another alt from same group ever again!
-                solution_proposition_build = dict()                                         # save all var values here. Most importantly: each variable (var) has to be found in this dict for the assembled solution to be even considered viable (because, each GROUP, i.e., each original EQUATION from the minesweeper map has to be satisfied, as there HAS to exist at least ONE solution where none of the equations disagree, i.e., a combination of alt-equations (one per group) that agree with each other, and since all the equations combined DO include all the variables, AND because each group was connected to each other using 'compatibility_groups' dict earlier, I will consider afterwards only those equations that contain all the variables! So we DO know that all equations must be satisfied by some combination of alt solutions (one alt from each group!))
+                seen_groups = [set(identify_group(random_origin))]                          # NB! A group is an equation from the minesweeper map. When I start from an alt answer to such group, I want to remember that that group has already been handled, i.e.: do NOT EVER handle another alt solution for that same group again IN THE SAME SOLUTION BUILD, as that's a simple impossibility (all the alt answers within one group disagree with each other, so they must NOT be ever combined) a list of sets of variables; there's never a big number of groups (at the very most, roughly 20 in Expert), so it's ok to look through that short list every time in 'traverse' for checking. So, TO-DO! This bookkeeping is necessary for recognizing valid solutions. So, not only does one need to have a value for every variable, but ALSO the origin for each of them has to be specific, namely ONE alt anser from EACH group only, AND do not permit entry to another alt from same group ever again!
+                possible_solution_build = dict()                                         # save all var values here, one set from ONE alt soultion per group. Connected different-grouped alt answers never disagree with each other DIRECTLY, but they can disagree indirectly. Most importantly: each variable (var) has to be found in this dict for the assembled solution to be even considered viable (because, each GROUP, i.e., each original EQUATION from the minesweeper map has to be satisfied, as there HAS to exist at least ONE solution where none of the equations disagree, i.e., a combination of alt-equations (one per group) that agree with each other, and since all the equations combined DO include all the variables, AND because each group was connected to each other using 'compatibility_groups' dict earlier, I will consider afterwards only those equations that contain all the variables! So we DO know that all equations must be satisfied by some combination of alt solutions (one alt from each group!))
                 seen_proposed_vectors.add(random_origin)
                 keyVars_to_keys = keyVars_to_keys_builder(compatibility_groups)
                 n_groups = len(keyVars_to_keys.keys())
-                traverse(random_origin, proposed_matches_for_the_random_origin, seen_proposed_vectors, solution_proposition_build, seen_groups)   # 'traverse' builds the 'possible_whole_solutions' 
+                traverse(random_origin, proposed_matches_for_the_random_origin, seen_proposed_vectors, possible_solution_build, seen_groups)   # 'traverse' builds the 'possible_whole_solutions' 
                 
             def handle_possible_whole_solutions():
                 final_answers = dict()
