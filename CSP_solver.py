@@ -87,27 +87,69 @@ class CSP_solver:
             return compatibility_groups                                             # remember! There's only ONE interpretation for those keys that have empty value set; they are NOT limited at all, that is, all alternatives (all 1-combinations, i.e. all mine combinations) are still possible for them!
         compatibility_groups = restrict_solution_space_as_equation_pairs_with_common_variables(alternative_answers_per_equation)
         
+        # every key in 'compatibility_groups' is an alt solution for one equation that must be solved one way or another. The same goes for all equation groups in each of those keys' values, BUT here I'm just looking at the keys before looking at their values.
+        def keyVars_to_keys_builder(compatibility_groups:dict) -> dict:
+            keyVars_to_key = dict()                                             # let's say there are 2 alt versions (two possible ALTERNATIVE solution vectors, e.g. (a) a=1, b=0, c=1 and (b) a=1, b=1, c=0, that survived the previous handling in 'restrict_solution_space_as_equation_pairs_with_common_variables()') for an equation (a+b+c=2 in this example). These 2 alternative solution vectors share all the same keyVars (a,b,c). We know that ONE of these alt vectors has to be true. So, if in both alt versions, a variable has value 0, then that variable MUST be 0. If both have a variable value 1 (a=1 in both alt solutions in my example!), then that variable MUST be 1. This is because this equation, as well as every other equation originating from a cell in the minesweeper map, has to be satisfied (because all of them are true!), so exactly one of its alt vectors has to be true.
+            for key in compatibility_groups.keys():                             # e.g. key = (('a',0),('b',1),('c',1)), values are similar, AND each value for each key shares at least one variable (like 'a') with the key (which is also an equation, just like the values)
+                key_vars = tuple(proposed_value[0] for proposed_value in key)   # NB! THese still are in alphabetic order, thanks to 'itertools.combinations' in 'find_and_group_possible_answers_per_single_equation' which sorted the answers alphabetically
+                if key_vars not in keyVars_to_key:
+                    keyVars_to_key[key_vars] = []
+                keyVars_to_key[key_vars].append(key)
+            return keyVars_to_key
+        
+        def alt_origin_builder() -> list:
+            keyVars_to_keys = keyVars_to_keys_builder(compatibility_groups)
+            min_length = 8
+            for keyVars, keys in keyVars_to_keys.items():
+                n_keys = len(keys)
+                if n_keys == 2:                                                 # let's find a group (like a+b=1) where there are at least two, PREFERABLY exactly 2, altenative solution vectors (a=0, b=1 and a=1, b=0 in this case) because of the nature
+                    if n_keys < min_length:                                     # if can't find length 2 keys, then just find the smallest non-1-length key
+                        min_length = n_keys
+                    origins = [key for key in keys]
+                    break
+                elif n_keys < min_length:                                       # if can't find length 2 keys, then just find the smallest non-1-length key
+                    min_length = n_keys
+                    origins = [key for key in keys]
+            if min_length == 8:                                                 # if there is an 8 OR a 1 (only one possible for each group, very rare), then just pick the first one from the dictionary and break
+                for keyVars, keys in keyVars_to_keys:                           # just pick the 1st one
+                    origins = [key for key in keys]
+                    break
+            return origins
+
+        
         def join_comp_groups_into_solutions(compatibility_groups:dict) -> None:
             possible_whole_solutions = []
+            alternative_origins = alt_origin_builder()                                      # if there's only a single origin and there has been no check if it's connected to all other groups, there'd be no quarantee of finding a solution (which encompasses all groups, as is necessary!). I want to keep things clear and force starting at least 2 or more times, using 2 or more origins if possible. If there's only 1, then that should work too in the 'traverse()' (or, I have to make it work, no big deal)
             all_variables = set(self.variable_to_equations.keys())
+            origin_dict = {alt_origin:compatibility_groups[alt_origin] for alt_origin in alternative_origins}
 
-            # def traverse(proposed_match):
-            
-           
-            for proposed_key, proposed_matches_for_the_key in compatibility_groups.items():             # ('d', 'e'), [(('d',1),('e',0)), (('d',0),('e',1))] for example. This quarantees that they are separate
-                solution_proposition_build = dict()                                         # save all var values here. Most importantly: each variable (var) has to be found in this dict for the assembled solution to be even considered viable (because, each GROUP, i.e., each original EQUATION from the minesweeper map has to be satisfied, as there HAS to exist at least ONE solution where none of the equations disagree, i.e., a combination of alt-equations (one per group) that agree with each other, and since all the equations combined DO include all the variables, AND because each group was connected to each other using 'compatibility_groups' dict earlier, I will consider afterwards only those equations that contain all the variables! So we DO know that all equations must be satisfied by some combination of alt solutions (one alt from each group!))
-                seen_proposed_vectors = set()
-                seen_proposed_vectors.add(proposed_key)
+            def traverse(proposed_origin, proposed_matches_for_the_key, seen_proposed_vectors, solution_proposition_build): # I'm keeping 'proposed_origin' solely for debugging purposes!
                 for proposed_match in proposed_matches_for_the_key:
-                    if proposed_match in compatibility_groups:                              # do NOT add those that are not present as keys of 'compatibility_groups' as THEY ARE NOT COMPATIBLE WITH ONE OR MORE GROUP c:
+                    if proposed_match in compatibility_groups:                              # do NOT handle (or add to possible solutions) those that are not present as keys of 'compatibility_groups' as THEY ARE NOT COMPATIBLE WITH ONE OR MORE GROUP c:
+                        new_matches = []
                         if proposed_match not in seen_proposed_vectors:
+                            new_matches = compatibility_groups[proposed_match]
                             for var, value in proposed_match:
                                 if var not in solution_proposition_build:
-                                    solution_proposition_build[var] = set()
-                                solution_proposition_build[var].add(value)                  # there can be 1 or 2 per variable. If 2, it means that there is not enough information (yet) for solving this variable. If only 1 value, great, that means the value is now solved.
+                                    solution_proposition_build[var] = set()                 # only one per each!
+                                    solution_proposition_build[var].add(value)              # there can be 1 or 2 per variable. If 2, it means that there is not enough information (yet) for solving this variable. If only 1 value, great, that means the value is now solved.
                             seen_proposed_vectors.add(proposed_match)
-                if len(solution_proposition_build.keys()) == len(all_variables):
-                    possible_whole_solutions.append(solution_proposition_build)
+                        if len(solution_proposition_build.keys()) == len(all_variables):    # if the addition done above was the last one that completes a possible solution,
+                            possible_whole_solutions.append(solution_proposition_build)
+                        else:
+                            for new_match in new_matches:
+                                if new_match not in seen_proposed_vectors:
+                                    traverse(proposed_origin, new_matches, seen_proposed_vectors, solution_proposition_build)
+                        
+           
+            # if I just pick one origin (origin = key in the map = ONE random alternative solution vector for one group), it may be a non-ok alternative meaning that it may never become connected with ALL other groups, never finding any whole solution. This is because the origins (key equations) are SINGLE ALTERNATIVES, and as we know, only ONE alternative may provide a possible answer for every group (depends on the case!)
+            for proposed_origin, proposed_matches_for_the_key in origin_dict.items(): # ('d', 'e'), [(('d',1),('e',0)), (('d',0),('e',1))] for example. This quarantees that they are separate
+                seen_proposed_vectors = set()                                               # PER alt answer, of course - that's why it's initialized here and not at the top of this 'join_groups_into_solutions'
+                seen_seen_proposed_vectors = set()                                          # this is for bookkeeping which combinations have been seen before; this ensures that no infinite loops occur
+                solution_proposition_build = dict()                                         # save all var values here. Most importantly: each variable (var) has to be found in this dict for the assembled solution to be even considered viable (because, each GROUP, i.e., each original EQUATION from the minesweeper map has to be satisfied, as there HAS to exist at least ONE solution where none of the equations disagree, i.e., a combination of alt-equations (one per group) that agree with each other, and since all the equations combined DO include all the variables, AND because each group was connected to each other using 'compatibility_groups' dict earlier, I will consider afterwards only those equations that contain all the variables! So we DO know that all equations must be satisfied by some combination of alt solutions (one alt from each group!))
+                seen_proposed_vectors.add(proposed_origin)
+                traverse(proposed_origin, proposed_matches_for_the_key, seen_proposed_vectors, solution_proposition_build)   # 'traverse' builds the 'possible_whole_solutions' 
+                
             pass
             for dictionary in possible_whole_solutions:
                 for var, vals in dictionary.items():
@@ -120,20 +162,12 @@ class CSP_solver:
                 
 
         join_comp_groups_into_solutions(compatibility_groups)
-
-        # every key in 'compatibility_groups' is an alt solution for one equation that must be solved one way or another. The same goes for all equation groups in each of those keys' values, BUT here I'm just looking at the keys before looking at their values.
+        
         def solution_finder_from_compatibility_groups(compatibility_groups:dict) -> dict:
             def key_altSolution_inspector():
                 new_solutions = set()
-                keyVars_to_key = dict()                                             # let's say there are 2 alt versions (two possible ALTERNATIVE solution vectors, e.g. (a) a=1, b=0, c=1 and (b) a=1, b=1, c=0, that survived the previous handling in 'restrict_solution_space_as_equation_pairs_with_common_variables()') for an equation (a+b+c=2 in this example). These 2 alternative solution vectors share all the same keyVars (a,b,c). We know that ONE of these alt vectors has to be true. So, if in both alt versions, a variable has value 0, then that variable MUST be 0. If both have a variable value 1 (a=1 in both alt solutions in my example!), then that variable MUST be 1. This is because this equation, as well as every other equation originating from a cell in the minesweeper map, has to be satisfied (because all of them are true!), so exactly one of its alt vectors has to be true.
-                keyVars_to_solutions = dict()                                       # for all alt keys, gather all the possible answers for both here. However, I've never noticed a situation where looking at alt keys doesn't lead to a solution, but looking at all the possible answers (more unlikely to begin with) for ALL the alts for an equation would agree regarding one or more variables. So, currently, I'm not gathering anything here.
-                marked_solved = []
-                for key in compatibility_groups.keys():                             # e.g. key = (('a',0),('b',1),('c',1)), values are similar, AND each value for each key shares at least one variable (like 'a') with the key (which is also an equation, just like the values)
-                    key_vars = tuple(proposed_value[0] for proposed_value in key)   # NB! THese still are in alphabetic order, thanks to 'itertools.combinations' in 'find_and_group_possible_answers_per_single_equation' which sorted the answers alphabetically
-                    if key_vars not in keyVars_to_key:
-                        keyVars_to_key[key_vars] = []
-                    keyVars_to_key[key_vars].append(key)
-                for keyVars, proposed_values in keyVars_to_key.items():             # each item in 'keyVars' represents a unique equation from the minesweeper map; so each item in 'keyVars' MUST be satisfied one way or another.
+                keyVars_to_keys = keyVars_to_keys_builder(compatibility_groups)
+                for keyVars, proposed_values in keyVars_to_keys.items():             # each item in 'keyVars' represents a unique equation from the minesweeper map; so each item in 'keyVars' MUST be satisfied one way or another.
                     if len(proposed_values) == 1:
                         for var, value in proposed_values[0]:
                             if (var, value) not in self.solved_variables:
