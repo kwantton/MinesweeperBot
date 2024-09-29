@@ -59,33 +59,37 @@ class CSP_solver:
         # for each group (group=alternative solutions for an equation), find at least one solution that's compatible with AT LEAST one alternative solution from every other group (i.e. from every other equation that MUST be satisfied). Then continue from that!
         def restrict_solution_space_as_equation_pairs_with_common_variables(alternative_answers_per_eq:list) -> dict:
             compatibility_groups = dict()                                           # { possible solution : all related possible solutions (i.e. those which share variables and do not disagree for any variable value for those variables that are present in both the key and each of the values in this dictionary for that key!) }. There's no need for explicit bookkeeping regarding which of the value solutions belong to which original equation, because the variables included themselves are enough to identify the origin.
-            for groupA in alternative_answers_per_eq:                               # e.g. ( (('a',0), ('b',1)), (('a',1),('b',0)) ) would constitute one 'group' (length 2) for the equation 'a+b=1' which is stored as ((a,b),1) in 'self.unique_variables'; that is, all the possible solutions for that equation constitute a 'group'
+            for a in range(len(alternative_answers_per_eq)):                               # e.g. ( (('a',0), ('b',1)), (('a',1),('b',0)) ) would constitute one 'group' (length 2) for the equation 'a+b=1' which is stored as ((a,b),1) in 'self.unique_variables'; that is, all the possible solutions for that equation constitute a 'group'
+                groupA = alternative_answers_per_eq[a]
+                if a == 0:
+                    starting_group = alternative_answers_per_eq[a]
                 for altA in groupA:                                                 # e.g. altA = (('a', 0), ('b', 1)); altA = alternative solution (i.e. ONE theoretically POSSIBLE solution) to the equation whose possible answers are members of groupA; altA = one alternative solution for a single equation, that might or might not be possible (i.e. might or might not be compatible with each groupB (i.e., with at least one possible answer of each other equation))
                     compatibility_groups[altA] = set()
-                    for groupB in alternative_answers_per_eq:
-                        if groupA==groupB:                                          # (1) this looks cooler than 'if groupA!=groupB -> yet_another_indentation_here....', (2) to avoid comparison of each group to itself, which we absolutely do not want
+                    for b in range(a+1, len(alternative_answers_per_eq)):
+                        groupB = alternative_answers_per_eq[b]
+                        if groupA==groupB:                                          # (1) importantly, this looks way cleaner than 'if groupA!=groupB -> yet_another_indentation_here....', (2) to avoid comparison of each group to itself, which we absolutely do NOT want
                             continue
-                        common_variables = common_vars(groupA[0], groupB[0])        # I only want coupled subsets; there's no point in constructing entities where a=0 or a=1 and b=0 or b=1 and f=0 or f=1; so I'm only looking for those pairs that share a variable, hopefully finding such pairs where a variable becomes restricted
-                        if common_variables:
-                            groupB_compatible = False                               # default. NB! groupB needs to be compatible for altA to be viable! That is: if altA is to be viable, it has to satisfy at least one altB from every groupB! (2) this ALSO checks if there are
-                            for altB in groupB:                                     # NB! ONE at least needs to be compatible with altA, OR altA is not 'viable_and_connected'. e.g. (('a', 0), ('b', 1)); alt = alternative = one alternative solution for a single equation, that might or might not be possible (i.e. might or might not be compatible with A)
-                                altA_altB_compatible = True                         # default                                                                  
-                                for var1, val1 in altA:                             # e.g. 'a', 0. Each var1, val1 has to be compatible with at least ONE alt2 from every other group, so that 'altA_is_viable'!
-                                    opposite_value = (var1, int(not val1))          # val1 = 1 or 0; if 1, opposite = (var1, 0). This is so I can avoid if-clause below, making it shorter.
-                                    if opposite_value in altB:
-                                        altA_altB_compatible = False
-                                        break
-                                if altA_altB_compatible:
-                                    groupB_compatible = True
-                                    compatibility_groups[altA].add(altB)            # I don't need to explicitly group this altB for this key; I know that those values which share the same variables belong to the same group (i.e. they originate from the same equation)!
-                            if not groupB_compatible:                               # if altA from groupA is viable, it will have added groups of viable altBs from every other group
-                                del compatibility_groups[altA]                      # do not keep lonely equations in the dict 'compatibility_groups'
-                                break                                               # move on to inspect the next altA, if the current altA is not viable!
+                        # common_variables = common_vars(groupA[0], groupB[0])  # I want unilateral direction to ALL possible compatible alt solutions from ALL OTHER groups
+                        # if common_variables:
+                        groupB_compatible = False                               # default. NB! groupB needs to be compatible for altA to be viable! That is: if altA is to be viable, it has to satisfy at least one altB from every groupB! (2) this ALSO checks if there are
+                        for altB in groupB:                                     # NB! ONE at least needs to be compatible with altA, OR altA is not 'viable_and_connected'. e.g. (('a', 0), ('b', 1)); alt = alternative = one alternative solution for a single equation, that might or might not be possible (i.e. might or might not be compatible with A)
+                            altA_altB_compatible = True                         # default                                                                  
+                            for var1, val1 in altA:                             # e.g. 'a', 0. Each var1, val1 has to be compatible with at least ONE alt2 from every other group, so that 'altA_is_viable'!
+                                opposite_value = (var1, int(not val1))          # val1 = 1 or 0; if 1, opposite = (var1, 0). This is so I can avoid if-clause below, making it shorter.
+                                if opposite_value in altB:
+                                    altA_altB_compatible = False
+                                    break
+                            if altA_altB_compatible:
+                                groupB_compatible = True
+                                compatibility_groups[altA].add(altB)            # I don't need to explicitly group this altB for this key; I know that those values which share the same variables belong to the same group (i.e. they originate from the same equation)!
+                        if not groupB_compatible:                               # if altA from groupA is viable, it will have added groups of viable altBs from every other group
+                            del compatibility_groups[altA]                      # do not keep lonely equations in the dict 'compatibility_groups'
+                            break                                               # move on to inspect the next altA, if the current altA is not viable!
                         else:                                                       # if there are no shared variables between groupA (including altA) and groupB (including altB), then groups A and B ARE compatible (they don't restrict each other in any way) -> move on to next groupB
-                            groupB_compatible = True
+                            groupB_compatible = True                            # just to show what
                             continue                                                # this means that entire groupA and groupB are compatible -> move on to the next altA (moving on to next GROUP A would be even better though)
-            return compatibility_groups                                             # remember! There's only ONE interpretation for those keys that have empty value set; they are NOT limited at all, that is, all alternatives (all 1-combinations, i.e. all mine combinations) are still possible for them!
-        compatibility_groups = restrict_solution_space_as_equation_pairs_with_common_variables(alternative_answers_per_equation)
+            return compatibility_groups, starting_group                                             # remember! There's only ONE interpretation for those keys that have empty value set; they are NOT limited at all, that is, all alternatives (all 1-combinations, i.e. all mine combinations) are still possible for them!
+        compatibility_groups, starting_group = restrict_solution_space_as_equation_pairs_with_common_variables(alternative_answers_per_equation)
         
         # every key in 'compatibility_groups' is an alt solution for one equation that must be solved one way or another. The same goes for all equation groups in each of those keys' values, BUT here I'm just looking at the keys before looking at their values.
         def keyVars_to_keys_builder(compatibility_groups:dict) -> dict:
@@ -97,25 +101,35 @@ class CSP_solver:
                 keyVars_to_key[key_vars].append(key)
             return keyVars_to_key
         
+        # def find_group_whose_alt_answers_have_0_incoming_arrows():
+        #     # keyVars_to_keys = keyVars_to_keys_builder(compatibility_groups)
+        #     incoming_arrows_per_alt = dict()                                    # for debugging. Not necessary otherwise.
+        #     zeros = set()
+        #     non_zeros = set()
+        #     for alt_key, alt_matches_to_alt_key in compatibility_groups.items():
+        #         for alt_match in alt_matches_to_alt_key:
+        #             if alt_key not in incoming_arrows_per_alt:
+        #                 incoming_arrows_per_alt[alt_key] = 0
+        #                 zeros.add(alt_key)
+        #             if alt_match not in incoming_arrows_per_alt:
+        #                 incoming_arrows_per_alt[alt_match] = 0
+        #             incoming_arrows_per_alt[alt_match] += 1
+        #             if alt_match in zeros:
+        #                 zeros.remove(alt_match)
+        #     pass
+                    
+
         # TO-DO; this should preferably find terminal alt solutions; those that have only one connection, and use those. PROBLEM: it's not quaranteed that such alt solutions even exist! If all alt solutions share variables, they can form a ring with bilateral connections between each adjacent member -> no 'terminal' alt solution found, that would otherwise be handy as origin to start answer compilation from
-        def alt_origin_builder() -> list:
-            keyVars_to_keys = keyVars_to_keys_builder(compatibility_groups)
-            min_length = 8
-            for keyVars, keys in keyVars_to_keys.items():
-                n_keys = len(keys)
-                if n_keys == 2:                                                 # let's find a group (like a+b=1) where there are at least two, PREFERABLY exactly 2, altenative solution vectors (a=0, b=1 and a=1, b=0 in this case) because of the nature
-                    if n_keys < min_length:                                     # if can't find length 2 keys, then just find the smallest non-1-length key
-                        min_length = n_keys
-                    origins = [key for key in keys]
-                    break
-                elif n_keys < min_length:                                       # if can't find length 2 keys, then just find the smallest non-1-length key
-                    min_length = n_keys
-                    origins = [key for key in keys]
-            if min_length == 8:                                                 # if there is an 8 OR a 1 (only one possible for each group, very rare), then just pick the first one from the dictionary and break
-                for keyVars, keys in keyVars_to_keys:                           # just pick the 1st one
-                    origins = [key for key in keys]
-                    break
-            return origins
+        # def alt_origin_builder() -> list:
+        #     keyVars_to_keys = keyVars_to_keys_builder(compatibility_groups)
+        #     min_length = 8
+        #     for keyVars, keys in keyVars_to_keys.items():
+        #         n_keys = len(keys)
+        #         if n_keys > 0:
+        #             if n_keys < min_length:                                       # if can't find length 2 keys, then just find the smallest non-1-length key
+        #                 min_length = n_keys
+        #                 origins = [key for key in keys]
+        #     return origins
         
         def identify_group(proposed_matching_alt_solution:tuple) -> set:        # the 'vars' set is a set of the variables present in the 'alt_solution'; this is for bookkeeping of which groups (i.e. equations, with one or more alt answers) have already been handled and which not. All groups must be found exactly one alt solution for!
             vars = set()
@@ -136,13 +150,17 @@ class CSP_solver:
             keyVars_to_keys = keyVars_to_keys_builder(compatibility_groups)
             n_groups = len(keyVars_to_keys.keys())
             possible_whole_solutions = []
-            # alternative_origins = alt_origin_builder()                                      # if there's only a single origin and there has been no check if it's connected to all other groups, there'd be no quarantee of finding a solution (which encompasses all groups, as is necessary!). I want to keep things clear and force starting at least 2 or more times, using 2 or more origins if possible. If there's only 1, then that should work too in the 'traverse()' (or, I have to make it work, no big deal)
-            
-            # origin_dict = {alt_origin:compatibility_groups[alt_origin] for alt_origin in alternative_origins}
             
             # TO-DO! Check group recognition. Group comparison works, but is everything else ok as well?
-            def traverse(origin, proposed_matches_for_the_key, entered_alts_for_this_build, 
-                possible_solution_build, already_handled_groups): # I'm keeping 'proposed_origin' solely for debugging purposes!
+            def traverse(this_alt, proposed_matches_for_the_key, entered_alts_for_this_build, 
+                possible_solution_build, already_handled_groups): # 'origin' is SOLELY for debugging purposes!
+
+                this_group = identify_group(this_alt)
+                already_handled_groups.append(this_group)
+
+                if n_groups == len(already_handled_groups):                             # NB! I could also check if all variables are present in 'solution_build', but this is clearer. It's technically equivalent and applicable here, though.
+                    possible_whole_solutions.append(possible_solution_build)
+                    return
             
                 # NB! this is a loop for ALTERNATIVE next moves; which alt solution match to next connect to the current one? That's why none of the info updates are saved permanently so that it would apply to the rest of the loop - no, these all are ALTERNATIVES.
                 for proposed_matching_alt in proposed_matches_for_the_key:
@@ -170,26 +188,24 @@ class CSP_solver:
                             already_handled_groups_updated.append(group_of_this_alt)
                             entered_alts_for_this_build_updated.add(proposed_matching_alt)
 
-                            if n_groups == len(already_handled_groups_updated):                 # NB! I could also check if all variables are present in 'solution_build', but this is clearer. It's technically equivalent and applicable here, though.
-                                possible_whole_solutions.append(possible_solution_build_updated)
-                                # do NOT return, instead continue with the next alternative; this was ONE ALTERNATIVE, there may be others remaining in the loop 'for proposed_matching_alt in proposed_matches_for_the_key:' in which we are now
-
                             # only do this if the above has not been fulfilled; it's not possible to gain another answer by trying to add yet another alt solution in the case where all the equations (all groups) have already been satisfied, which is checked in the 'if' clause above. SO: for every set of new_matches, I want the info that was updated according to what happened in the specific alternative solution above; which alt solution ('proposed_matching_alt') was 'entered' (seen, processed), which 'group' (equation) in question was handled. Since all the alternatives in the above loop are indeed ALTERNATIVES, they are NOT all saved immediately! (that would be incorrect), instead that is done after the 'traverse()'s below!
-                            elif new_matches:
+                            if new_matches:
                                 for new_match in new_matches:
                                     if new_match not in entered_alts_for_this_build_updated:    # technically redundant BUT probably saves a bit of computing
                                         proposed_matches_for_the_new_match = compatibility_groups[new_match]
-                                        traverse(origin, proposed_matches_for_the_new_match, 
+                                        traverse(new_match, proposed_matches_for_the_new_match, 
                                             entered_alts_for_this_build_updated, possible_solution_build_updated, already_handled_groups_updated)
                         
            
-            # if I were to select just ONE origin (origin = a key in 'compatibility_groups' = ONE random alternative solution for one equation), it may be a non-ok alternative meaning that it may never become connected with ALL other equations via any of their alt solutions, thus never finding any whole solution that satisfies all equations. Therefore, at least I have to pick ALL alternatives for ONE single group, as alternative origins where 'traverse()' starts, to quarantee that some kind of a whole-solution is found. This is because the origins (key equations) are SINGLE ALTERNATIVES for one equation, and as we know, only ONE alternative may provide a possible answer for every group (depends on the case, actually - sometimes two alternatives are possible, if there is not enough information to be able to deduce in which one the mine is, for example! And/or if the groups are entirely disconnected!)
-            for random_origin, proposed_matches_for_the_random_origin in compatibility_groups.items(): # ('d', 'e'), [(('d',1),('e',0)), (('d',0),('e',1))] for example. This quarantees that they are separate
-                seen_proposed_vectors = set()                                   # PER alt answer, of course - that's why it's initialized here and not at the top of this 'join_groups_into_solutions'
-                already_handled_groups = [set(identify_group(random_origin))]   # NB! Initialized here, otherwise it's not done in 'traverse()'! A group is an equation from the minesweeper map. When I start from an alt answer to such group, I want to remember that that group has already been handled, i.e.: do NOT EVER handle another alt solution for that same group again IN THE SAME SOLUTION BUILD, as that's a simple impossibility (all the alt answers within one group disagree with each other, so they must NOT be ever combined) a list of sets of variables; there's never a big number of groups (at the very most, roughly 20 in Expert), so it's ok to look through that short list every time in 'traverse' for checking. So, TO-DO! This bookkeeping is necessary for recognizing valid solutions. So, not only does one need to have a value for every variable, but ALSO the origin for each of them has to be specific, namely ONE alt anser from EACH group only, AND do not permit entry to another alt from same group ever again!
-                possible_solution_build = {var:value for var,value in random_origin}  # NB! Initialized here, otherwise it's not done in 'traverse()'!
-                seen_proposed_vectors.add(random_origin)                        # NB! Initialized here, otherwise it's not done in 'traverse()'!
-                traverse(random_origin, proposed_matches_for_the_random_origin, seen_proposed_vectors, possible_solution_build, already_handled_groups)   # 'traverse' builds the 'possible_whole_solutions' 
+            # 'starting_group' the group from where all arrows leave, and back to which no arrows return; an alt origin for an alt tree, essentially! (If I were to select just ONE origin (origin = a key in 'compatibility_groups' = ONE random alternative solution for one equation), it may be a non-ok alternative meaning that it may never become connected with ALL other equations via any of their alt solutions, thus never finding any whole solution that satisfies all equations. Therefore, at least I have to pick ALL alternatives for ONE single group, as alternative origins where 'traverse()' starts, to quarantee that some kind of a whole-solution is found. This is because the origins (key equations) are SINGLE ALTERNATIVES for one equation, and as we know, only ONE alternative may provide a possible answer for every group (depends on the case, actually - sometimes two alternatives are possible, if there is not enough information to be able to deduce in which one the mine is, for example! And/or if the groups are entirely disconnected!))
+            for alt_origin in starting_group: # ('d', 'e'), [(('d',1),('e',0)), (('d',0),('e',1))] for example. This quarantees that they are separate
+                if alt_origin in compatibility_groups:                              # some might have been filtered out as they were no longer fitting ALL other groups
+                    proposed_matches_for_alt_origin = compatibility_groups[alt_origin]
+                    seen_proposed_vectors = set()                                   # PER alt answer, of course - that's why it's initialized here and not at the top of this 'join_groups_into_solutions'
+                    already_handled_groups = []                                     # NB! NOT Initialized here; it's added right at the beginning of 'traverse()' for each alt solution that's traversed.
+                    possible_solution_build = {var:value for var,value in alt_origin}  # NB! Initialized here, otherwise it's not done in 'traverse()'!
+                    seen_proposed_vectors.add(alt_origin)                           # NB! Initialized here, otherwise it's not done in 'traverse()'!
+                    traverse(alt_origin, proposed_matches_for_alt_origin, seen_proposed_vectors, possible_solution_build, already_handled_groups)   # 'traverse' builds the 'possible_whole_solutions' 
                 
             def handle_possible_whole_solutions():
                 final_answers = dict()
