@@ -151,50 +151,38 @@ class CSP_solver:
             n_groups = len(keyVars_to_keys.keys())
             possible_whole_solutions = []
             
-            # TO-DO! Check group recognition. Group comparison works, but is everything else ok as well?
             def traverse(this_alt, proposed_matches_for_the_key, entered_alts_for_this_build, 
-                possible_solution_build, already_handled_groups): # 'origin' is SOLELY for debugging purposes!
+                possible_solution_build, already_handled_groups):
+                
+                if this_alt in compatibility_groups:                        # If this alt solution is not a key in 'compatibility_groups', then IT IS UNTRUE as it's incompatible with one or more other groups' every possible alt answer; in that case, do NOT handle this alt at all (do not (1) mark its variables' proposed values as possible solutions, and do not (2) mark the group that it presents as handled); if the current alt is NOT present as a key of 'compatibility_groups', IT IS INCOMPATIBLE WITH AT LEAST ONE OTHER GROUP. In English, if the current alt solution is not present as a key in 'compatibility_groups', it CANNOT EVER SATISFY ALL THE EQUATIONS that we know MUST be true using at least one combination of alt solutions.
+                    group_of_this_alt = identify_group(this_alt)            # 'this_alt' is an alt answer for some group - 'identify_group(this_alt)' tells me WHICH group it belongs to. I want EXACTLY ONE alt answer for EACH group, as each group represents an original equation from the minesweeper map (a number cell, the equation of which is always true, so MUST be satisfied and MUST be compatible with all other groups!)
+                    if group_of_this_alt not in already_handled_groups:     # NB! So, I only want EXACTLY ONE alt solution per group. If an alt solution has already been handled, DO NOT HANDLE ANOTHER; that another alt solution will be handled in a whole another iteration of this 'traverse()'. (2) Comparison of sets in python; if the values in the set are the same, then the sets are 'equal' in the == comparison. Nice.
 
-                this_group = identify_group(this_alt)
-                already_handled_groups.append(this_group)
+                        incompatible_pma = check_for_disagreements(         # this cannot happen on the FIRST call of 'traverse()', but it CAN happen on later calls - the 'compatibility_groups' only ensure PAIR compatibility, not further than that!
+                            this_alt, possible_solution_build)
+                        if incompatible_pma:                                # if this alt solution disagrees i.e. is incompatible with already-recorded alt solutions (one from each met group so far), then move on to the next 'proposed_matching_alt' (which may be of the same OR of different group!) NB! Do NOT mark the group of the current alt solution as handled if it's incompatible; this means that we still need to wait for a compatible alt to come by from this group, so I must NOT mark it as handled yet!
+                            return 
 
-                if n_groups == len(already_handled_groups):                             # NB! I could also check if all variables are present in 'solution_build', but this is clearer. It's technically equivalent and applicable here, though.
-                    possible_whole_solutions.append(possible_solution_build)
-                    return
-            
-                # NB! this is a loop for ALTERNATIVE next moves; which alt solution match to next connect to the current one? That's why none of the info updates are saved permanently so that it would apply to the rest of the loop - no, these all are ALTERNATIVES.
-                for proposed_matching_alt in proposed_matches_for_the_key:
-                    # entered_alts_for_this_build.add(proposed_matching_alt)            # NB! This is a loop that iterates through DIFFERENT ALTERNATIVES; different alt solutions where to go next from the current alt solution - hence I do NOT want to permanently save this info for the next round, as it's ANOTHER alternative. Instead, I'm using a copy of the current state, updated with the currently seen alt (and handled group, below, if applicable), and then 'forget' the seen alt for the next option. Why this list exists: I should never re-enter an alt solution later again; just mark it as seen, and that's it.
-                    if proposed_matching_alt in compatibility_groups:                   # If this alt solution is not a key in 'compatibility_groups', then IT IS UNTRUE; then do NOT handle this alt (do not (1) mark its variables' proposed values as possible solutions, and do not (2) mark the group that it presents as handled); if the current alt is NOT present as a key of 'compatibility_groups', IT IS INCOMPATIBLE WITH AT LEAST ONE OTHER GROUP. In English, if the current alt solution is not present as a key in 'compatibility_groups', it CANNOT EVER SATISFY ALL THE EQUATIONS that we know MUST be true using at least one combination of alt solutions.
-                        group_of_this_alt = identify_group(proposed_matching_alt)       # this 'proposed_matching_alt' is an alt answer for a group - 'group(proposed_match)' tells me WHICH group it belongs to. I want EXACTLY ONE alt answer for EACH group, as each group represents an original equation from the minesweeper map (a number cell, the equation of which is always true, so MUST be satisfied and MUST be compatible with all other groups!)
-                        if group_of_this_alt not in already_handled_groups:             # NB! So, I only want EXACTLY ONE alt solution per group. If an alt solution has already been handled, DO NOT HANDLE ANOTHER; that another alt solution will be handled in a whole another iteration of this 'traverse()'. (2) Comparison of sets in python; if the values in the set are the same, then the sets are 'equal' in the == comparison. Nice.
+                        for var, value in this_alt:                         # (('a',0), ('b',1), ...) a 'proposed_matching_alt' has this format. It's one alt solution to an equation that's derived from the minesweeper map and which has to have ONE alt solution, the other ones being untrue.
+                            possible_solution_build[var] = value            # there can be 1 or 2 per variable. If 2, it means that there is not enough information (yet) for solving this variable. If only 1 value, great, that means the value is now solved.
+                        
+                        already_handled_groups.append(group_of_this_alt)
 
-                            incompatible_pma = check_for_disagreements(                 # this cannot happen on the FIRST call of 'traverse()', but it CAN happen on later calls - the 'compatibility_groups' only ensure PAIR compatibility, not further than that!
-                                proposed_matching_alt, possible_solution_build)
-                            if incompatible_pma:                                        # if this alt solution disagrees i.e. is incompatible with already-recorded alt solutions (one from each met group so far), then move on to the next 'proposed_matching_alt' (which may be of the same OR of different group!) NB! Do NOT mark the group of the current alt solution as handled if it's incompatible; this means that we still need to wait for a compatible alt to come by from this group, so I must NOT mark it as handled yet!
-                                continue 
-                                
-                            already_handled_groups_updated = already_handled_groups.copy()  # for the traverse() iteration below, I need to create a this-alt-specific copy of the current state: (1) the just-handled group (as per this alt), (2) updated list of entered alt solutions, and (3) updated alt-specific list of possible var values, and I'll pass these to the next recursive iteration of 'traverse()'!
-                            possible_solution_build_updated = possible_solution_build.copy()
-                            entered_alts_for_this_build_updated = entered_alts_for_this_build.copy()
-
-                            for var, value in proposed_matching_alt:                # (('a',0), ('b',1), ...) a 'proposed_matching_alt' has this format. It's one alt solution to an equation that's derived from the minesweeper map and which has to have ONE alt solution, the other ones being untrue.
-                                possible_solution_build_updated[var] = value        # there can be 1 or 2 per variable. If 2, it means that there is not enough information (yet) for solving this variable. If only 1 value, great, that means the value is now solved.
-                                # possible_solution_build[var] = value              # I must NOT updated this, as that would live on to the next alt solution (next iteration of this loop!); it has to be alt-solution-specific, and passed on to the next recursive iteration of 'traverse()'          
-                            new_matches = compatibility_groups[proposed_matching_alt]# continue to matches of this alt solution ONLY if none of the values of this alt solution disagree with values that have already been recorded in 'possible_solution_build' as values of the variables
-                            new_matches = [new_m for new_m in new_matches if new_m in compatibility_groups] # I have no need for non-key values here, as they are incompatible with one or more equations (equations = 'groups' of alt answers/solutions)
-                                                                        # move on to the next 'proposed_matching_alt' for the current key equation, if the current 'proposed_matching_alt' is incompatible with one or more value recorded in 'possible_solution_build'. So, incompatibility here means that one or more values of the proposed_matching_alt variables' disagree with an already-recorded value in 'possible_solution_build' that has been built until this point in the loop, for this origin in question. If that disagreement happens, it's because even though every key:value-pair in 'compatibility_groups' are DIRECTLY compatible with each other, they are not necessarily INDIRECTLY compatible with each other through traversing other alt solutions from other groups in-between; these alt answers can disagree, and if such an alt answer is come across, then it must be bypassed altogether, not added to solutions (it's a direct unimpossibility to have two values for one variabls). NB! This depends on what alt answers have been previously come across, of course. So there's no such thing as an universally incompatible alt answer remaining in 'compatibility_groups' keys at this point; they were got rid of earlier. As for the values, they are universally incompatible if they are not found in keys, but I'm already checking that elswehere in this loop c:
-                            
-                            already_handled_groups_updated.append(group_of_this_alt)
-                            entered_alts_for_this_build_updated.add(proposed_matching_alt)
-
-                            # only do this if the above has not been fulfilled; it's not possible to gain another answer by trying to add yet another alt solution in the case where all the equations (all groups) have already been satisfied, which is checked in the 'if' clause above. SO: for every set of new_matches, I want the info that was updated according to what happened in the specific alternative solution above; which alt solution ('proposed_matching_alt') was 'entered' (seen, processed), which 'group' (equation) in question was handled. Since all the alternatives in the above loop are indeed ALTERNATIVES, they are NOT all saved immediately! (that would be incorrect), instead that is done after the 'traverse()'s below!
-                            if new_matches:
-                                for new_match in new_matches:
-                                    if new_match not in entered_alts_for_this_build_updated:    # technically redundant BUT probably saves a bit of computing
-                                        proposed_matches_for_the_new_match = compatibility_groups[new_match]
-                                        traverse(new_match, proposed_matches_for_the_new_match, 
-                                            entered_alts_for_this_build_updated, possible_solution_build_updated, already_handled_groups_updated)
+                        if n_groups == len(already_handled_groups):
+                            possible_whole_solutions.append(possible_solution_build)
+                            return
+                        
+                        new_matches = compatibility_groups[this_alt]# continue to matches of this alt solution ONLY if none of the values of this alt solution disagree with values that have already been recorded in 'possible_solution_build' as values of the variables
+                        new_matches = [new_m for new_m in new_matches if new_m in compatibility_groups] # I have no need for non-key values here, as they are incompatible with one or more equations (equations = 'groups' of alt answers/solutions)
+                        entered_alts_for_this_build.add(this_alt)
+                        
+                        # only do this if the above has not been fulfilled; it's not possible to gain another answer by trying to add yet another alt solution in the case where all the equations (all groups) have already been satisfied, which is checked in the 'if' clause above. SO: for every set of new_matches, I want the info that was updated according to what happened in the specific alternative solution above; which alt solution ('proposed_matching_alt') was 'entered' (seen, processed), which 'group' (equation) in question was handled. Since all the alternatives in the above loop are indeed ALTERNATIVES, they are NOT all saved immediately! (that would be incorrect), instead that is done after the 'traverse()'s below!
+                        if new_matches:
+                            for new_match in new_matches:
+                                if new_match not in entered_alts_for_this_build:    # technically redundant, probably almost no effect regarding computing efficiency, BUT it's nice for clarity, and showing the logic still (even if double check)
+                                    proposed_matches_for_the_new_match = compatibility_groups[new_match]
+                                    traverse(new_match, proposed_matches_for_the_new_match, 
+                                        entered_alts_for_this_build, possible_solution_build, already_handled_groups)
                         
            
             # 'starting_group' the group from where all arrows leave, and back to which no arrows return; an alt origin for an alt tree, essentially! (If I were to select just ONE origin (origin = a key in 'compatibility_groups' = ONE random alternative solution for one equation), it may be a non-ok alternative meaning that it may never become connected with ALL other equations via any of their alt solutions, thus never finding any whole solution that satisfies all equations. Therefore, at least I have to pick ALL alternatives for ONE single group, as alternative origins where 'traverse()' starts, to quarantee that some kind of a whole-solution is found. This is because the origins (key equations) are SINGLE ALTERNATIVES for one equation, and as we know, only ONE alternative may provide a possible answer for every group (depends on the case, actually - sometimes two alternatives are possible, if there is not enough information to be able to deduce in which one the mine is, for example! And/or if the groups are entirely disconnected!))
@@ -202,9 +190,8 @@ class CSP_solver:
                 if alt_origin in compatibility_groups:                              # some might have been filtered out as they were no longer fitting ALL other groups
                     proposed_matches_for_alt_origin = compatibility_groups[alt_origin]
                     seen_proposed_vectors = set()                                   # PER alt answer, of course - that's why it's initialized here and not at the top of this 'join_groups_into_solutions'
-                    already_handled_groups = []                                     # NB! NOT Initialized here; it's added right at the beginning of 'traverse()' for each alt solution that's traversed.
-                    possible_solution_build = {var:value for var,value in alt_origin}  # NB! Initialized here, otherwise it's not done in 'traverse()'!
-                    seen_proposed_vectors.add(alt_origin)                           # NB! Initialized here, otherwise it's not done in 'traverse()'!
+                    already_handled_groups = []
+                    possible_solution_build = {}
                     traverse(alt_origin, proposed_matches_for_alt_origin, seen_proposed_vectors, possible_solution_build, already_handled_groups)   # 'traverse' builds the 'possible_whole_solutions' 
                 
             def handle_possible_whole_solutions():
