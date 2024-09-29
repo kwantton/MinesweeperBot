@@ -65,7 +65,8 @@ class CSP_solver:
                     starting_group = alternative_answers_per_eq[a]
                 for altA in groupA:                                                 # e.g. altA = (('a', 0), ('b', 1)); altA = alternative solution (i.e. ONE theoretically POSSIBLE solution) to the equation whose possible answers are members of groupA; altA = one alternative solution for a single equation, that might or might not be possible (i.e. might or might not be compatible with each groupB (i.e., with at least one possible answer of each other equation))
                     compatibility_groups[altA] = set()
-                    for b in range(a+1, len(alternative_answers_per_eq)):
+                    b = a+1
+                    if b < len(alternative_answers_per_eq):
                         groupB = alternative_answers_per_eq[b]
                         if groupA==groupB:                                          # (1) importantly, this looks way cleaner than 'if groupA!=groupB -> yet_another_indentation_here....', (2) to avoid comparison of each group to itself, which we absolutely do NOT want
                             continue
@@ -100,36 +101,6 @@ class CSP_solver:
                     keyVars_to_key[key_vars] = []
                 keyVars_to_key[key_vars].append(key)
             return keyVars_to_key
-        
-        # def find_group_whose_alt_answers_have_0_incoming_arrows():
-        #     # keyVars_to_keys = keyVars_to_keys_builder(compatibility_groups)
-        #     incoming_arrows_per_alt = dict()                                    # for debugging. Not necessary otherwise.
-        #     zeros = set()
-        #     non_zeros = set()
-        #     for alt_key, alt_matches_to_alt_key in compatibility_groups.items():
-        #         for alt_match in alt_matches_to_alt_key:
-        #             if alt_key not in incoming_arrows_per_alt:
-        #                 incoming_arrows_per_alt[alt_key] = 0
-        #                 zeros.add(alt_key)
-        #             if alt_match not in incoming_arrows_per_alt:
-        #                 incoming_arrows_per_alt[alt_match] = 0
-        #             incoming_arrows_per_alt[alt_match] += 1
-        #             if alt_match in zeros:
-        #                 zeros.remove(alt_match)
-        #     pass
-                    
-
-        # TO-DO; this should preferably find terminal alt solutions; those that have only one connection, and use those. PROBLEM: it's not quaranteed that such alt solutions even exist! If all alt solutions share variables, they can form a ring with bilateral connections between each adjacent member -> no 'terminal' alt solution found, that would otherwise be handy as origin to start answer compilation from
-        # def alt_origin_builder() -> list:
-        #     keyVars_to_keys = keyVars_to_keys_builder(compatibility_groups)
-        #     min_length = 8
-        #     for keyVars, keys in keyVars_to_keys.items():
-        #         n_keys = len(keys)
-        #         if n_keys > 0:
-        #             if n_keys < min_length:                                       # if can't find length 2 keys, then just find the smallest non-1-length key
-        #                 min_length = n_keys
-        #                 origins = [key for key in keys]
-        #     return origins
         
         def identify_group(proposed_matching_alt_solution:tuple) -> set:        # the 'vars' set is a set of the variables present in the 'alt_solution'; this is for bookkeeping of which groups (i.e. equations, with one or more alt answers) have already been handled and which not. All groups must be found exactly one alt solution for!
             vars = set()
