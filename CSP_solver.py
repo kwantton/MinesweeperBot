@@ -55,41 +55,49 @@ class CSP_solver:
                     common = True
                     break
             return common
-        
+
         # for each group (group=alternative solutions for an equation), find at least one solution that's compatible with AT LEAST one alternative solution from every other group (i.e. from every other equation that MUST be satisfied). Then continue from that!
         def restrict_solution_space_as_equation_pairs_with_common_variables(alternative_answers_per_eq:list) -> dict:
-            compatibility_groups = dict()                                           # { possible solution : all related possible solutions (i.e. those which share variables and do not disagree for any variable value for those variables that are present in both the key and each of the values in this dictionary for that key!) }. There's no need for explicit bookkeeping regarding which of the value solutions belong to which original equation, because the variables included themselves are enough to identify the origin.
-            for a in range(len(alternative_answers_per_eq)):                               # e.g. ( (('a',0), ('b',1)), (('a',1),('b',0)) ) would constitute one 'group' (length 2) for the equation 'a+b=1' which is stored as ((a,b),1) in 'self.unique_variables'; that is, all the possible solutions for that equation constitute a 'group'
-                groupA = alternative_answers_per_eq[a]
+            compatibility_groups = dict()                                   # { possible solution : all related possible solutions (i.e. those which share variables and do not disagree for any variable value for those variables that are present in both the key and each of the values in this dictionary for that key!) }. There's no need for explicit bookkeeping regarding which of the value solutions belong to which original equation, because the variables included themselves are enough to identify the origin.
+            for a in range(len(alternative_answers_per_eq)-1):              # e.g. ( (('a',0), ('b',1)), (('a',1),('b',0)) ) would constitute one 'group' (length 2) for the equation 'a+b=1' which is stored as ((a,b),1) in 'self.unique_variables'; that is, all the possible solutions for that equation constitute a 'group'
                 if a == 0:
+                    groupA = alternative_answers_per_eq[a]
                     starting_group = alternative_answers_per_eq[a]
-                for altA in groupA:                                                 # e.g. altA = (('a', 0), ('b', 1)); altA = alternative solution (i.e. ONE theoretically POSSIBLE solution) to the equation whose possible answers are members of groupA; altA = one alternative solution for a single equation, that might or might not be possible (i.e. might or might not be compatible with each groupB (i.e., with at least one possible answer of each other equation))
+                else:
+                    groupA = sorted(tuple(next_round_groupA))               # from the previous round! Since this is from a set, it may become disordered -> for comparison if equal with groupB, sorting is needed!
+                b = a+1
+                groupB = alternative_answers_per_eq[b]
+                if groupA==groupB:                                          # shouldn't be needed, but this sometimes happens. To-do: find out why.
+                    continue
+                next_round_groupA = set()
+                common_variables = common_vars(groupA[0], groupB[0])        # I want unilateral direction to ALL possible compatible alt solutions from ALL OTHER groups
+                at_least_1_altA_compatible_with_groupB = False              # default. NB! groupB needs to be compatible for altA to be viable! That is: if altA is to be viable, it has to satisfy at least one altB from every groupB! (2) this ALSO checks if there are
+                for altA in groupA:                                         # e.g. altA = (('a', 0), ('b', 1)); altA = alternative solution (i.e. ONE theoretically POSSIBLE solution) to the equation whose possible answers are members of groupA; altA = one alternative solution for a single equation, that might or might not be possible (i.e. might or might not be compatible with each groupB (i.e., with at least one possible answer of each other equation))
                     compatibility_groups[altA] = set()
-                    b = a+1
-                    if b < len(alternative_answers_per_eq):
-                        groupB = alternative_answers_per_eq[b]
-                        if groupA==groupB:                                          # (1) importantly, this looks way cleaner than 'if groupA!=groupB -> yet_another_indentation_here....', (2) to avoid comparison of each group to itself, which we absolutely do NOT want
-                            continue
-                        # common_variables = common_vars(groupA[0], groupB[0])  # I want unilateral direction to ALL possible compatible alt solutions from ALL OTHER groups
-                        # if common_variables:
-                        groupB_compatible = False                               # default. NB! groupB needs to be compatible for altA to be viable! That is: if altA is to be viable, it has to satisfy at least one altB from every groupB! (2) this ALSO checks if there are
-                        for altB in groupB:                                     # NB! ONE at least needs to be compatible with altA, OR altA is not 'viable_and_connected'. e.g. (('a', 0), ('b', 1)); alt = alternative = one alternative solution for a single equation, that might or might not be possible (i.e. might or might not be compatible with A)
-                            altA_altB_compatible = True                         # default                                                                  
-                            for var1, val1 in altA:                             # e.g. 'a', 0. Each var1, val1 has to be compatible with at least ONE alt2 from every other group, so that 'altA_is_viable'!
-                                opposite_value = (var1, int(not val1))          # val1 = 1 or 0; if 1, opposite = (var1, 0). This is so I can avoid if-clause below, making it shorter.
+                    for altB in groupB:                                     # NB! ONE at least needs to be compatible with altA, OR altA is not 'viable_and_connected'. e.g. (('a', 0), ('b', 1)); alt = alternative = one alternative solution for a single equation, that might or might not be possible (i.e. might or might not be compatible with A)
+                        altA_altB_compatible = True                         # default
+                        if common_variables:                                                                  
+                            for var1, val1 in altA:                         # e.g. 'a', 0. Each var1, val1 has to be compatible with at least ONE alt2 from every other group, so that 'altA_is_viable'!
+                                opposite_value = (var1, int(not val1))      # val1 = 1 or 0; if 1, opposite = (var1, 0). This is so I can avoid if-clause below, making it shorter.
                                 if opposite_value in altB:
                                     altA_altB_compatible = False
                                     break
-                            if altA_altB_compatible:
-                                groupB_compatible = True
-                                compatibility_groups[altA].add(altB)            # I don't need to explicitly group this altB for this key; I know that those values which share the same variables belong to the same group (i.e. they originate from the same equation)!
-                        if not groupB_compatible:                               # if altA from groupA is viable, it will have added groups of viable altBs from every other group
-                            del compatibility_groups[altA]                      # do not keep lonely equations in the dict 'compatibility_groups'
-                            break                                               # move on to inspect the next altA, if the current altA is not viable!
-                        else:                                                       # if there are no shared variables between groupA (including altA) and groupB (including altB), then groups A and B ARE compatible (they don't restrict each other in any way) -> move on to next groupB
-                            groupB_compatible = True                            # just to show what
-                            continue                                                # this means that entire groupA and groupB are compatible -> move on to the next altA (moving on to next GROUP A would be even better though)
-            return compatibility_groups, starting_group                                             # remember! There's only ONE interpretation for those keys that have empty value set; they are NOT limited at all, that is, all alternatives (all 1-combinations, i.e. all mine combinations) are still possible for them!
+                        if altA_altB_compatible:
+                            at_least_1_altA_compatible_with_groupB = True
+                            compatibility_groups[altA].add(altB)            # I don't need to explicitly group this altB for this key; I know that those values which share the same variables belong to the same group (i.e. they originate from the same equation)!
+                            next_round_groupA.add(altB)                     # on the next round, these ok altBs become groupA c:
+                    # THIS IS PER altA! It's completely ok if the code goes here; if 
+                    if not at_least_1_altA_compatible_with_groupB:          # if altA from groupA is viable, it will have added groups of viable altBs from every other group
+                        del compatibility_groups[altA]                      # do not keep lonely equations in the dict 'compatibility_groups'
+                        # NB! DO NOT BREAK! That was a remnant from the previous version... sigh.
+                    else:                                                   # if there are no shared variables between groupA (including altA) and groupB (including altB), then groups A and B ARE compatible (they don't restrict each other in any way) -> move on to next groupB
+                        at_least_1_altA_compatible_with_groupB = True       # just to show what
+                        continue                                            # this means that entire groupA and groupB are compatible -> move on to the next altA (moving on to next GROUP A would be even better though)
+                # BELOW SHOULD NEVER HAPPEN
+                if not next_round_groupA:                                   # BIG TROUBLE! This means that none of the altAs were compatible with any of the altBs -> group A and B are not compatible -> NO SOLUTION POSSIBLE! This should NEVER happen.
+                    if a!= len(alternative_answers_per_eq)-2:
+                        "TROUBLE"
+            return compatibility_groups, starting_group                     # remember! There's only ONE interpretation for those keys that have empty value set; they are NOT limited at all, that is, all alternatives (all 1-combinations, i.e. all mine combinations) are still possible for them!
         compatibility_groups, starting_group = restrict_solution_space_as_equation_pairs_with_common_variables(alternative_answers_per_equation)
         
         # every key in 'compatibility_groups' is an alt solution for one equation that must be solved one way or another. The same goes for all equation groups in each of those keys' values, BUT here I'm just looking at the keys before looking at their values.
@@ -499,10 +507,12 @@ FAILED tests:''')
     eq2 = [1, 1, ('a', 'c', 'd'), 1]
     eq3 = [2, 1, ('c', 'd', 'e'), 2]
     eq4 = [3, 1, ('d', 'e'), 1]
+
+    name = 'test 1a: letters. a0, b1, c1, d0, e1 expected'
     csp = CSP_solver()
     csp.add_equations_if_new([eq1, eq2, eq3, eq4])
     csp.absolut_brut()       # TO-DO; fails sometimes, even if 2 ... 10 rounds! (why sometimes; because sets can be handled in undeterministic order relative to each other)     # PRINT: see answer above in orange
-    name = 'test 1a: letters. a0, b1, c1, d0, e1 expected'
+    
     expected_result = '01101'
     test_info_dict[name] = [csp, expected_result]
     # print_solved_variables(csp, name, expected_result)
@@ -519,10 +529,12 @@ FAILED tests:''')
     eq2 = [1, 1, ((0,0), (1,0), (2,0)), 1]
     eq3 = [2, 1, ((1,0), (2,0), (3,0)), 2]
     eq4 = [3, 1, ((2,0), (3,0)), 1]
+
+    name = 'test 1b: (x,y): (0,0)=0, (0,1)=1, (1,0)=1, (2,0)=0, (3,0)=1 expected'
     csp = CSP_solver()
     csp.add_equations_if_new([eq1, eq2, eq3, eq4])
     csp.absolut_brut()
-    name = 'test 1b: (x,y): (0,0)=0, (0,1)=1, (1,0)=1, (2,0)=0, (3,0)=1 expected'
+    
     expected_result = '01101'
     test_info_dict[name] = [csp, expected_result]
 
@@ -551,11 +563,13 @@ FAILED tests:''')
     eq2 = [1, 1, ('a', 'd'), 0]
     eq3 = [2, 1, ('d', 'e'), 1]
     eq4 = [3, 1, ('d', 'e'), 1]
+
+    name = 'test 1c: letters. a0, b1, d0, e1 expected'
     csp = CSP_solver()
     csp.add_equations_if_new([eq1, eq2, eq3, eq4])
     csp.absolut_brut() 
 
-    name = 'test 1c: letters. a0, b1, d0, e1 expected'
+    
     expected_result = '0101'
     test_info_dict[name] = [csp, expected_result]        
                      
@@ -576,11 +590,13 @@ FAILED tests:''')
     eq2 = [1, 1, ('a', 'b', 'c', 'd', 'e'), 2]
     eq3 = [2, 1, ('b', 'c', 'e'), 1]
     eq4 = [1, 2, ('d', 'e'), 1]
+
+    name = 'test 2, letters. a0,b1,c0,d1,e0 expected'
     csp = CSP_solver()
     csp.add_equations_if_new([eq1, eq2, eq3, eq4])
     csp.absolut_brut() 
 
-    name = 'test 2, letters. a0,b1,c0,d1,e0 expected'
+    
     expected_result = '01010'
     test_info_dict[name] = [csp, expected_result]                         
     # print_solved_variables(csp, name, expected_result)
@@ -598,11 +614,13 @@ FAILED tests:''')
     eq2 = [1, 1, ('a', 'b', 'c'), 1]
     eq3 = [2, 0, ('d', 'e'), 1]
     eq4 = [2, 1, ('d', 'e', 'f', 'b'), 3]
+
+    name = 'test 3a, letters. a0,b1,c0,f1 expected'
     csp = CSP_solver()
     csp.add_equations_if_new([eq1, eq2, eq3, eq4])
     csp.absolut_brut()
 
-    name = 'test 3a, letters. a0,b1,c0,f1 expected'
+    
     expected_result = '0101'
     test_info_dict[name] = [csp, expected_result]
 
@@ -624,11 +642,13 @@ FAILED tests:''')
     c11 = [1, 1, ((0,2), (1,2), (2,2)), 1]
     c20 = [2, 0, ((3,0), (3,1)), 1]
     c21 = [2, 1, ((3,0), (3,1), (3,2), (1,2)), 3]
+    
+    name = 'test 3b, (x,y). (0,2)=0, (1,2)=1, (2,2)=0, (3,2)=1 (AND (3,0) = not (3,1))'
     csp = CSP_solver()
     csp.add_equations_if_new([c01, c11, c20, c21])
     csp.absolut_brut()
 
-    name = 'test 3b, (x,y). (0,2)=0, (1,2)=1, (2,2)=0, (3,2)=1 (AND (3,0) = not (3,1))'
+    
     expected_result = '0101'
     test_info_dict[name] = [csp, expected_result]
 
@@ -642,11 +662,13 @@ FAILED tests:''')
     eqvi    = [3, 4, ('a', 'd', 'e', 'f', 'g'), 2]
     eqa     = [2, 7, ('h', 'i'), 1]
     eqb     = [3, 5, ('e', 'f', 'g', 'h', 'i'), 2]
+    
+    name = 'test 4a, letters. e=0 expected'
     csp = CSP_solver()
     csp.add_equations_if_new([eqi, eqiii, eqv, eqvi, eqa, eqb])
     csp.absolut_brut()                                  # NB! after 3 rounds minimum, e=0 is solved! A smaller number of rounds is not enough. This is ok and expected given the functions written in the class, as not everything is recursively updated until the end of the world (as this would complicate things even more!); also, nb! The purpose is not to be able to solve everything in one go, as that would also mean that pressing 'b' once in 'botGame.py' would proceed a huge number of steps at a time, AND this has nothing to do, as such, with efficiency either; so I want to divide this into small(ish) steps whenever possible, facilitating visualization and debugging that way, as there's no real reason not to do this. In fact, efficiency-wise, it's better to run as little as CSP_solver as possible, instead relying on the much simpler 'simple_solver' in 'botGame.py' as possible
 
-    name = 'test 4a, letters. e=0 expected'
+    
     expected_result = '0'
     test_info_dict[name] = [csp, expected_result]
 
@@ -660,12 +682,13 @@ FAILED tests:''')
     eq4     = [-1, -1, ('e', 'f', 'g'), 2]
     eq5     = [-1, -1, ('f', 'g', 'h', 'i', 'j'), 1]
     
+    name = 'test 5a, letters. c0, d0, e1, f1, g0, h0, i0, j0 expected'
     csp = CSP_solver()
     csp.add_equations_if_new([eq1, eq2, eq3, eq4, eq5])
     csp.absolut_brut()                                  # NB! This needs 2 rounds!
     # TO-DO: Thanks to this, I added more CSP conditions -> now it's sometimes ENTIRELY solved, sometimes NOT AT ALL (0 variables solved!)
 
-    name = 'test 5a, letters. c0, d0, e1, f1, g0, h0, i0, j0 expected'
+    
     expected_result = '00110000'
     test_info_dict[name] = [csp, expected_result]
     # print_solved_variables(csp, name, expected_result) # expected cdefg 00110
