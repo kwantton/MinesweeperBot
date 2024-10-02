@@ -1,5 +1,5 @@
 # MinesweeperBot
-Course Aineopintojen harjoitustyö - algoritmit ja tekoäly, University of Helsinki
+Course _Aineopintojen harjoitustyö - algoritmit ja tekoäly_, University of Helsinki
 
 ## Current state (2.10.2024, 19.49)
 
