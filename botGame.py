@@ -445,7 +445,7 @@ if __name__ == '__main__':
     dense_beg = 9,9,70
     beginner = 9,9,10
     intermediate = 16,16,40
-    expert = 30,16,99  
+    expert = 30,16,99
 
     # START A NEW MINESWEEPER with the ability to play the bot by pressing b
     # Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=False) # IF YOU WANT ONLY simple_solver(), which WORKS at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
