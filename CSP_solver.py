@@ -192,12 +192,12 @@ class CSP_solver:
                         elif final_answers[var] != val:
                             final_answers[var] = 'either or'                                    # either this was 'either or' was here or not, the result is the same - 'either or'
                         
-                    for var, val in final_answers.items():
-                        if val != 'either or':
-                            self.solved_variables.add((var, val))                               # reduces redundant work in 'update_related_info...' if ALL of these are added first, before the loop below calling that function for all of those newly solved variables.
-                    for var, val in final_answers.items():
-                        if val != 'either or':
-                            self.update_related_info_for_solved_var((var, val))
+                for var, val in final_answers.items():
+                    if val != 'either or':
+                        self.solved_variables.add((var, val))                               # reduces redundant work in 'update_related_info...' if ALL of these are added first, before the loop below calling that function for all of those newly solved variables.
+                for var, val in final_answers.items():
+                    if val != 'either or':
+                        self.update_related_info_for_solved_var((var, val))
             handle_possible_whole_solutions()
             pass
                 
