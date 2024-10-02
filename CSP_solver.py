@@ -5,15 +5,19 @@ from itertools import combinations
 
 # NB! 'sum' = the label of the cell in minesweeer map (the number seen on the cell)
 class CSP_solver:
-    def __init__(self):
+    def __init__(self, mines_total=100):
 
         self.variables = set()                                          # ALL variables, solved or not
         self.unique_equations = set()                                   # { ((var1, var2, ..), sum_of_mines_in_vars), (...) }. Each var (variable) has format (x,y) of that cell's location; cell with a number label 1...8 = var. Here, I want uniqe EQUATIONS, not unique LOCATIONS, and therefore origin-(x,y) is not stored here. It's possible to get the same equation for example from two different sides, and via multiple different calculation routes, and it's of course possible to mistakenly try to add the same equation multiple times; that's another reason to use a set() here, the main reason being fast search from this hashed set.        
         self.solved_variables = set()                                   # ((x,y), value); the name of the variable is (x,y) where x and y are its location in the minesweeper map (if applicable), and the value of the variable is either 0 or 1, if everything is ok (each variable is one cell in the minesweeper map, and its value is the number of mines in the cell; 0 or 1, that is)
         self.impossible_combinations = set()
+        self.mines_total = mines_total
 
     # 100% solution: (1) PER EACH EQUATION that MUST be satisfied (i.e. each number cell on the minesweeper map), try all combinations of ones (=mines). That's what THIS function does. (2) After this function below, from all of the alternative combinations of 1s and 0s that DO satisfy the CURRENT equation, find those alternatives that are incompatible with all other equations, pairing one group's all possible alts with compatible alts of ONE other group (i.e. "groups", i.e. incompatible with ALL the alternative solutions of at least one other group) (3) from the remaining alt equations per group (i.e. PER original equation), find columns where a variable is always 0 or 1 -> it HAS to be 0 or 1 ALWAYS. Then see these new solutions, inspect the remaining equations for untrue alternatives now that we've solved a new variable (or many new variables), and keep repeating the whole loop (1),(2),(3) as long as new solutions keep coming. Stop iteration when there are no longer new solutions produced by the whole loop.
     def absolut_brut(self) -> None:
+
+        if not self.unique_equations:
+            return
 
         # for each equation (i.e. each number cell on the minesweeper map), given that each variable (= each unopened cell) is 0 or 1 (no mine or a mine), find all possible combinations of 1s and 0s that can satisfy that SINGLE equation GIVEN THAT it has sum = k (some integer number = the number of mines in those unopened surrounding cells in total!)
         def find_and_group_possible_answers_per_single_equation() -> list:                  
@@ -187,9 +191,6 @@ class CSP_solver:
                 for var, val in final_answers.items():
                     if val != 'either or':
                         self.solved_variables.add((var, val))                               # reduces redundant work in 'update_related_info...' if ALL of these are added first, before the loop below calling that function for all of those newly solved variables.
-                for var, val in final_answers.items():
-                    if val != 'either or':
-                        self.update_related_info_for_solved_var((var, val))
             handle_possible_whole_solutions()
             pass
                 
@@ -231,9 +232,9 @@ class CSP_solver:
 
 
     # NB! This is called, when adding new equations for the first time, AND after finding new variables IF the related equations are (1) new and (2) do not become single solved variables as well (i.e. if the related equations are not reduced from equations like a+b=1 to just solved single variables like b=1). Hence, sometimes the 'self.update_equation(equation)' is necessary.
-    def add_equations_if_new(self, equations:list) -> None:                             # equations = [(x, y, ((x1, y1), (x2, y2), ...), summa), ...]; so each equation is a tuple of of x, y, unflagged unclicked neighbours (coordinates; unique variables, that is!), and the label of the cell (1,2,...8)
-        for equation in equations:                                                      # (x,y,(variables),sum_of_variables)
-            x, y, variables, summa = self.update_equation_and_related_info(equation)    # both updates, IF NECESSARY, 'self.unique_equations' (removes the old one, adds the shorter one), AND returns the new one here right away. NB: this small sidetrack is very short in cases where an equation is truly added for the first time (such as in 'botGame.py' from where this 'CSP_solver' class is used)
+    def handle_incoming_equations(self, equations:list) -> None:    # equations = [(x, y, ((x1, y1), (x2, y2), ...), summa), ...]; so each equation is a tuple of of x, y, unflagged unclicked neighbours (coordinates; unique variables, that is!), and the label of the cell (1,2,...8)
+        self.unique_equations = set()
+        for x,y, variables, summa in equations:                     # (x,y, variables, sum_of_variables). The x and y are the origin of the equation - actually unnecessary at the moment, I'm not using it for anything atm.
             variables = tuple(sorted(variables))
             if (variables, summa) not in self.unique_equations:
                 variable_count = 0
@@ -243,77 +244,7 @@ class CSP_solver:
                 self.unique_equations.add((variables, summa))
                 
 
-    # this is used in (1) 'self.add_equations_if_new()' and in (2) 'self.update_info_after_solving_new_variable'; (1) purpose: do not add 'new' equations that have been already (partially) solved; that is, take into account the fact that some variables have been solved already
-    # (1) in all equations where solved variables exist, reduce for solved variables (2) update the reduced form to 'self.unique_equations'
-    def update_equation_and_related_info(self, equation:tuple) -> None:                                      # equation = ( (var1, var2, ...), sum_of_variables). There's no origin (x,y) here, because all of those are unique, and irrelevant here!
-        x, y, original_vars, original_summa = equation
-        unsolved_variables, sum_of_solved_vars, solved_variables = self.filter_out_solved_variables(original_vars)
-        if len(unsolved_variables) != len(original_vars):                                   # if one or more variables in 'original_vars' had indeed been solved already; in that case we need to update all related information: (1) 'self.unique_equations'
-            if (original_vars, original_summa) in self.unique_equations:
-                self.unique_equations.remove((original_vars, original_summa))
-                
-            if original_summa-sum_of_solved_vars == 0:                          # old equation sum - (minus) the new, updated equation sum. If this is zero, then all the remaining variables are 0!
-                for var in unsolved_variables:
-                    self.solved_variables.add((var,0))
-                    
-            if len(unsolved_variables) == 1:                                    # NB! NOT 'elif'!
-                self.solved_variables.add((unsolved_variables[0], original_summa-sum_of_solved_vars))
-                # self.mark_var_as_solved_and_update_related_info((unsolved_variables[0], original_summa-sum_of_solved_vars))
-            elif len(unsolved_variables) == original_summa-sum_of_solved_vars:
-                for var in unsolved_variables:
-                    self.solved_variables.add((var,1))
-                    # self.mark_var_as_solved_and_update_related_info((var,1))
-            
-            # NB! This should NOT BE in any 'if' clauses!! I had made that blunder at one point, leading to missing 'self.unique_equations' which led to major deficiencies in solving capability in some cases.
-            self.unique_equations.add((unsolved_variables, original_summa-sum_of_solved_vars))  # why 'else': we don't need 'equations' that are ({c},1) or such; these are saved to 'self.solved_variables'. So let's keep equations as actual equations.
-            x = y = -1                                                                          # if information from already solved variables has been used to simplify equation, then this equation no longer has defnitivie single (x,y) origin from the minesweeper map; hence, mark it as (-1,-1).
-        return [x, y, unsolved_variables, original_summa-sum_of_solved_vars]
-
-    def filter_out_solved_variables(self, variables) -> tuple:                          # returns ((unsolved_variables), sum_of_solved_variables); this is for comparison before-and-after in 'update_equation()', where from this function is called. If something changed, then update it further in 'update_equation()'
-        unsolved_vars = []
-        solved_vars = []
-        sum_of_solved_vars = 0
-        for var in variables:
-            # ((x,y), value). I can't know if it's 0 or 1, so I'm checking both. 'var' = (x,y) and each var is unique cell of the minesweeper map
-            if (var, 0) in self.solved_variables:
-                solved_vars.append((var,0))
-            elif (var, 1) in self.solved_variables:
-                solved_vars.append((var,1))
-                sum_of_solved_vars += 1
-            else:  # ((x,y), value), in 'self.solved_variables'
-                unsolved_vars.append(var)
-        return tuple(unsolved_vars), sum_of_solved_vars, solved_vars                    # you can't hash sets or lists (not immutable), hence a tuple is returned instead for 'unsolved_vars'. Hashing of 'unsolved_variables' is needed in 'add_equations' from where this function is used.
-
-    def find_solutions_from_single_equations(self, equations:list) -> bool:             # this checks if (1) a+b+...=0 -> then a,b,... = 0, since every variable is 0 or 1, (2) if the length of the variables is 1, then there's only one variable x with value y -> mark variable x as y, (3) if a new equation is found, then check it and mark all variables associated with it
-        new_solutions = []
-        equations_to_add = []
-        found_solutions = False
-        subtractions_done = False
-        for variables, summa in equations:
-            if summa == 0:
-                found_solutions = True
-                for var in variables:
-                    new_solutions.append((var, 0))
-            elif len(variables) == 1:
-                new_solutions.append((variables[0], summa))
-                found_solutions = True
-            elif len(variables) == summa:
-                found_solutions = True
-                for var in variables:
-                    new_solutions.append((var, 1))
-            else:
-                if (variables, summa) not in self.unique_equations:                     # if the equation is longer than 1 (e.g. if 'its a+b=1) and not =0 (not a+b=0), and if it's not already in 'self.unique_equations', then add it to 'self.unique_equations'
-                    equations_to_add.append((-1, -1, variables, summa))                 # (1) if the equation wasn't c=1 or a+b+c=3 or a+b+c+d+...=0, then add this to the set of equations (2) why (-1, -1) is included in front (it's (x,y)): because 'add_equations_if_new()' will feed the equations to 'update_equations' which takes this format. Also, this (-1,-1) means that it's not an original equation originating from a single cell on the map; it means that this equation is the result of a calculation (no matter how simple the calculation is)
-                    subtractions_done = True
-        for new_solution in new_solutions:                                              # immediately add ALL the newly solved variables; only THEN (belo) update the related info; avoiding unnecessary computation regarding the related info!
-            self.solved_variables.add(new_solution)
-        for new_solution in new_solutions:
-            self.update_related_info_for_solved_var(new_solution)
-        self.add_equations_if_new(equations_to_add)                                     # these were gathered in a list, because 'self.numberOfVariables_to_equations' (which no longer exists, as I no longer should need it) can't be changed during its iteration
-        return found_solutions, subtractions_done
-    
-    def update_related_info_for_solved_var(self, new_solution:tuple) -> None:
-        solved_var, value = new_solution
+  
         
         
             
@@ -399,7 +330,7 @@ FAILED tests:''')
 
     name = 'test 1a: letters. a0, b1, c1, d0, e1 expected'
     csp = CSP_solver()
-    csp.add_equations_if_new([eq1, eq2, eq3, eq4])
+    csp.handle_incoming_equations([eq1, eq2, eq3, eq4])
     csp.absolut_brut()
     
     expected_result = '01101'
@@ -421,7 +352,7 @@ FAILED tests:''')
 
     name = 'test 1b: (x,y): (0,0)=0, (0,1)=1, (1,0)=1, (2,0)=0, (3,0)=1 expected'
     csp = CSP_solver()
-    csp.add_equations_if_new([eq1, eq2, eq3, eq4])
+    csp.handle_incoming_equations([eq1, eq2, eq3, eq4])
     csp.absolut_brut()
     
     expected_result = '01101'
@@ -455,7 +386,7 @@ FAILED tests:''')
 
     name = 'test 1c: letters. a0, b1, d0, e1 expected'
     csp = CSP_solver()
-    csp.add_equations_if_new([eq1, eq2, eq3, eq4])
+    csp.handle_incoming_equations([eq1, eq2, eq3, eq4])
     csp.absolut_brut() 
 
     
@@ -482,7 +413,7 @@ FAILED tests:''')
 
     name = 'test 2, letters. a0,b1,c0,d1,e0 expected'
     csp = CSP_solver()
-    csp.add_equations_if_new([eq1, eq2, eq3, eq4])
+    csp.handle_incoming_equations([eq1, eq2, eq3, eq4])
     csp.absolut_brut() 
 
     
@@ -506,7 +437,7 @@ FAILED tests:''')
 
     name = 'test 3a, letters. a0,b1,c0,f1 expected'
     csp = CSP_solver()
-    csp.add_equations_if_new([eq1, eq2, eq3, eq4])
+    csp.handle_incoming_equations([eq1, eq2, eq3, eq4])
     csp.absolut_brut()
 
     
@@ -534,7 +465,7 @@ FAILED tests:''')
     
     name = 'test 3b, (x,y). (0,2)=0, (1,2)=1, (2,2)=0, (3,2)=1 (AND (3,0) = not (3,1))'
     csp = CSP_solver()
-    csp.add_equations_if_new([c01, c11, c20, c21])
+    csp.handle_incoming_equations([c01, c11, c20, c21])
     csp.absolut_brut()
 
     
@@ -554,7 +485,7 @@ FAILED tests:''')
     
     name = 'test 4a, letters. e=0 expected'
     csp = CSP_solver()
-    csp.add_equations_if_new([eqi, eqiii, eqv, eqvi, eqa, eqb])
+    csp.handle_incoming_equations([eqi, eqiii, eqv, eqvi, eqa, eqb])
     csp.absolut_brut()                                  # NB! after 3 rounds minimum, e=0 is solved! A smaller number of rounds is not enough. This is ok and expected given the functions written in the class, as not everything is recursively updated until the end of the world (as this would complicate things even more!); also, nb! The purpose is not to be able to solve everything in one go, as that would also mean that pressing 'b' once in 'botGame.py' would proceed a huge number of steps at a time, AND this has nothing to do, as such, with efficiency either; so I want to divide this into small(ish) steps whenever possible, facilitating visualization and debugging that way, as there's no real reason not to do this. In fact, efficiency-wise, it's better to run as little as CSP_solver as possible, instead relying on the much simpler 'simple_solver' in 'botGame.py' as possible
 
     
@@ -573,7 +504,7 @@ FAILED tests:''')
     
     name = 'test 5a, letters. c0, d0, e1, f1, g0, h0, i0, j0 expected'
     csp = CSP_solver()
-    csp.add_equations_if_new([eq1, eq2, eq3, eq4, eq5])
+    csp.handle_incoming_equations([eq1, eq2, eq3, eq4, eq5])
     csp.absolut_brut()                                  # NB! This needs 2 rounds!
 
     

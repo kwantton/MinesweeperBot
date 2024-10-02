@@ -292,7 +292,7 @@ class Minesweeper:
                     n_surrounding_flags = self.count_flags(neighbours)
                     csp_solver_input_addition = format_equation_for_csp_solver(x, y, unflagged_unclicked_neighbours, surrounding_mine_count - n_surrounding_flags)    # NB! 'surrounding_mine_count - n_surrounding_flags' was what I was missing for two days; it caused solving of WRONG equations in the CSP_solver(). I.e.; what if there are flags around, not just unflagged neighbours? That's why there's the '- n_unflagged_neighbours' subtraction. They have to be removed from the total minecount.
                     csp_solver_input.append(csp_solver_input_addition)
-                self.solver.add_equations_if_new(csp_solver_input)
+                self.solver.handle_incoming_equations(csp_solver_input)
 
             if self.debug_csp:
                 self.draw_display()
