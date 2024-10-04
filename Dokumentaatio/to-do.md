@@ -1,4 +1,4 @@
-## Taustaa (nykytilanne):
+## Taustaa (nykytilanne) (katso `/määrittely.md`):
 Päädyin tekemään ratkaisijan `CSP_solver` pitkälti uudestaan niin, että
 
 <ol>
