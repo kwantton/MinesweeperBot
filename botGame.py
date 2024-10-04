@@ -14,9 +14,9 @@ class Minesweeper:
         # NB! Put here ONLY those that are not reset at every 'new_game()'
         self.mines = mines
         self.width = width
-        self.cell_size = 50-int(0.8*height)                      # how many px in height and width should each cell be?
+        self.cell_size = 50-int(0.8*height)             # how many px in height and width should each cell be?
         self.csp_on = csp_on
-        self.height = height                            # map height measured in in rows
+        self.height = height                            # map height measured in rows
         self.infobar_height = 100                       # pixels for the infobar above the minesweeper map
         self.debug_csp = debug_csp
         self.clock = pygame.time.Clock()
@@ -28,7 +28,7 @@ class Minesweeper:
         
         self.images = {}                                # {name : loaded image}
         self.load_images()
-        self.screen = pygame.display.set_mode((self.cell_size*width, self.cell_size*height + self.infobar_height + self.instructions_height)) # each .png is 100 px, which is large. Extra height for info bar above the minesweeper map, and instructions bar below the minesweeper map
+        self.screen = pygame.display.set_mode((self.cell_size*width, self.cell_size*height + self.infobar_height + self.instructions_height), pygame.RESIZABLE) # each .png is 100 px, which is large. Extra height for info bar above the minesweeper map, and instructions bar below the minesweeper map
         
         self.new_game()
         self.loop()
@@ -73,7 +73,7 @@ class Minesweeper:
         self.start_time = None
         self.hit_a_mine = False
         self.timer_active = False
-        self.solver = CSP_solver()
+        self.solver = CSP_solver(mines_total = self.mines)
         self.obsolete_front = set()         # after each legitimate chording, and after entering a new previously unprobed cell if it has no neighbours
         self.new_front_members = set()
         
@@ -108,7 +108,7 @@ class Minesweeper:
             cell_y = (mouse_y - self.infobar_height) // self.cell_size              # Like explained in the above comment. Implementation here: adjust for the infobar by 'raising' the click by infobar height, then get the row number by division by self.scale. Asked from ChatGPT when trying to find the problem with the y-location
             if (cell_y < 0) or (cell_y >= self.height) or (cell_x < 0) or (cell_x >= self.width):
                 pass                                                                # if you click the top bar, it starts a new game
-            elif event.button == 1:                                                 # left click == 2!
+            elif event.button == 1:                                                 # left click == 1!
                 print(f'- cell_x, cell_y: {cell_x, cell_y}')                        # if each cell width is e.g. 100 px, then if you click e.g. on x-coord 540, it's the 6th column (40 would be 1st)
                 if not self.started:
                     self.handle_first_left_click(cell_x, cell_y)
@@ -447,7 +447,7 @@ if __name__ == '__main__':
     intermediate = 16,16,40
     expert = 30,16,99
 
-    # START A NEW MINESWEEPER with the ability to play the bot by pressing b
+    ''' ↓↓↓ STARTS A NEW MINESWEEPER with the ability to play the bot by pressing b ↓↓↓ (instructions in the game) '''
     # Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=False) # IF YOU WANT ONLY simple_solver(), which WORKS at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
     Minesweeper(expert[0], expert[1], expert[2], csp_on=True) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
-    #           width       height      mines    
+    #           width       height      mines
