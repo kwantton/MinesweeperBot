@@ -18,28 +18,30 @@ class CSP_solver:
         if not self.unique_equations:
             return
 
-        # for each equation (i.e. each number cell on the minesweeper map), given that each variable (= each unopened cell) is 0 or 1 (no mine or a mine), find all possible combinations of 1s and 0s that can satisfy that SINGLE equation GIVEN THAT it has sum = k (some integer number = the number of mines in those unopened surrounding cells in total!)
-        def find_and_group_possible_answers_per_single_equation() -> list:
-            alt_answers_per_equation = []
-            for variables, summa in self.unique_equations:
-                mine_location_combinations = combinations(variables, summa)         # all possible combinations of mines for this equation. Since all incoming equations are of form a+b+c=1, and each variable is 0 or 1, I'm here just picking the MINE cells; combinations of mine cells.
-                this_eq_group = []                                                  # NB! All the possible solutions for THIS equation ('variables', 'summa' constitutes an equation in 'self.unique_equations') are gathered here; in the end, I have to solve each of these 'individual' equations, AND find a solution that satisfies all the other equations as well.
-                for mine_location_combination in mine_location_combinations:
-                    combo = []                                                      # for all vars a,b,c,... {a:1, b:0, c:0, ....}
-                    for var in sorted(variables):                                   # I want to always handle variables in alphabetical order so that I can be sure that when I read/write into data structures according to combinations of variables, then for example a dict key (a,b,c) is always (a,b,c), not (b,c,a) or something else. This is to reduce unnecessary computing and to keep things overall as simple and reliable as possible.
-                        if var in mine_location_combination:
-                            combo.append((var, 1))                                  # I could add only the 1s as all the others are 0, BUT then I'd have to also gather a set of all the variables present. Instead, I like to keep it more visually clear here; also each 'combo' is short, so using a set vs. iterating through all (usually 2-4) items makes no big difference performance-wise
-                        else:
-                            combo.append((var, 0))
+        # for each separate group of eqs, for each equation (i.e. each number cell on the minesweeper map), given that each variable (= each unopened cell) is 0 or 1 (no mine or a mine), find all possible combinations of 1s and 0s that can satisfy that SINGLE equation GIVEN THAT it has sum = k (some integer number = the number of mines in those unopened surrounding cells in total!)
+        def find_and_group_possible_answers_per_single_equation(groups_of_eqs:list) -> list:
+            alt_answers_for_groups = list()
+            for group_of_eqs in groups_of_eqs:
+                alt_answers_per_equation = []
+                for variables, summa in group_of_eqs:
+                    mine_location_combinations = combinations(variables, summa)         # all possible combinations of mines for this equation. Since all incoming equations are of form a+b+c=1, and each variable is 0 or 1, I'm here just picking the MINE cells; combinations of mine cells.
+                    this_eq_group = []                                                  # NB! All the possible solutions for THIS equation ('variables', 'summa' constitutes an equation in 'self.unique_equations') are gathered here; in the end, I have to solve each of these 'individual' equations, AND find a solution that satisfies all the other equations as well.
+                    for mine_location_combination in mine_location_combinations:
+                        combo = []                                                      # for all vars a,b,c,... {a:1, b:0, c:0, ....}
+                        for var in sorted(variables):                                   # I want to always handle variables in alphabetical order so that I can be sure that when I read/write into data structures according to combinations of variables, then for example a dict key (a,b,c) is always (a,b,c), not (b,c,a) or something else. This is to reduce unnecessary computing and to keep things overall as simple and reliable as possible.
+                            if var in mine_location_combination:
+                                combo.append((var, 1))                                  # I could add only the 1s as all the others are 0, BUT then I'd have to also gather a set of all the variables present. Instead, I like to keep it more visually clear here; also each 'combo' is short, so using a set vs. iterating through all (usually 2-4) items makes no big difference performance-wise
+                            else:
+                                combo.append((var, 0))
 
-                    combo = tuple(combo)                                            # (('a',1),('c',0),...) is the format of combo
+                        combo = tuple(combo)                                            # (('a',1),('c',0),...) is the format of combo
 
-                    if combo not in self.impossible_combinations:                   # (('a',1),('c',0),...) is the format of each combo in 'self.impossible_mine_combos', obviously, as well
-                        this_eq_group.append(combo)
-                        
-                alt_answers_per_equation.append(tuple(this_eq_group))               # each list in this list is a list of alternative answers for that equation in question
-            return alt_answers_per_equation
-        alternative_answers_per_equation = find_and_group_possible_answers_per_single_equation()    # each group represents the answers for a single equation derived from a single number cell on the minesweeper map.
+                        if combo not in self.impossible_combinations:                   # (('a',1),('c',0),...) is the format of each combo in 'self.impossible_mine_combos', obviously, as well
+                            this_eq_group.append(combo)
+                            
+                    alt_answers_per_equation.append(tuple(this_eq_group))               # each list in this list is a list of alternative answers for that equation in question
+                alt_answers_for_groups.append(alt_answers_per_equation)
+            return alt_answers_for_groups
 
         # used in 'restrict_solution_space_as_equation_pairs_with_common_variables()' below; are there common variables between two equations (i.e. groups)?
         def common_vars(vars1, vars2) -> bool:
@@ -51,15 +53,18 @@ class CSP_solver:
                     break
             return common
         
-        def find_equation_groups():
+        def find_equation_groups() -> dict:                                         # FINDS SEPARATE EQUATION GROUPS; finds separate groups of equations that do not share a single variable between the equation groups. For example a+b = 1 and b+c=1 would be one group, separate from e+f+g=2, if there was only those three equations in total in self.unique_equations.
             called_vars = set()
             grouped_vars = set()
             groupN_to_eqs = dict()
             groupN_to_vars = dict()                                                 # group_n : {var1, var2, var3..}
             completely_grouped_eqs = set()
+            n_calls_of_add_eqs = 0
 
             def add_eqs_containing_current_var_to_current_group(group_n, variable):
-                if variable in called_vars:                                         # this function will be called exactly as many times as how many UNIQUE variables there are; if a,b,c,d, then 4 times in total, no more. Quite practical.
+                nonlocal n_calls_of_add_eqs                                         # FOR DEBUG: I wanted to see how many times it ends up here. Turns out, 10-90 times depending on the test, which is not too bad since it comes right back in 90% of the cases.
+                n_calls_of_add_eqs += 1
+                if variable in called_vars:                                         # this function will pass this check (i.e. will NOT return) exactly as many times as how many UNIQUE variables there are; if a,b,c,d, then 4 times in total, no more. Quite practical.
                     return
                 next_up = self.variable_to_equations[variable]
                 called_vars.add(variable)
@@ -76,77 +81,97 @@ class CSP_solver:
             group_n = 1
             for key, eqs in self.variable_to_equations.items():
                 if len(called_vars) == len(self.variables):                         # if ALL the variables have been classified, then return. Usually, this return happens after the first round, if all the variables are connected! This saves quite a bit of work. This saves a LOT of work later on when connecting equation pairs, and when building solution trees; I'm keeping separate groups separate!
-                    return
+                    print("n_calls_of_add_eqs:", n_calls_of_add_eqs)
+                    return groupN_to_vars
                 groupN_to_vars[group_n] = set()                                     # initialize for this 'group_n'
                 for variables, summa in eqs:
                     for var in variables:                                           # add all vars to current group
                         if var not in grouped_vars:                                 # if one of these is not present, then none should be! The 'add_eqs_to_current_group' below might have added these already. If it has, then DON'T make another group
                             add_eqs_containing_current_var_to_current_group(group_n, var)
                 group_n += 1       
-            pass
+            return groupN_to_vars
      
-
-        find_equation_groups()
-
-        # for each group (group=alternative solutions for an equation like a+b=1), find at least one solution that's compatible with AT LEAST ONE alternative solution from ONE other group. Then for those compatible alt solutions, couple all of those to the NEXT group; this builds a chain of equations, where the first equation is linked to one equation, the next one to the previous and to the next, etc, and the last one is linked only to the previous one. AFTER 'chain_link_equations', continue to build all possible alternative answers from those
-        def chain_link_equations(alternative_answers_per_eq:list) -> dict:
-            compatibility_groups = dict()                                   # { possible solution : all related possible solutions (i.e. those which share variables and do not disagree for any variable value for those variables that are present in both the key and each of the values in this dictionary for that key!) }. There's no need for explicit bookkeeping regarding which of the value solutions belong to which original equation, because the variables included themselves are enough to identify the origin.
-            # NB! I need to add the keys also for the last groupA even though it has no groupB to pair it with! This is because checks in later functions require the existence of viable alts in 'compatibility_groups' keys!
-            for a in range(len(alternative_answers_per_eq)):                # e.g. ( (('a',0), ('b',1)), (('a',1),('b',0)) ) would constitute one 'group' (length 2) for the equation 'a+b=1' which is stored as ((a,b),1) in 'self.unique_variables'; that is, all the possible solutions for that equation constitute a 'group'
-                if a == 0:
-                    groupA = alternative_answers_per_eq[a]
-                    starting_group = alternative_answers_per_eq[a]
-                else:
-                    groupA = sorted(tuple(next_round_groupA))               # from the previous round! Since this is from a set, it may become disordered -> for comparison if equal with groupB, sorting is needed!
-                if a == len(alternative_answers_per_eq)-1:
-                    for alt in groupA:
-                        compatibility_groups[alt] = set()                   # all viable alts must be found in keys of 'compatibilty_groups'. On the last round, groupA is the compatible alt solutions of last round's groupB, and these are all ok. Therefore, all of them must be added to 'compatibility_groups'.
-                    break
-                b = a+1
-                groupB = alternative_answers_per_eq[b]
-                if groupA==groupB:
-                    continue                                                # This never happens (GOOD! This is currently the expected result). It should NEVER happen as long as I don't change this whole function (again...).
-                next_round_groupA = set()
-                common_variables = common_vars(groupA[0], groupB[0])        # I want unilateral direction to ALL possible compatible alt solutions from ALL OTHER groups
-                at_least_1_altA_compatible_with_groupB = False              # Default. NB! groupB needs to be compatible for altA to be viable! That is: if altA is to be viable, it has to satisfy at least one altB from every groupB! (2) this ALSO checks if there are
-                n_compatible_altBs = 0                                      # If from the entire groupB we end up with just ONE altB that's compatible with groupA, then it IS THE ONLY POSSIBLE ANSWER (=the only viable altB) FOR THAT groupB IN QUESTION beause every single equation (each groupA and groupB) must have at least one compatible solution with each other -> altB therefore provides UNIVERSALLY THE ONLY POSSIBLE (combination of) VALUE(s) FOR EACH OF altB's VARIABLES -> mark all those as solved
-                for altA in groupA:                                         # E.g. altA = (('a', 0), ('b', 1)); altA = alternative solution (i.e. ONE theoretically POSSIBLE solution) to the equation whose possible answers are members of groupA; altA = one alternative solution for a single equation, that might or might not be possible (i.e. might or might not be compatible with each groupB (i.e., with at least one possible answer of each other equation))
-                    compatibility_groups[altA] = set()
-                    for altB in groupB:                                     # NB! ONE at least needs to be compatible with altA, OR altA is not 'viable_and_connected'. e.g. (('a', 0), ('b', 1)); alt = alternative = one alternative solution for a single equation, that might or might not be possible (i.e. might or might not be compatible with A)
-                        altA_altB_compatible = True                         # default
-                        if common_variables:                                                                  
-                            for var1, val1 in altA:                         # e.g. 'a', 0. Each var1, val1 has to be compatible with at least ONE alt2 from every other group, so that 'altA_is_viable'!
-                                opposite_value = (var1, int(not val1))      # val1 = 1 or 0; if 1, opposite = (var1, 0). This is so I can avoid if-clause below, making it shorter.
-                                if opposite_value in altB:
-                                    altA_altB_compatible = False
-                                    break
-                        if altA_altB_compatible:
-                            n_compatible_altBs += 1
-                            at_least_1_altA_compatible_with_groupB = True
-                            compatibility_groups[altA].add(altB)            # I don't need to explicitly group this altB for this key; I know that those values which share the same variables belong to the same group (i.e. they originate from the same equation)!
-                            next_round_groupA.add(altB)                     # on the next round, these ok altBs become groupA c:
-                    
-                    # THIS IS PER altA! It's completely OK if the code goes here, it reduces time complexity later on; if the current altA is not compatible with any altB from the current group, then it's deleted from the 'compatibility_groups', because it's an impossible combination of variable values.
-                    if not at_least_1_altA_compatible_with_groupB:          # if altA from groupA is viable, it will have added groups of viable altBs from every other group
-                        del compatibility_groups[altA]                      # do not keep lonely equations in the dict 'compatibility_groups'
-                        # NB! DO NOT 'break' here! That was a remnant from a previous version... sigh.
-                    else:                                                   # if there are no shared variables between groupA (including altA) and groupB (including altB), then groups A and B ARE compatible (they don't restrict each other in any way) -> move on to next groupB
-                        at_least_1_altA_compatible_with_groupB = True       # just to show what this means in reality! Writing clear the logic for future generations... or myself, maybe.
-                        continue                                            # this means that entire groupA and groupB are compatible -> move on to the next altA (moving on to next GROUP A would be even better though)
+        groupN_to_vars = find_equation_groups()
+        separate_groups_of_vars = [group for group in groupN_to_vars.values()]      # in the first 8 tests, there's just one 'separate' group, meaning that all the variables are connected. In real minesweeper, especially in expert, you frequently see more than one separate group, meaning that one's mine locations do not directly affect the other's logic in any way.
+        if len(separate_groups_of_vars) == 1:
+            separate_groups_of_eqs = [self.unique_equations]                        # just to demonstrate (the same thing would happen in the 'else' below): if all the unique equations are in one connected group, then that's that. Otherwise, get all equations for all groups.
+        else:
+            separate_groups_of_eqs = []
+            for group_of_vars in separate_groups_of_vars:
+                eqs_of_this_group = set()
+                for var in group_of_vars:
+                    eqs_for_var = self.variable_to_equations[var]
+                    for eq in eqs_for_var:
+                        eqs_of_this_group.add(eq)
+                separate_groups_of_eqs.append(eqs_of_this_group)
                 
-                # this 'if' below SHOULD NEVER HAPPEN. Currently: OK, I fixed it, it does never happen.
-                if not next_round_groupA:                                   # if this happens, it means BIG TROUBLE occurring in this function. This means that none of the altAs were compatible with any of the altBs -> group A and B are not compatible -> NO SOLUTION POSSIBLE! This should NEVER happen since a universal solution must always be found.
-                    # if a!= len(alternative_answers_per_eq)-2:
-                    "TROUBLE"
-                # else:                                                     # this works well, but the tests break. The idea behind this commented-out part is that it first looks for the obvious solutions, before using the heavy machinery. This saves computation in cases where 'self.front' is big in 'botGame.py'.
-                #     if n_compatible_altBs == 1:
-                #         for value, variable in tuple(next_round_groupA)[0]: # at this point, 'next_round_groupA' consists of all the altB equations from groupB that were compatible with groupA! As there's only one equation now, all its variables have now been solved.
-                #             self.solved_variables.add((value, variable))
-                #         return 'stop', 'here'
-            return compatibility_groups, starting_group                     # remember! There's only ONE interpretation for those keys that have empty value set; they are NOT limited at all, that is, all alternatives (all 1-combinations, i.e. all mine combinations) are still possible for them!
-        compatibility_groups, starting_group = chain_link_equations(alternative_answers_per_equation)
-        if compatibility_groups == 'stop':
-            return
+        alternative_answers_per_equation_per_set_of_eqs = find_and_group_possible_answers_per_single_equation(separate_groups_of_eqs)    # each group represents the answers for a single equation derived from a single number cell on the minesweeper map.
+        
+
+        # for each separated set of equations, do the following: for each group (group=alternative solutions for an equation like a+b=1), find at least one solution that's compatible with AT LEAST ONE alternative solution from EXACTLY ONE other group. Then for those compatible alt solutions, couple all of those to the NEXT group; this builds a chain of equations, where the first equation is linked to one equation, the next one to the previous and to the next, etc, and the last one is linked only to the previous one. AFTER 'chain_link_equations', continue to build all possible alternative answers from those
+        def chain_link_equations(alternative_answers_per_equation_per_set_of_eqs:list) -> dict:
+            comp_groups_and_starting_groups = []
+            for alternative_answers_per_eq in alternative_answers_per_equation_per_set_of_eqs:
+                compatibility_groups = dict()                                   # { possible solution : all related possible solutions (i.e. those which share variables and do not disagree for any variable value for those variables that are present in both the key and each of the values in this dictionary for that key!) }. There's no need for explicit bookkeeping regarding which of the value solutions belong to which original equation, because the variables included themselves are enough to identify the origin.
+                # NB! I need to add the keys also for the last groupA even though it has no groupB to pair it with! This is because checks in later functions require the existence of viable alts in 'compatibility_groups' keys!
+                for a in range(len(alternative_answers_per_eq)):                # e.g. ( (('a',0), ('b',1)), (('a',1),('b',0)) ) would constitute one 'group' (length 2) for the equation 'a+b=1' which is stored as ((a,b),1) in 'self.unique_variables'; that is, all the possible solutions for that equation constitute a 'group'
+                    if a == 0:
+                        groupA = alternative_answers_per_eq[a]
+                        starting_group = alternative_answers_per_eq[a]
+                    else:
+                        groupA = sorted(tuple(next_round_groupA))               # from the previous round! Since this is from a set, it may become disordered -> for comparison if equal with groupB, sorting is needed!
+                    if a == len(alternative_answers_per_eq)-1:
+                        for alt in groupA:
+                            compatibility_groups[alt] = set()                   # all viable alts must be found in keys of 'compatibilty_groups'. On the last round, groupA is the compatible alt solutions of last round's groupB, and these are all ok. Therefore, all of them must be added to 'compatibility_groups'.
+                        break
+                    b = a+1
+                    groupB = alternative_answers_per_eq[b]
+                    if groupA==groupB:
+                        continue                                                # This never happens (GOOD! This is currently the expected result). It should NEVER happen as long as I don't change this whole function (again...).
+                    next_round_groupA = set()
+                    common_variables = common_vars(groupA[0], groupB[0])        # I want unilateral direction to ALL possible compatible alt solutions from ALL OTHER groups
+                    at_least_1_altA_compatible_with_groupB = False              # Default. NB! groupB needs to be compatible for altA to be viable! That is: if altA is to be viable, it has to satisfy at least one altB from every groupB! (2) this ALSO checks if there are
+                    n_compatible_altBs = 0                                      # If from the entire groupB we end up with just ONE altB that's compatible with groupA, then it IS THE ONLY POSSIBLE ANSWER (=the only viable altB) FOR THAT groupB IN QUESTION beause every single equation (each groupA and groupB) must have at least one compatible solution with each other -> altB therefore provides UNIVERSALLY THE ONLY POSSIBLE (combination of) VALUE(s) FOR EACH OF altB's VARIABLES -> mark all those as solved
+                    for altA in groupA:                                         # E.g. altA = (('a', 0), ('b', 1)); altA = alternative solution (i.e. ONE theoretically POSSIBLE solution) to the equation whose possible answers are members of groupA; altA = one alternative solution for a single equation, that might or might not be possible (i.e. might or might not be compatible with each groupB (i.e., with at least one possible answer of each other equation))
+                        compatibility_groups[altA] = set()
+                        for altB in groupB:                                     # NB! ONE at least needs to be compatible with altA, OR altA is not 'viable_and_connected'. e.g. (('a', 0), ('b', 1)); alt = alternative = one alternative solution for a single equation, that might or might not be possible (i.e. might or might not be compatible with A)
+                            altA_altB_compatible = True                         # default
+                            if common_variables:                                                                  
+                                for var1, val1 in altA:                         # e.g. 'a', 0. Each var1, val1 has to be compatible with at least ONE alt2 from every other group, so that 'altA_is_viable'!
+                                    opposite_value = (var1, int(not val1))      # val1 = 1 or 0; if 1, opposite = (var1, 0). This is so I can avoid if-clause below, making it shorter.
+                                    if opposite_value in altB:
+                                        altA_altB_compatible = False
+                                        break
+                            if altA_altB_compatible:
+                                n_compatible_altBs += 1
+                                at_least_1_altA_compatible_with_groupB = True
+                                compatibility_groups[altA].add(altB)            # I don't need to explicitly group this altB for this key; I know that those values which share the same variables belong to the same group (i.e. they originate from the same equation)!
+                                next_round_groupA.add(altB)                     # on the next round, these ok altBs become groupA c:
+                        
+                        # THIS IS PER altA! It's completely OK if the code goes here, it reduces time complexity later on; if the current altA is not compatible with any altB from the current group, then it's deleted from the 'compatibility_groups', because it's an impossible combination of variable values.
+                        if not at_least_1_altA_compatible_with_groupB:          # if altA from groupA is viable, it will have added groups of viable altBs from every other group
+                            del compatibility_groups[altA]                      # do not keep lonely equations in the dict 'compatibility_groups'
+                            # NB! DO NOT 'break' here! That was a remnant from a previous version... sigh.
+                        else:                                                   # if there are no shared variables between groupA (including altA) and groupB (including altB), then groups A and B ARE compatible (they don't restrict each other in any way) -> move on to next groupB
+                            at_least_1_altA_compatible_with_groupB = True       # just to show what this means in reality! Writing clear the logic for future generations... or myself, maybe.
+                            continue                                            # this means that entire groupA and groupB are compatible -> move on to the next altA (moving on to next GROUP A would be even better though)
+                    
+                    # this 'if' below SHOULD NEVER HAPPEN. Currently: OK, I fixed it, it does never happen.
+                    if not next_round_groupA:                                   # if this happens, it means BIG TROUBLE occurring in this function. This means that none of the altAs were compatible with any of the altBs -> group A and B are not compatible -> NO SOLUTION POSSIBLE! This should NEVER happen since a universal solution must always be found.
+                        # if a!= len(alternative_answers_per_eq)-2:
+                        "TROUBLE"
+                    # else:                                                     # this works well, but the tests break. The idea behind this commented-out part is that it first looks for the obvious solutions, before using the heavy machinery. This saves computation in cases where 'self.front' is big in 'botGame.py'.
+                    #     if n_compatible_altBs == 1:
+                    #         for value, variable in tuple(next_round_groupA)[0]: # at this point, 'next_round_groupA' consists of all the altB equations from groupB that were compatible with groupA! As there's only one equation now, all its variables have now been solved.
+                    #             self.solved_variables.add((value, variable))
+                    #         return [['stop', 'here']]
+                comp_groups_and_starting_groups.append((compatibility_groups, starting_group))
+            return comp_groups_and_starting_groups
+                                     
+        list_of_compGroups_startingGroup = chain_link_equations(alternative_answers_per_equation_per_set_of_eqs)
+        for compatibility_groups, starting_group in list_of_compGroups_startingGroup:
+            if compatibility_groups == 'stop':
+                return                                                          # the idea here is: if simple solutions were found above, use them first (i.e. just return, stop), don't use the heavier tree building below if not necessary
 
         # every key in 'compatibility_groups' is an alt solution for one equation that must be solved one way or another. The same goes for all equation groups in each of those keys' values, BUT here I'm just looking at the keys before looking at their values.
         def keyVars_to_keys_builder(compatibility_groups:dict) -> dict:
@@ -247,8 +272,8 @@ class CSP_solver:
             
             handle_possible_whole_solutions()
                 
-
-        join_comp_groups_into_solutions(compatibility_groups)
+        for compatibility_groups, starting_group in list_of_compGroups_startingGroup:
+            join_comp_groups_into_solutions(compatibility_groups)
         
         def solution_finder_from_compatibility_groups(compatibility_groups:dict) -> dict:
             def key_altSolution_inspector():
