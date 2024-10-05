@@ -281,7 +281,7 @@ class Minesweeper:
                         if len(unflagged_unclicked_neighbours) >= 1:                        # then if there also are unclicked cells around the current front cell,
                             self.handle_chord(x,y)                                          # then open all of them (i.e. 'chord' at this current front cell (x,y)).
                 
-                check_minecount_zero()
+                check_minecount_zero()                                                      # if minecount is zero, then probe all 'unclicked' cells, since they cannot be mines -> map completed! This situation needs separate handling because the last 'unclicked' cells can be inside completely flagged boxes, isolating them from 'self.front'. It took me 5 weeks to even arrive in that kind of a situation! It's extremely rare, as it needs at least 3 already-flagged cells in a cordner, or 5 in a center edge, or 8 or more in the middle! Awesomesauce.
                 
                 filter_front_cells()
 
