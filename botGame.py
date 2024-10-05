@@ -38,7 +38,6 @@ class Minesweeper:
         self.show_mines = False
         self.highlight_front = False                                                # 'front' cells = number-labeled cells that neighbour unsolved cells, i.e. cells in x € {1,2,...8} that do not have x flags marked around them. When this is 'True', it draws a yellow rectangle around each such cell.
         self.highlight_bot_location = False
-        self.highlight_obsolete_front = False
         self.highlight_csp_solved = self.debug_csp
         self.instructions = '''
         b : bot move
@@ -73,9 +72,9 @@ class Minesweeper:
         self.start_time = None
         self.hit_a_mine = False
         self.timer_active = False
-        self.solver = CSP_solver(mines_total = self.mines)
         self.obsolete_front = set()         # after each legitimate chording, and after entering a new previously unprobed cell if it has no neighbours
         self.new_front_members = set()
+        self.solver = CSP_solver(mines_total = self.mines)                          # minecount is needed in 'CSP_solver' in those rarish cases where information about the remaining minecount near the end of the game is needed to be able to solve the last few cases that would otherwise require guessing.
         
         self.minecount = self.mines
         self.map = [[unclicked for x in range(self.width)] for y in range(self.infobar_height, self.height + self.infobar_height)]   # map = all the mines. Since the infobar is on top, the '0' y for mines = infobar_height. This map records the names of the images of each cell on the map.
@@ -90,8 +89,6 @@ class Minesweeper:
                 self.bot_act()                                                      # the bot makes a move when you press b
             elif event.key == pygame.K_f:
                 self.highlight_front = not self.highlight_front                     # toggle debug; highlighting the frontline (rintama) of not-yet-solved portion of the map, on/off toggle
-            elif event.key == pygame.K_o:
-                self.highlight_obsolete_front = not self.highlight_obsolete_front   # good for debugging, however note: you should NOT see anything! If somethign is in self.obsolete_front, it is immediately removed at the end of that round -> nothing to be seen any longer.
             elif event.key == pygame.K_l:
                 self.highlight_bot_location = not self.highlight_bot_location       # toggle debug: highlighting the bot 'location' on/off toggle
             elif event.key == pygame.K_m:
@@ -137,7 +134,7 @@ class Minesweeper:
         print(f'- clicked coordinates {mouse_x, mouse_y} and placed the mines as follows:\n', self.mine_locations)
 
     def probe(self, x:int, y:int, primary=False) -> None:           # if primary = False, then don't go to 'handle_probing_of_already_opened_cell', otherwise it can loop and cause another chord! The chording is meant ONLY for actual chording
-        print(f'\nprobe({x,y}, from primary={primary});')
+        # print(f'\nprobe({x,y}, from primary={primary});')
 
         if self.map[y][x] == flag:                                  # NB! This has to come first, as this is most probably in 'self.mine_locations'; If you left click on a red flag (i.e. 'probe' a flagged cell), it does nothing (like in real minesweeper)
             return
@@ -158,7 +155,7 @@ class Minesweeper:
         self.draw_display()       
 
     def handle_probing_of_already_opened_cell(self, x:int, y:int) -> None:      # this kind of a probing (when humans play) is either a chording, or a wasted click (it doesn't do anything)
-        print('\nhandle_probing_of_already_opened_cell()')
+        # print('\nhandle_probing_of_already_opened_cell()')
         neighbours = self.get_neighbours_of(x, y)                               # finds all the actual cells neighbouring (x,y)
         n_surrounding_flags = self.count_flags(neighbours)
         label = self.map[y][x]
@@ -168,7 +165,7 @@ class Minesweeper:
             pass
 
     def handle_opening_a_new_cell(self, x:int, y:int) -> None:                  # ALL NEW CELL OPENINGS GO HERE, doesn't matter how the cell was opened (player/bot/single click/chord)
-        print('\nhandle_opening_of_a_new_cell()')
+        # print('\nhandle_opening_of_a_new_cell()')
         self.opened.add((x, y))                                                 # why: in case a zero is clicked open, I'm using handle_click recursively to open up all the surrounding cells that are not mines. For that, this list is needed, so that an endless recursion doesn't occur.
         neighbours = self.get_neighbours_of(x, y)
 
@@ -203,7 +200,7 @@ class Minesweeper:
         return count
 
     def get_cells_of_type(self, wanted_cell_type:str, coordinates:list, negative=False) -> list:
-        print(f'\nget_cells_of_type({wanted_cell_type})')
+        # print(f'\nget_cells_of_type({wanted_cell_type})')
         l = []
         for c in coordinates:
             if negative:
@@ -212,13 +209,12 @@ class Minesweeper:
             else:
                 if self.map[c[1]][c[0]] == wanted_cell_type:
                     l.append(c)
-        print('- l length:', len(l))
         return l
 
     def handle_chord(self, x:int, y:int):
-        print('\nchord')
+        # print('\nchord')
         neighbours = self.get_neighbours_of(x,y)
-        print(f'- ({x,y}) neighbours:', neighbours)
+        # print(f'- ({x,y}) neighbours:', neighbours)
         for neighbour in neighbours:
             if self.map[neighbour[1]][neighbour[0]] == unclicked:                       # without this, it would chord also flagged cells
                 self.probe(neighbour[0], neighbour[1])
@@ -232,8 +228,11 @@ class Minesweeper:
             self.minecount -= 1
 
     def bot_act(self) -> None:                                                          # before this, if started with 'b', there's been in order (1) 'self.handle_first_left_click()' (2) 'self.generate_map()' (3) 'self.probe()'
-        print('\nbot_act():')                                                           # the following prints will be '- something', '- something_else'. I like this way of console printing because it makes it faster to search for the useful stuff at a given moment in the console, and makes it clear which print originates from which function.
-
+        # print('\nbot_act():')                                                           # the following prints will be '- something', '- something_else'. I like this way of console printing because it makes it faster to search for the useful stuff at a given moment in the console, and makes it clear which print originates from which function.
+        
+        width = self.width
+        height = self.height
+        
         def brain() -> None:
 
             def remove_obsolete_front() -> None:
@@ -258,6 +257,13 @@ class Minesweeper:
                             self.obsolete_front.add((x,y))
                 remove_obsolete_front()
 
+            def check_minecount_zero():
+                if self.minecount == 0:
+                    for x in range (width):
+                        for y in range (height):
+                            if self.map[y][x] == labellize('unclicked'):
+                                self.probe(x,y,True)
+            
             # this function's "for x,y in self.front" loop finds SIMPLE non-CSP solutions: (1) where the number of neighbouring unflagged unclicked cells + flagged cells equals to the label -> flag all, and (2) if label = number of surrounding flags, then perform a chord. Then, I remove unnecessary cells from the front to cut unnecessary computing work for the linear equation CSP solver.
             def simple_solver() -> None:    
                 for x,y in self.front:
@@ -274,6 +280,9 @@ class Minesweeper:
                     if label == labellize(number_of_surrounding_flags):                     # NB! 'if', not 'elif'. If the number of flagged neighbours equals to the label of the current front cell,
                         if len(unflagged_unclicked_neighbours) >= 1:                        # then if there also are unclicked cells around the current front cell,
                             self.handle_chord(x,y)                                          # then open all of them (i.e. 'chord' at this current front cell (x,y)).
+                
+                check_minecount_zero()
+                
                 filter_front_cells()
 
             simple_solver()
@@ -300,12 +309,12 @@ class Minesweeper:
             feed_csp_solver()
 
             def csp_solve():
-                self.solver.absolut_brut()
+                self.solver.absolut_brut(self.minecount)
                 solved_vars = self.solver.solved_variables      # each is a tuple ((x,y), value)
                 print('csp_solve():')
-                print('-solved_vars:', solved_vars)
+                # print('-solved_vars:', solved_vars)
                 for (x,y), value in solved_vars:
-                    print(f'- solved {x,y} = {value}')
+                    # print(f'- solved {x,y} = {value}')
                     if value == 1:
                         flag_these([(x,y)])
                     elif value == 0:                            
@@ -375,11 +384,6 @@ class Minesweeper:
             surface = transparent_highlight_surface(255,255,0,128)
             for x,y in self.front:
                 self.screen.blit(surface, (x*self.cell_size, y*self.cell_size + self.infobar_height))
-
-        def highlight_obsolete_front_grey() -> None:
-            surface = transparent_highlight_surface(0,0,0,128)
-            for x,y in self.obsolete_front:
-                self.screen.blit(surface, ((x*self.cell_size, y*self.cell_size + self.infobar_height)))
         
         def highlight_start_location_blue() -> None:
             surface = transparent_highlight_surface(0,0,255,128)

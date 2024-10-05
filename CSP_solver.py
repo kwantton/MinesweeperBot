@@ -11,9 +11,14 @@ class CSP_solver:
         self.solved_variables = set()                                   # ((x,y), value); the name of the variable is (x,y) where x and y are its location in the minesweeper map (if applicable), and the value of the variable is either 0 or 1, if everything is ok (each variable is one cell in the minesweeper map, and its value is the number of mines in the cell; 0 or 1, that is)
         self.impossible_combinations = set()
         self.mines_total = mines_total
+        self.previous_minecount = -1                                    # if this stays the same for 2 rounds, then use minecount
 
     # 100% solution: (1) PER EACH EQUATION that MUST be satisfied (i.e. each number cell on the minesweeper map), try all combinations of ones (=mines). That's what THIS function does. (2) After this function below, from all of the alternative combinations of 1s and 0s that DO satisfy the CURRENT equation, find those alternatives that are incompatible with all other equations, pairing one group's all possible alts with compatible alts of ONE other group (i.e. "groups", i.e. incompatible with ALL the alternative solutions of at least one other group) (3) from the remaining alt equations per group (i.e. PER original equation), find columns where a variable is always 0 or 1 -> it HAS to be 0 or 1 ALWAYS. Then see these new solutions, inspect the remaining equations for untrue alternatives now that we've solved a new variable (or many new variables), and keep repeating the whole loop (1),(2),(3) as long as new solutions keep coming. Stop iteration when there are no longer new solutions produced by the whole loop.
-    def absolut_brut(self) -> None:
+    def absolut_brut(self, minecount=100) -> None:
+
+        print("previous minecount:", self.previous_minecount)
+        self.previous_minecount = minecount
+        print("minecount from CSP_solver:", minecount)                                  # the number of unlocated maps at this point
 
         if not self.unique_equations:
             return
@@ -59,11 +64,11 @@ class CSP_solver:
             groupN_to_eqs = dict()
             groupN_to_vars = dict()                                                 # group_n : {var1, var2, var3..}
             completely_grouped_eqs = set()
-            n_calls_of_add_eqs = 0
+            # n_calls_of_add_eqs = 0
 
             def add_eqs_containing_current_var_to_current_group(group_n, variable):
-                nonlocal n_calls_of_add_eqs                                         # FOR DEBUG: I wanted to see how many times it ends up here. Turns out, 10-90 times depending on the test, which is not too bad since it comes right back in 90% of the cases.
-                n_calls_of_add_eqs += 1
+                # nonlocal n_calls_of_add_eqs                                         # FOR DEBUG: I wanted to see how many times it ends up here. Turns out, 10-90 times depending on the test, which is not too bad since it comes right back in 90% of the cases.
+                # n_calls_of_add_eqs += 1
                 if variable in called_vars:                                         # this function will pass this check (i.e. will NOT return) exactly as many times as how many UNIQUE variables there are; if a,b,c,d, then 4 times in total, no more. Quite practical.
                     return
                 next_up = self.variable_to_equations[variable]
@@ -81,7 +86,7 @@ class CSP_solver:
             group_n = 1
             for key, eqs in self.variable_to_equations.items():
                 if len(called_vars) == len(self.variables):                         # if ALL the variables have been classified, then return. Usually, this return happens after the first round, if all the variables are connected! This saves quite a bit of work. This saves a LOT of work later on when connecting equation pairs, and when building solution trees; I'm keeping separate groups separate!
-                    print("n_calls_of_add_eqs:", n_calls_of_add_eqs)
+                    # print("n_calls_of_add_eqs:", n_calls_of_add_eqs)
                     return groupN_to_vars
                 groupN_to_vars[group_n] = set()                                     # initialize for this 'group_n'
                 for variables, summa in eqs:
@@ -113,16 +118,16 @@ class CSP_solver:
             comp_groups_and_starting_groups = []
             for alternative_answers_per_eq in alternative_answers_per_equation_per_set_of_eqs:
                 compatibility_groups = dict()                                   # { possible solution : all related possible solutions (i.e. those which share variables and do not disagree for any variable value for those variables that are present in both the key and each of the values in this dictionary for that key!) }. There's no need for explicit bookkeeping regarding which of the value solutions belong to which original equation, because the variables included themselves are enough to identify the origin.
-                # NB! I need to add the keys also for the last groupA even though it has no groupB to pair it with! This is because checks in later functions require the existence of viable alts in 'compatibility_groups' keys!
+                
                 for a in range(len(alternative_answers_per_eq)):                # e.g. ( (('a',0), ('b',1)), (('a',1),('b',0)) ) would constitute one 'group' (length 2) for the equation 'a+b=1' which is stored as ((a,b),1) in 'self.unique_variables'; that is, all the possible solutions for that equation constitute a 'group'
                     if a == 0:
                         groupA = alternative_answers_per_eq[a]
                         starting_group = alternative_answers_per_eq[a]
                     else:
                         groupA = sorted(tuple(next_round_groupA))               # from the previous round! Since this is from a set, it may become disordered -> for comparison if equal with groupB, sorting is needed!
-                    if a == len(alternative_answers_per_eq)-1:
+                    if a == len(alternative_answers_per_eq)-1:                  # NB! See comment below. Here, I need to add the keys also for the last groupA even though it has no groupB to pair it with. This is because checks in 'traverse()' later require the existence of at least one viable alt per group in the keys of 'compatibility_groups', for EVERY group (i.e. for all original equations from the minesweeper map)
                         for alt in groupA:
-                            compatibility_groups[alt] = set()                   # all viable alts must be found in keys of 'compatibilty_groups'. On the last round, groupA is the compatible alt solutions of last round's groupB, and these are all ok. Therefore, all of them must be added to 'compatibility_groups'.
+                            compatibility_groups[alt] = set()                   # all viable alts must be found in keys of 'compatibilty_groups'. On the last round, groupA consists of the compatible alt solutions of last round's groupB, and these are all ok. Therefore, all of them must be added to 'compatibility_groups'.
                         break
                     b = a+1
                     groupB = alternative_answers_per_eq[b]
@@ -160,7 +165,7 @@ class CSP_solver:
                     if not next_round_groupA:                                   # if this happens, it means BIG TROUBLE occurring in this function. This means that none of the altAs were compatible with any of the altBs -> group A and B are not compatible -> NO SOLUTION POSSIBLE! This should NEVER happen since a universal solution must always be found.
                         # if a!= len(alternative_answers_per_eq)-2:
                         "TROUBLE"
-                    # else:                                                     # this works well, but the tests break. The idea behind this commented-out part is that it first looks for the obvious solutions, before using the heavy machinery. This saves computation in cases where 'self.front' is big in 'botGame.py'.
+                    # else:                                                     # this works well, but the tests break, because this returns before ALL possible solutions have been found! The idea behind this commented-out part is that it first looks for the obvious solutions, before using the heavier machinery of solution tree building. This saves computation in cases where there are many separate parts of 'self.front' and/or one or more of them is big, in 'botGame.py'.
                     #     if n_compatible_altBs == 1:
                     #         for value, variable in tuple(next_round_groupA)[0]: # at this point, 'next_round_groupA' consists of all the altB equations from groupB that were compatible with groupA! As there's only one equation now, all its variables have now been solved.
                     #             self.solved_variables.add((value, variable))
@@ -401,6 +406,14 @@ FAILED tests:''')
     csp = CSP_solver()
     csp.handle_incoming_equations([eq1, eq2, eq3, eq4])
     csp.absolut_brut()
+    # for solved_variable in csp.solved_variables:
+    #     print(solved_variable)
+# ('d', 0)
+# ('a', 0)
+# ('e', 1)
+# ('c', 1)
+# ('b', 1)
+    
     
     expected_result = '01101'
     test_info_dict[name] = [csp, expected_result]
