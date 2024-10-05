@@ -9,19 +9,30 @@ class CSP_solver:
         self.variables = set()                                          # ALL variables, solved or not
         self.unique_equations = set()                                   # { ((var1, var2, ..), sum_of_mines_in_vars), (...) }. Each var (variable) has format (x,y) of that cell's location; cell with a number label 1...8 = var. Here, I want uniqe EQUATIONS, not unique LOCATIONS, and therefore origin-(x,y) is not stored here. It's possible to get the same equation for example from two different sides, and via multiple different calculation routes, and it's of course possible to mistakenly try to add the same equation multiple times; that's another reason to use a set() here, the main reason being fast search from this hashed set.        
         self.solved_variables = set()                                   # ((x,y), value); the name of the variable is (x,y) where x and y are its location in the minesweeper map (if applicable), and the value of the variable is either 0 or 1, if everything is ok (each variable is one cell in the minesweeper map, and its value is the number of mines in the cell; 0 or 1, that is)
-        self.impossible_combinations = set()
         self.mines_total = mines_total
-        self.previous_minecount = -1                                    # if this stays the same for 2 rounds, then use minecount
+        self.previous_round_minecount = -1                              # if this stays the same for 2 rounds, then use minecount
+        self.impossible_combinations = set()
 
     # 100% solution: (1) PER EACH EQUATION that MUST be satisfied (i.e. each number cell on the minesweeper map), try all combinations of ones (=mines). That's what THIS function does. (2) After this function below, from all of the alternative combinations of 1s and 0s that DO satisfy the CURRENT equation, find those alternatives that are incompatible with all other equations, pairing one group's all possible alts with compatible alts of ONE other group (i.e. "groups", i.e. incompatible with ALL the alternative solutions of at least one other group) (3) from the remaining alt equations per group (i.e. PER original equation), find columns where a variable is always 0 or 1 -> it HAS to be 0 or 1 ALWAYS. Then see these new solutions, inspect the remaining equations for untrue alternatives now that we've solved a new variable (or many new variables), and keep repeating the whole loop (1),(2),(3) as long as new solutions keep coming. Stop iteration when there are no longer new solutions produced by the whole loop.
-    def absolut_brut(self, minecount=100) -> None:
-
-        print("previous minecount:", self.previous_minecount)
-        self.previous_minecount = minecount
-        print("minecount from CSP_solver:", minecount)                                  # the number of unlocated maps at this point
+    def absolut_brut(self, minecount=-1, need_for_minecount = False, all_unclicked = []) -> None:   # mineconting logic is used ONLY if the minecount is not changing, i.e., if CSP_solver is currently incapable of solving any more of the map (not enough information -> normal logic is not enough). In this situation, add another equation, which is unclicked_cell_1 + unclicked_cell_2 + unclicked_cell_3 + .... = total number of mines remaining in the entire map. In some cases, that helps solve the remaining situation, sometimes not.
 
         if not self.unique_equations:
             return
+        
+        print("minecount from CSP_solver:", minecount)                      # the number of unlocated maps at this point
+        print("previous round minecount:", self.previous_round_minecount)
+        
+        def handle_minecount():
+            print("NEED FOR MINECOUNT")
+            total_eq = (tuple(coord for coord in all_unclicked), minecount)
+            self.unique_equations.add(total_eq)
+            print('total_eq:', total_eq)
+            print('variables in total_eq = len(total_eq[0]):', len(total_eq[0]))
+            
+        if need_for_minecount:
+            handle_minecount()
+        self.previous_round_minecount = minecount
+        
 
         # for each separate group of eqs, for each equation (i.e. each number cell on the minesweeper map), given that each variable (= each unopened cell) is 0 or 1 (no mine or a mine), find all possible combinations of 1s and 0s that can satisfy that SINGLE equation GIVEN THAT it has sum = k (some integer number = the number of mines in those unopened surrounding cells in total!)
         def find_and_group_possible_answers_per_single_equation(groups_of_eqs:list) -> list:
@@ -591,6 +602,19 @@ FAILED tests:''')
 
     
     expected_result = '00110000'
+    test_info_dict[name] = [csp, expected_result]
+    # print_solved_variables(csp, name, expected_result) # expected cdefg 00110
+
+    ########################## Test 6: letters. Minecount! Make a situation where there's one number cell '1' pointing to two adjacent cells, a and b, and there's also a third cell 'c' that's not seen by any number cell; it's boxed by flags. I just ran into a situation like this and the minecount didn't work; so this is truly a test for debugging! #
+    
+    eq1     = [-1, -1, ('a', 'b'), 1]                         
+    
+    name = 'test 6a, letters, MINECOUNT=1. c=0 expected.'
+    csp = CSP_solver()
+    csp.handle_incoming_equations([eq1])
+    csp.absolut_brut(minecount=1, need_for_minecount=True, all_unclicked=['a','b','c'])                 # So, here 'a' and 'b' are seen by number cell that says '1'. So, a+b=1. But also, there's an isolated cell c in the corner, surrounded by three flags, hence not seen by any number cell. The wanted result here is that c=0, because the remaining minecount is 1, and a+b=1, so c=0.
+    
+    expected_result = '0'                                                                               # c=0
     test_info_dict[name] = [csp, expected_result]
     # print_solved_variables(csp, name, expected_result) # expected cdefg 00110
 

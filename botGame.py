@@ -77,6 +77,8 @@ class Minesweeper:
         self.solver = CSP_solver(mines_total = self.mines)                          # minecount is needed in 'CSP_solver' in those rarish cases where information about the remaining minecount near the end of the game is needed to be able to solve the last few cases that would otherwise require guessing.
         
         self.minecount = self.mines
+        self.previous_round_minecount = -1                                          # inspect: if current minecount == previous, then try minecount logic. Then if that doesn't work, try quessing (last resort)
+
         self.map = [[unclicked for x in range(self.width)] for y in range(self.infobar_height, self.height + self.infobar_height)]   # map = all the mines. Since the infobar is on top, the '0' y for mines = infobar_height. This map records the names of the images of each cell on the map.
 
     def inspect_event(self, event) -> None:
@@ -264,6 +266,19 @@ class Minesweeper:
                             if self.map[y][x] == labellize('unclicked'):
                                 self.probe(x,y,True)
             
+            def check_for_stalling():
+                all_unclicked = []
+                need_for_minecount = False
+                if self.minecount == self.previous_round_minecount:                                             # don't waste resources going through the whole map below (not terrible, but not needed. Also expert has 480 cells; don't go through them all if you don't have to) if the minecount keeps steadily decreasing; i.e., if minecount is not needed, don't use it, use 'normal' logic
+                    if self.minecount < 10:
+                        need_for_minecount = True
+                        for x in range (width):
+                            for y in range (height):
+                                if self.map[y][x] == labellize('unclicked'):
+                                    all_unclicked.append((x,y))                
+                self.previous_round_minecount = self.minecount                                                  # update for the next round, based on the current minecount
+                return need_for_minecount, all_unclicked
+            
             # this function's "for x,y in self.front" loop finds SIMPLE non-CSP solutions: (1) where the number of neighbouring unflagged unclicked cells + flagged cells equals to the label -> flag all, and (2) if label = number of surrounding flags, then perform a chord. Then, I remove unnecessary cells from the front to cut unnecessary computing work for the linear equation CSP solver.
             def simple_solver() -> None:    
                 for x,y in self.front:
@@ -282,7 +297,6 @@ class Minesweeper:
                             self.handle_chord(x,y)                                          # then open all of them (i.e. 'chord' at this current front cell (x,y)).
                 
                 check_minecount_zero()                                                      # if minecount is zero, then probe all 'unclicked' cells, since they cannot be mines -> map completed! This situation needs separate handling because the last 'unclicked' cells can be inside completely flagged boxes, isolating them from 'self.front'. It took me 5 weeks to even arrive in that kind of a situation! It's extremely rare, as it needs at least 3 already-flagged cells in a cordner, or 5 in a center edge, or 8 or more in the middle! Awesomesauce.
-                
                 filter_front_cells()
 
             simple_solver()
@@ -309,7 +323,8 @@ class Minesweeper:
             feed_csp_solver()
 
             def csp_solve():
-                self.solver.absolut_brut(self.minecount)
+                need_for_minecount, all_unclicked_cells = check_for_stalling()
+                self.solver.absolut_brut(self.minecount, need_for_minecount, all_unclicked_cells)
                 solved_vars = self.solver.solved_variables      # each is a tuple ((x,y), value)
                 print('csp_solve():')
                 # print('-solved_vars:', solved_vars)
@@ -446,10 +461,11 @@ class Minesweeper:
             self.draw_display()                                             # (2) then draw the screen after handling them
 
 if __name__ == '__main__':
-    dense_beg = 9,9,70
     beginner = 9,9,10
     intermediate = 16,16,40
     expert = 30,16,99
+    dense_beg = 9,9,70
+    less_dense_beg = 9,9,15
 
     ''' ↓↓↓ STARTS A NEW MINESWEEPER with the ability to play the bot by pressing b ↓↓↓ (instructions in the game) '''
     # Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=False) # IF YOU WANT ONLY simple_solver(), which WORKS at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
