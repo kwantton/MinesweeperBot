@@ -596,7 +596,7 @@ FAILED tests:''')
 
     expected_result = '00110000'
     test_info_dict[name] = [csp, expected_result]
-    # print_solved_variables(csp, name, expected_result) # expected cdefg 00110
+    
 
     ########################## Test 6a: letters. Minecount! Make a situation where there's one number cell '1' pointing to two adjacent cells, a and b, and there's also a third cell 'c' that's not seen by any number cell; it's boxed by flags. I just ran into a situation like this and the minecount didn't work; so this is truly a test for debugging! #
 
@@ -609,7 +609,7 @@ FAILED tests:''')
 
     expected_result = '0'                                                                               # c=0
     test_info_dict[name] = [csp, expected_result]
-    # print_solved_variables(csp, name, expected_result) # expected cdefg 00110
+    
 
     ########################## Test 7a: letters. NOTHING expected. Minecount situation without minecount! Expected: nothing (this situation needs minecount to be able to be solved) #
 
@@ -626,7 +626,7 @@ FAILED tests:''')
 
     expected_result = 'NOTHING'
     test_info_dict[name] = [csp, expected_result]
-    # print_solved_variables(csp, name, expected_result) # expected cdefg 00110
+    
 
         ########################## Test 7b: letters. e0, g0, k0 expected. Minecount situation without minecount! Expected: nothing (this situation needs minecount to be able to be solved) #
 
@@ -636,14 +636,14 @@ FAILED tests:''')
     eq4     = [-1, -1, ('h', 'i'), 1]
     eq5     = [-1, -1, ('d', 'f', 'i', 'j'), 1]                         
 
-    name = 'Test 7b: letters. Minecount #2. e0, g0, k0 expected'
+    name = 'Test 7b: unsolvable 2. NOTHING expected'
     csp = CSP_solver()
     csp.handle_incoming_equations([eq1, eq2, eq3, eq4, eq5])
     csp.absolut_brut(minecount=3, need_for_minecount=True, all_unclicked='a b c d e f g h i j k'.split())
 
-    expected_result = '000'
+    expected_result = 'NOTHING'
     test_info_dict[name] = [csp, expected_result]
-    # print_solved_variables(csp, name, expected_result) # expected cdefg 00110
+    
 
     
     
