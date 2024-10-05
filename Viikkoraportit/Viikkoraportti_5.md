@@ -7,13 +7,13 @@ Lisäksi:
   - minecount-tilanteen testi tehty `CSP_solver`:issa, ja tämä testi menee läpi
   - KAIKKI TESTIT MENEVÄT LÄPI
   - nopeutettu `CSP_solver`:ia tekemällä `find_equation_groups()`, joka jakaa yhtälöt joukkoihin suoraan tai epäsuorasti yhteisten muuttujien perusteella -> `chain_link_equations()` ja seuraava `join_comp_groups_into_solutions()` jossa tarkastetaan `map`:ien avulla rakennetut alt-ratkaisupuut ovat nopeampia tämän ansiosta
-  - minecount-tilanteiden logiikan pitäisi olla melkein valmis (debuggaus menossa): testi #9 menee jo läpi, mutta jostain syystä `botGame`:n kautta se ei vielä näytä osaavan hommaansa
+  - minecount-tilanteiden pikkuversio (hidas, raskas) on valmis; minecount-tilanteet, joissa miinoja mapissa on jäljellä enää 10 tai vähemmän, ratkeavat nyt `CSP_solver`:issa. Tämä on sen ansiota, että jos muuten jäädään jumiin (jos kaksi botin rundia peräkkäin ei saada enää uusia miinoja liputettua) lisätään mukaan yhtälö, jossa kaikki jäljelläolevat ruudut = jäljelläoleva miinamäärä. Tämän ansiosta tällä lisätiedolla ratkeavat tilanteet ratkeavat. Ongelmana on se, että jos mapissa on vaikka 30 avaamatonta ruutua jäljellä, ja 10 miinaa, niin ruvetaan väsäämään $\{30 \choose 10\}$-kombinaatioita kyseiselle yhtälölle. Ei kiva.
 
 
 2. Miten edistynyt: Erittäin hyvin. Minecount-tilanteet korjaamatta. Kun ne on korjattu, niin solver osaa ratkaista kaikki logiikkatapaukset.
   - tilanteesta 4/8 testiä läpi tilanteeseen 9/9 testiä läpi
-  - minecount tulossa
-  - nopeampi `CSP_solver`, joka osaa jakaa yhtälöt erillisiin joukkoihin ja ratkaista ne ominaan. Tämä rajoittaa huomattavasti alt-ratkaisupuiden maksimikokoa
+  - minecountin järkevämpi versio (vähemmän brut) tulossa
+  - nopeampi `CSP_solver`, joka osaa jakaa yhtälöt erillisiin joukkoihin ja ratkaista ne ominaan. Tämä rajoittaa huomattavasti alt-ratkaisupuiden maksimikokoa, mikä on ollut (melko varmasti) nopeudessa pullonkaulana isoimmissa tilanteissa tähän mennessä
 
 3. Mitä opin:
 - Pythonin rekursiossa lapsifunktio muuttaa myös vanhempien arvoja (kun ne ovat parametreina). Pelottavaa! En muistanut ollenkaan. Pitää kerrata lisää, että varmasti osaan oikein jatkossa. Oli hankalaa debuggata rekursiota `traverse()`:ssa.
