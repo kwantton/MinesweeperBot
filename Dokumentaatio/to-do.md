@@ -19,4 +19,4 @@ Päädyin tekemään ratkaisijan `CSP_solver` pitkälti uudestaan niin, että
 
 ## TO-DO:
 
-- minecount; ainoa, mitä tällä hetkellä solver EI osaa, on ne harvinaiset tilanteet, joissa pelin lopussa jäljellä olevien miinojen lukumäärästä voi päätellä, mikä ratkaisu / mitkä ratkaisut ovat mahdollisia ja mitkä eivät. Tämä on sikäli yksinkertaisesti yksi yhtälö lisää: jäljelläolevat avaamattomat ruudut = jäljelläolevien miinojen lukumäärä (ruutu 0 ei miinaa, ruutu 1 miina)
+- minecount; ainoa, mitä tällä hetkellä solver EI osaa, ovat isokokoiset versiot (yli 10 miinaa mapissa jäljellä) niistä harvinaisista tilanteet, joissa pelin lopussa jäljellä olevien miinojen lukumäärästä voi päätellä, mikä ratkaisu / mitkä ratkaisut ovat mahdollisia ja mitkä eivät. Tämä on sikäli yksinkertaisesti yksi yhtälö lisää: jäljelläolevat avaamattomat ruudut = jäljelläolevien miinojen lukumäärä (ruutu 0 ei miinaa, ruutu 1 miina). Pienemmät versiot ratkeavat, mutta osa niistäkin todella hitaasti.
