@@ -4,12 +4,9 @@
 
 Graafinen käyttöliittymä on toteutettu `pygame`:ä käyttäen.
 
-Botti aloittaa vasemmasta yläkulmasta, ja etenee `self.front`:ia, jota se tällä hetkellä (24.9.24) onnistuneesti ylläpitää (poistaa `self.front`:ista joka kierroksen jälkeen ruudut, jotka eivät tarjoa enää informaatiota jota voidaan hyödyntää ratkaisun kannalta, ja lisää `self.front`:iin sellaiset avatut ruudut, jotka tarjoavat informaatiota. Tämän 'hyödyllisyyden' määritelmä on yksinkertaisesti se, onko kyseisen avatun ruudun ympärillä enää avaamattomia ruutuja vai ei; jos on, ruutu on `self.front`:issa)
+Botti aloittaa vasemmasta yläkulmasta, ja etenee `self.front`:ia, jota se tällä hetkellä (5.10.24) onnistuneesti ylläpitää (poistaa `self.front`:ista joka kierroksen jälkeen ruudut, jotka eivät tarjoa enää informaatiota jota voidaan hyödyntää ratkaisun kannalta, ja lisää `self.front`:iin sellaiset avatut ruudut, jotka tarjoavat informaatiota. Tämän 'hyödyllisyyden' määritelmä on yksinkertaisesti se, onko kyseisen avatun ruudun ympärillä enää avaamattomia ruutuja vai ei; jos on, ruutu on `self.front`:issa)
 
-Tällä hetkellä CSP:tä hyödyntävä botti osaa ratkaista suurimman osan tapauksista. Minulla on nyt kaksi vaihtoehtoa:
-
-(a) lisätä CSP:tä hyödyntävää logiikkaa tapaus kerrallaan (mitkä tapaukset? minulla ei ole matemaattista todistusta siitä, minkälainen rajallinen joukko tapauksia riittää; siis minkälaisiin tapauksiin loppujen lopuksi tiettyjä operaatioita hyödyntämällä voidaan redusoida kaikki muut tapaukset)
-(b) koska `self.front`:in kirjanpito toimii, käyttää kussakin yhtälöryppäässä, jotka jakavat yhteisen muuttujan, brute-force-tyyppistä ratkaisua (joka ei ole paha, koska yhtälöitä voi olla korkeintaan 8 per muuttuja ja jokainen muuttuja on 0 tai 1 - ei ole paljoa kokeiltavaa) selvittämään, onko kaikissa mahdollisissa ratkaisussa jokin muuttuja 1 tai 0 - jos on, niin se on ainoa mahdollinen ratkaisu.
+Tällä hetkellä CSP:tä hyödyntävä botti osaa ratkaista kaikki tapaukset paitsi ne minecount-tilanteet, joissa miinoja on jäljellä mapissa 11 tai enemmän (koska nykyinen minecount-ratkaisija on hidas ja raskas)
 
 - [ ] to-do: Saavutetut aika- ja tilavaativuudet (esim. O-analyysit pseudokoodista)
 - [ ] to-do: Suorituskyky- ja O-analyysivertailu (mikäli sopii työn aiheeseen)
@@ -40,8 +37,8 @@ Lopulta on joku rypäs mahdollisia ratkaisuja, jotka toteuttavat samaan aikaan k
 
 <h2>aiempia huomautuksia</h2>
 
-- monesti riittää pelkkä ympäröivän 8 ruudun tarkastelu, mutta joskus taas ei - tällöin otetaan käyttöön tietoa ympäröivien ruutujen miinaluvuista, ja tämä voi mennä hyvinkin monimutkaiseksi, kuten voi itselleen todistaa täällä https://minesweeper.online/game/3720717509 (no guessing mode, mappi 'evil')
-- optimaalisia arvauksia käsitellään jos päästään siihen vaiheeseen tämän algoritmin kehittämisessä, että kaikki mahdollinen logiikka on ratkaistu ja voidaan seuraavaksi alkaa tehdä myös fiksuja arvauksia pakon osuessa (mieluiten käyttäen ehdollisia todennäköisyyksiä), eli JOS ollaan jo tehokkaasti ratkaistu kaikki 'pelkällä logiikalla' ratkaistavissa olevat tilanteet, mukaan lukien käyttäen tietoa jäljelläolevien miinojen lukumääristä ja viereisten ruutujen lukuarvoista.
+- etenkin harvamiinaisissa kentissä (mapeissa) monesti riittää pelkkä ympäröivän 8 ruudun tarkastelu, mutta joskus taas ei - tällöin otetaan käyttöön tietoa ympäröivien ruutujen miinaluvuista, ja tämä voi mennä hyvinkin monimutkaiseksi, kuten voi itselleen todistaa täällä https://minesweeper.online/game/3720717509 (no guessing mode, mappi 'evil')
+- optimaalisia arvauksia käsitellään JOS päästään siihen vaiheeseen tämän algoritmin kehittämisessä, että kaikki mahdollinen logiikka (mukaanlukien minecount kaikissa mahdollisissa tapauksissa, koosta riippumatta kunhan koko on realistinen (expert yläarajana)) on ratkaistu ja voidaan seuraavaksi alkaa tehdä myös fiksuja arvauksia pakon osuessa (mieluiten käyttäen ehdollisia todennäköisyyksiä), eli JOS ollaan jo tehokkaasti ratkaistu kaikki 'pelkällä logiikalla' ratkaistavissa olevat tilanteet, mukaan lukien käyttäen tietoa jäljelläolevien miinojen lukumääristä ja viereisten ruutujen lukuarvoista.
 
 
 <h2>Viitteet</h2>
