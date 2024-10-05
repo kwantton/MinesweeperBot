@@ -19,4 +19,9 @@ Päädyin tekemään ratkaisijan `CSP_solver` pitkälti uudestaan niin, että
 
 ## TO-DO:
 
-- minecount; ainoa, mitä tällä hetkellä solver EI osaa, ovat isokokoiset versiot (yli 10 miinaa mapissa jäljellä) niistä harvinaisista tilanteet, joissa pelin lopussa jäljellä olevien miinojen lukumäärästä voi päätellä, mikä ratkaisu / mitkä ratkaisut ovat mahdollisia ja mitkä eivät. Tämä on sikäli yksinkertaisesti yksi yhtälö lisää: jäljelläolevat avaamattomat ruudut = jäljelläolevien miinojen lukumäärä (ruutu 0 ei miinaa, ruutu 1 miina). Pienemmät versiot ratkeavat, mutta osa niistäkin todella hitaasti.
+### minecountin parempi versio
+Tilanteissa, joissa ylläoleva ei riitä (eli jos ilman minecountia, eli mapissa jäljelläolevien miinojen kokonaismäärää, ei saada pääteltyä mitään lisää, minkä tunnistaa siitä että kaksi peräkkäistä botin rundia ei olla liputettu mitään lisää eikä avattu mitään lisää), tehdään seuraavasti: kullekin vaihtoehtoiselle kokonaisratkaisulle, joissa voi siis olla eri määrä miinoja, eli jokaiselle koko mapin tämänhetkiselle koko `self.frontin` vaihtoehtoiselle ratkaisulle joka saadaan yhdistämällä `join_comp_groups_into_solutions()`:in `handle_possible_whole_solutions()`:issa kootut mahdolliset kunkin yhtälöjoukon alt-ratkaisut yhteen, tarkistetaan seuraava:
+
+kullekin vaihtoehtoiselle `self.front`:in kokonaisratkaisulle, jos
+
+| niiden 'unclicked'-ruutujen lukumäärä, joista ei tiedetä vielä mitään, eli joita `self.front` ei näe | $\cdot 1 +$ | vaihtoehtoisen koko `self.front`:in kokonaisratkaisun miinojen lukumäärä | $<$ | koko loppumapissa jäljellä olevien miinojen lukumäärä | $\Rightarrow$ tässä `self.front`:in ratkaisuehdotuksessa on liian vähän miinoja, joten se hylätään
