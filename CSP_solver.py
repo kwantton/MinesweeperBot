@@ -619,7 +619,7 @@ FAILED tests:''')
     eq4     = [-1, -1, ('h', 'i'), 1]
     eq5     = [-1, -1, ('d', 'f', 'i', 'j'), 1]                         
 
-    name = 'test 6a, letters, MINECOUNT=1. NOTHING expected.'
+    name = 'test 7a, letters. NOTHING expected.'
     csp = CSP_solver()
     csp.handle_incoming_equations([eq1, eq2, eq3, eq4, eq5])
     csp.absolut_brut()
@@ -628,7 +628,7 @@ FAILED tests:''')
     test_info_dict[name] = [csp, expected_result]
     
 
-        ########################## Test 7b: letters. e0, g0, k0 expected. Minecount situation without minecount! Expected: nothing (this situation needs minecount to be able to be solved) #
+    ########################## Test 7b: letters. e0, g0, k0 expected. Minecount situation without minecount! Expected: nothing (this situation needs minecount to be able to be solved) #
 
     eq1     = [-1, -1, ('a', 'b', 'c'), 1]
     eq2     = [-1, -1, ('b', 'd'), 1]
@@ -643,9 +643,28 @@ FAILED tests:''')
 
     expected_result = 'NOTHING'
     test_info_dict[name] = [csp, expected_result]
-    
 
-    
+    ########################## Test 8a: Expert_minecount-solvable_1. c0, d1, e1, f0, g0, i0, j0, t0 expected ##############################
+
+    eq1     = [-1, -1, ('a', 'b'), 1]
+    eq2     = [-1, -1, ('c', 'd'), 1]
+    eq3     = [-1, -1, ('e', 'f'), 1]
+    eq4     = [-1, -1, ('d', 'g'), 1]   
+    eq5     = [-1, -1, ('k', 'l', 'm'), 1]
+    eq6     = [-1, -1, ('l', 'm', 'n'), 1]
+    eq7     = [-1, -1, ('m', 'n', 'o'), 1]
+    eq8     = [-1, -1, ('n', 'o', 'p'), 1]
+    eq9     = [-1, -1, ('o', 'p', 'q'), 1]
+    eq10    = [-1, -1, ('p', 'q', 'r'), 1]
+    eq11    = [-1, -1, ('e', 'h', 'q', 'r', 's'), 2]
+
+    name = 'Test 8a: Expert_minecount-solvable_1. c0, d1, e1, f0, g0, i0, j0, t0 expected'
+    csp = CSP_solver()
+    csp.handle_incoming_equations([eq1, eq2, eq3, eq4, eq5, eq6, eq7, eq8, eq9, eq10, eq11])
+    csp.absolut_brut(minecount=6, need_for_minecount=True, all_unclicked='a b c d e f g h i j k l m n o p q r s t'.split())
+
+    expected_result = '01100000'
+    test_info_dict[name] = [csp, expected_result]
     
     
     print_multiple_results(test_info_dict)
