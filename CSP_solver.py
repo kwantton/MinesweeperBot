@@ -263,9 +263,6 @@ class CSP_solver:
                     alt_solution_build = {}
                     traverse(alt_origin, seen_proposed_vectors, 
                         alt_solution_build, handled_groups)                         # 'traverse' builds alternative 'possible_whole_solutions' and saves all viable ones to 'possible_whole_solutions'
-                
-            def minecount(possible_whole_solutions):
-                pass
 
             def handle_possible_whole_solutions():
                 final_answers = dict()
@@ -283,8 +280,6 @@ class CSP_solver:
                 for var, val in final_answers.items():
                     if val != 'either or':
                         self.solved_variables.add((var, val))                               # reduces redundant work in 'update_related_info...' if ALL of these are added first, before the loop below calling that function for all of those newly solved variables.
-                if new_answer_count == 0:
-                    minecount(possible_whole_solutions)
             
             handle_possible_whole_solutions()
                 
