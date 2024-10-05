@@ -249,7 +249,7 @@ class Minesweeper:
                 self.new_front_members.clear()                                              # now that they are added, reset this list for the next round of bot_act()
 
             # NB! This is the most straightforward way of removing obsolete front cells from 'self.front' in one go. For each cell in 'self.front', it checks if it has unclicked neighbours. If not, it removes all those cells from 'self.front'. Previously, I had this whole functionality split up into subcases: chording cases and cases of entering a new cell, but that serves no actual purpose, it's too complicated, error-prone and doesn't really save processing (almost) at all. This is much better, universal, reusable and clearer, and is utilized by the CSP-bot as well too. This function is for ensuring that there DEFINITELY are no obsolete front cells in self.front any longer, as that has been my problem for days now.
-            def filter_front_cells():
+            def filter_front_cells() -> None:
                 add_new_front_cells_to_self_front()                                         # I switched the order of 'add_new..' and 'remove_obsolete...' around; the only way to make absolutely sure that no obsolete front survives the filtering is to (1) FIRST add the new self.front members and (2) from THESE ALSO, filter out the unneeded ones (obsolete ones).
                 for x,y in self.front:
                     neighbours = self.get_neighbours_of(x, y)
@@ -259,24 +259,24 @@ class Minesweeper:
                             self.obsolete_front.add((x,y))
                 remove_obsolete_front()
 
-            def check_minecount_zero():
+            def check_minecount_zero() -> None:
                 if self.minecount == 0:
                     for x in range (width):
                         for y in range (height):
                             if self.map[y][x] == labellize('unclicked'):
                                 self.probe(x,y,True)
             
-            def check_for_stalling():
+            def check_for_stalling() -> tuple:
                 all_unclicked = []
                 need_for_minecount = False
-                if self.minecount == self.previous_round_minecount:                                             # don't waste resources going through the whole map below (not terrible, but not needed. Also expert has 480 cells; don't go through them all if you don't have to) if the minecount keeps steadily decreasing; i.e., if minecount is not needed, don't use it, use 'normal' logic
-                    if self.minecount < 10:
+                if self.minecount == self.previous_round_minecount:                         # don't waste resources going through the whole map below (not terrible, but not needed. Also expert has 480 cells; don't go through them all if you don't have to) if the minecount keeps steadily decreasing; i.e., if minecount is not needed, don't use it, use 'normal' logic
+                    if self.minecount <= 10:                                                # TO-DO: this is arbitrary
                         need_for_minecount = True
                         for x in range (width):
                             for y in range (height):
                                 if self.map[y][x] == labellize('unclicked'):
                                     all_unclicked.append((x,y))                
-                self.previous_round_minecount = self.minecount                                                  # update for the next round, based on the current minecount
+                self.previous_round_minecount = self.minecount                              # update for the next round, based on the current minecount
                 return need_for_minecount, all_unclicked
             
             # this function's "for x,y in self.front" loop finds SIMPLE non-CSP solutions: (1) where the number of neighbouring unflagged unclicked cells + flagged cells equals to the label -> flag all, and (2) if label = number of surrounding flags, then perform a chord. Then, I remove unnecessary cells from the front to cut unnecessary computing work for the linear equation CSP solver.
@@ -323,10 +323,10 @@ class Minesweeper:
             feed_csp_solver()
 
             def csp_solve():
+                print('\ncsp_solve():')
                 need_for_minecount, all_unclicked_cells = check_for_stalling()
                 self.solver.absolut_brut(self.minecount, need_for_minecount, all_unclicked_cells)
                 solved_vars = self.solver.solved_variables      # each is a tuple ((x,y), value)
-                print('csp_solve():')
                 # print('-solved_vars:', solved_vars)
                 for (x,y), value in solved_vars:
                     # print(f'- solved {x,y} = {value}')

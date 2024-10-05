@@ -1,5 +1,7 @@
 '''to-do:
-- make it snappy; now 'botGame.py' is laggy; update data structures as needed, find the cause of the lag
+- minecount bug
+- even faster?
+- more tests, also on 'botGame.py' side
 '''
 from itertools import combinations
 
@@ -296,7 +298,6 @@ class CSP_solver:
                             if (var, value) not in self.solved_variables:
                                 self.solved_variables.add((var,value))
                                 new_solutions.add((var,value))                      # I need to know if it ACTUALLY solved something new!
-                                self.update_related_info_for_solved_var(((var, value)))
                     else:
                         var_to_possibleValues = dict()                              # for each proposed ((var1,value1), (var2,value2), ...), here called a 'vector', record the value. Since all these vectors now inspected are derived from a single equation that MUST be solved, then if all the suggested values are equal for a variable, it MUST be solved as that value, as otherwise the equation could not be solved. Use debugger if this is unclear, it shows very clearly what's happening here c:
                         for proposed_vector in proposed_values:                     # NB! This gathers all possible values for each variable (i.e., 0, or 1, or 0 and 1 per variable!) for ALL the proposed vectors per key; so
@@ -310,7 +311,6 @@ class CSP_solver:
                                 if (var, value) not in self.solved_variables:
                                     self.solved_variables.add((var, values[0]))
                                     new_solutions.add((var,values[0]))
-                                    self.update_related_info_for_solved_var(((var, value)))
                 return new_solutions
         # solution_finder_from_compatibility_groups(compatibility_groups)           # works, but I'm not using it.
 
@@ -381,12 +381,12 @@ FAILED tests:''')
             for variable, value in sorted(csp.solved_variables):
                 print("- solved a new variable!", variable , "=", value)
                 concat += str(value)
-        elif len(csp.solved_variables) == 0:
-            print('- NO SOLVED VARIABLES!')
-            return(name, 'failed', concat)
         if concat == expected_result:
             print('test passed!')
             return(name, 'passed', concat)
+        elif len(csp.solved_variables) == 0:
+            print('- NO SOLVED VARIABLES!')
+            return(name, 'failed', concat)
         else:
             print('TEST FAILED')
             return(name, 'failed', concat)
@@ -576,7 +576,6 @@ FAILED tests:''')
     csp.handle_incoming_equations([eqi, eqiii, eqv, eqvi, eqa, eqb])
     csp.absolut_brut()                                  # NB! after 3 rounds minimum, e=0 is solved! A smaller number of rounds is not enough. This is ok and expected given the functions written in the class, as not everything is recursively updated until the end of the world (as this would complicate things even more!); also, nb! The purpose is not to be able to solve everything in one go, as that would also mean that pressing 'b' once in 'botGame.py' would proceed a huge number of steps at a time, AND this has nothing to do, as such, with efficiency either; so I want to divide this into small(ish) steps whenever possible, facilitating visualization and debugging that way, as there's no real reason not to do this. In fact, efficiency-wise, it's better to run as little as CSP_solver as possible, instead relying on the much simpler 'simple_solver' in 'botGame.py' as possible
 
-    
     expected_result = '0'
     test_info_dict[name] = [csp, expected_result]
 
@@ -595,24 +594,63 @@ FAILED tests:''')
     csp.handle_incoming_equations([eq1, eq2, eq3, eq4, eq5])
     csp.absolut_brut()                                  # NB! This needs 2 rounds!
 
-    
     expected_result = '00110000'
     test_info_dict[name] = [csp, expected_result]
     # print_solved_variables(csp, name, expected_result) # expected cdefg 00110
 
-    ########################## Test 6: letters. Minecount! Make a situation where there's one number cell '1' pointing to two adjacent cells, a and b, and there's also a third cell 'c' that's not seen by any number cell; it's boxed by flags. I just ran into a situation like this and the minecount didn't work; so this is truly a test for debugging! #
-    
+    ########################## Test 6a: letters. Minecount! Make a situation where there's one number cell '1' pointing to two adjacent cells, a and b, and there's also a third cell 'c' that's not seen by any number cell; it's boxed by flags. I just ran into a situation like this and the minecount didn't work; so this is truly a test for debugging! #
+
     eq1     = [-1, -1, ('a', 'b'), 1]                         
-    
+
     name = 'test 6a, letters, MINECOUNT=1. c=0 expected.'
     csp = CSP_solver()
     csp.handle_incoming_equations([eq1])
     csp.absolut_brut(minecount=1, need_for_minecount=True, all_unclicked=['a','b','c'])                 # So, here 'a' and 'b' are seen by number cell that says '1'. So, a+b=1. But also, there's an isolated cell c in the corner, surrounded by three flags, hence not seen by any number cell. The wanted result here is that c=0, because the remaining minecount is 1, and a+b=1, so c=0.
-    
+
     expected_result = '0'                                                                               # c=0
     test_info_dict[name] = [csp, expected_result]
     # print_solved_variables(csp, name, expected_result) # expected cdefg 00110
 
+    ########################## Test 7a: letters. NOTHING expected. Minecount situation without minecount! Expected: nothing (this situation needs minecount to be able to be solved) #
+
+    eq1     = [-1, -1, ('a', 'b', 'c'), 1]
+    eq2     = [-1, -1, ('b', 'd'), 1]
+    eq3     = [-1, -1, ('h', 'i'), 1]
+    eq4     = [-1, -1, ('h', 'i'), 1]
+    eq5     = [-1, -1, ('d', 'f', 'i', 'j'), 1]                         
+
+    name = 'test 6a, letters, MINECOUNT=1. NOTHING expected.'
+    csp = CSP_solver()
+    csp.handle_incoming_equations([eq1, eq2, eq3, eq4, eq5])
+    csp.absolut_brut()
+
+    expected_result = 'NOTHING'
+    test_info_dict[name] = [csp, expected_result]
+    # print_solved_variables(csp, name, expected_result) # expected cdefg 00110
+
+        ########################## Test 7b: letters. e0, g0, k0 expected. Minecount situation without minecount! Expected: nothing (this situation needs minecount to be able to be solved) #
+
+    eq1     = [-1, -1, ('a', 'b', 'c'), 1]
+    eq2     = [-1, -1, ('b', 'd'), 1]
+    eq3     = [-1, -1, ('h', 'i'), 1]
+    eq4     = [-1, -1, ('h', 'i'), 1]
+    eq5     = [-1, -1, ('d', 'f', 'i', 'j'), 1]                         
+
+    name = 'Test 7b: letters. Minecount #2. e0, g0, k0 expected'
+    csp = CSP_solver()
+    csp.handle_incoming_equations([eq1, eq2, eq3, eq4, eq5])
+    csp.absolut_brut(minecount=3, need_for_minecount=True, all_unclicked='a b c d e f g h i j k'.split())
+
+    expected_result = '000'
+    test_info_dict[name] = [csp, expected_result]
+    # print_solved_variables(csp, name, expected_result) # expected cdefg 00110
+
+    
+    
+    
+    print_multiple_results(test_info_dict)
+    
+    
     print_multiple_results(test_info_dict)
 
 
