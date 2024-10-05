@@ -16,7 +16,7 @@ class CSP_solver:
         self.impossible_combinations = set()
 
     # 100% solution: (1) PER EACH EQUATION that MUST be satisfied (i.e. each number cell on the minesweeper map), try all combinations of ones (=mines). That's what THIS function does. (2) After this function below, from all of the alternative combinations of 1s and 0s that DO satisfy the CURRENT equation, find those alternatives that are incompatible with all other equations, pairing one group's all possible alts with compatible alts of ONE other group (i.e. "groups", i.e. incompatible with ALL the alternative solutions of at least one other group) (3) from the remaining alt equations per group (i.e. PER original equation), find columns where a variable is always 0 or 1 -> it HAS to be 0 or 1 ALWAYS. Then see these new solutions, inspect the remaining equations for untrue alternatives now that we've solved a new variable (or many new variables), and keep repeating the whole loop (1),(2),(3) as long as new solutions keep coming. Stop iteration when there are no longer new solutions produced by the whole loop.
-    def absolut_brut(self, minecount=-1, need_for_minecount = False, all_unclicked = []) -> None:   # mineconting logic is used ONLY if the minecount is not changing, i.e., if CSP_solver is currently incapable of solving any more of the map (not enough information -> normal logic is not enough). In this situation, add another equation, which is unclicked_cell_1 + unclicked_cell_2 + unclicked_cell_3 + .... = total number of mines remaining in the entire map. In some cases, that helps solve the remaining situation, sometimes not.
+    def absolut_brut(self, minecount=-1, need_for_minecount = False, all_unclicked = []) -> None:   # minecounting logic is used ONLY if the minecount is not changing, i.e., if CSP_solver is currently incapable of solving any more of the map (not enough information -> normal logic is not enough). In this situation, add another equation, which is unclicked_cell_1 + unclicked_cell_2 + unclicked_cell_3 + .... = total number of mines remaining in the entire map. In some cases, that helps solve the remaining situation, sometimes not.
 
         if not self.unique_equations:
             return
@@ -27,7 +27,7 @@ class CSP_solver:
         def handle_minecount():
             print("NEED FOR MINECOUNT")
             total_eq = (tuple(coord for coord in all_unclicked), minecount)
-            self.unique_equations.add(total_eq)
+            self.handle_incoming_equations([(-1,-1, total_eq[0], total_eq[1])], reset=False)           # (x, y, variables, sum_of_variables) is the format of every equation that's fed (in a list) to 'self.handle_incoming_equations([eq1, eq2...])'. The x and y don't matter; they are the ORIGIN of the equation (origin, as in, from where on the minesweeper map the equation came from). It doesn't affect the result in any way, so I'm using -1, -1 to mark that it's not from a single origin, instead a compound (in this case; all the remaining unclicked cells)
             print('total_eq:', total_eq)
             print('variables in total_eq = len(total_eq[0]):', len(total_eq[0]))
             
@@ -312,13 +312,14 @@ class CSP_solver:
                                     self.solved_variables.add((var, values[0]))
                                     new_solutions.add((var,values[0]))
                 return new_solutions
-        # solution_finder_from_compatibility_groups(compatibility_groups)           # works, but I'm not using it.
+        # solution_finder_from_compatibility_groups(compatibility_groups)       # works, but I'm not using it.
 
     # NB! This is called, when adding new equations for the first time, AND after finding new variables IF the related equations are (1) new and (2) do not become single solved variables as well (i.e. if the related equations are not reduced from equations like a+b=1 to just solved single variables like b=1). Hence, sometimes the 'self.update_equation(equation)' is necessary.
-    def handle_incoming_equations(self, equations:list) -> None:    # equations = [(x, y, ((x1, y1), (x2, y2), ...), summa), ...]; so each equation is a tuple of of x, y, unflagged unclicked neighbours (coordinates; unique variables, that is!), and the label of the cell (1,2,...8)
-        self.unique_equations = set()
-        self.variable_to_equations = dict()
-        for x,y, variables, summa in equations:                     # (x,y, variables, sum_of_variables). The x and y are the origin of the equation - actually unnecessary at the moment, I'm not using it for anything atm.
+    def handle_incoming_equations(self, equations:list, reset=True) -> None:    # equations = [(x, y, ((x1, y1), (x2, y2), ...), summa), ...]; so each equation is a tuple of of x, y, unflagged unclicked neighbours (coordinates; unique variables, that is!), and the label of the cell (1,2,...8)
+        if reset:
+            self.unique_equations = set()
+            self.variable_to_equations = dict()
+        for x,y, variables, summa in equations:                                 # (x,y, variables, sum_of_variables). The x and y are the origin of the equation - actually unnecessary at the moment, I'm not using it for anything atm.
             variables = tuple(sorted(variables))
             self.unique_equations.add((variables, summa))
             for var in variables:
