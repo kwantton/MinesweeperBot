@@ -60,8 +60,8 @@ class Minesweeper:
         self.start_x = 0
         self.start_y = 0
         self.front = set()                  # cells that are not finished
-        self.inner = set()                  # cells that are not finished and are not neighboured by any opened cells (i.e., are not 'seen' by any opened cells). TO-DO; I haven't touched these yet; these come into play when I start handling guesses
         self.opened = set()                 # all thus-far opened cells {(x0,y0), (x1,y1),...}, updated when new cells are opened
+        self.unseen = set()                 # all untouched cells; not opened, not in 'self.front', and not next to 'self.front': all unclicked cells that are deeper 'in' the map. This is needed for minecount cases
 
         self.started = False                # the mines will be placed AFTER the first click, as in real minesweeper. Otherwise you could lose on the first click. For that, we need to keep track on if the first click has already commenced or not.
         self.victory = False
@@ -258,24 +258,39 @@ class Minesweeper:
                         if (x,y) in self.front:
                             self.obsolete_front.add((x,y))
                 remove_obsolete_front()
-
+            
+            def get_unclicked_cells() -> set:                                           # needed below in two functions
+                not_clicked = set()
+                for x in range (width):
+                    for y in range (height):
+                        if self.map[y][x] == unclicked:
+                            not_clicked.add((x,y))
+                return not_clicked
+            
             def check_minecount_zero() -> None:
                 if self.minecount == 0:
-                    for x in range (width):
-                        for y in range (height):
-                            if self.map[y][x] == labellize('unclicked'):
-                                self.probe(x,y,True)
+                    for x,y in get_unclicked_cells():
+                        self.probe(x,y,True)
+            
+            def count_unseen_unclicked_cells() -> int:
+                print("COUNT UNSEEN UNCLICKED CELLS")
+                all_unclicked_cells = get_unclicked_cells()
+                adjacent_to_front = set()
+                for x,y in self.front:
+                    unclicked_front_cell_neighbours = self.get_cells_of_type(unclicked, self.get_neighbours_of(x,y))
+                    for neighbour in unclicked_front_cell_neighbours:
+                        adjacent_to_front.add(neighbour)
+                return len(all_unclicked_cells)-len(adjacent_to_front)
             
             def check_for_stalling() -> tuple:
                 all_unclicked = []
                 need_for_minecount = False
                 if self.minecount == self.previous_round_minecount:                         # don't waste resources going through the whole map below (not terrible, but not needed. Also expert has 480 cells; don't go through them all if you don't have to) if the minecount keeps steadily decreasing; i.e., if minecount is not needed, don't use it, use 'normal' logic
-                    if self.minecount <= 10:                                                # TO-DO: this is arbitrary
-                        need_for_minecount = True
-                        for x in range (width):
-                            for y in range (height):
-                                if self.map[y][x] == labellize('unclicked'):
-                                    all_unclicked.append((x,y))                
+                    need_for_minecount = True
+                    for x in range (width):
+                        for y in range (height):
+                            if self.map[y][x] == labellize('unclicked'):
+                                all_unclicked.append((x,y))                
                 self.previous_round_minecount = self.minecount                              # update for the next round, based on the current minecount
                 return need_for_minecount, all_unclicked
             
@@ -325,7 +340,11 @@ class Minesweeper:
             def csp_solve():
                 print('\ncsp_solve():')
                 need_for_minecount, all_unclicked_cells = check_for_stalling()
-                self.solver.absolut_brut(self.minecount, need_for_minecount, all_unclicked_cells)
+                if need_for_minecount:
+                    number_of_unclicked_unseen_cells = count_unseen_unclicked_cells()
+                    self.solver.absolut_brut(self.minecount, need_for_minecount, all_unclicked_cells, number_of_unclicked_unseen_cells)
+                else:
+                    self.solver.absolut_brut()
                 solved_vars = self.solver.solved_variables      # each is a tuple ((x,y), value)
                 # print('-solved_vars:', solved_vars)
                 for (x,y), value in solved_vars:

@@ -1,12 +1,12 @@
 '''to-do:
-- minecount bug
+- smart minecount: for all the total alt solutions, subtract them from the total minecount and/or see if the min sum of mines is too high regarding minecount?
 - even faster?
 - more tests, also on 'botGame.py' side
 '''
 from itertools import combinations
 
 class CSP_solver:
-    def __init__(self, mines_total = 100):
+    def __init__(self, mines_total = float("inf")):
 
         self.variables = set()                                          # ALL variables, solved or not
         self.unique_equations = set()                                   # { ((var1, var2, ..), sum_of_mines_in_vars), (...) }. Each var (variable) has format (x,y) of that cell's location; cell with a number label 1...8 = var. Here, I want uniqe EQUATIONS, not unique LOCATIONS, and therefore origin-(x,y) is not stored here. It's possible to get the same equation for example from two different sides, and via multiple different calculation routes, and it's of course possible to mistakenly try to add the same equation multiple times; that's another reason to use a set() here, the main reason being fast search from this hashed set.        
@@ -16,25 +16,25 @@ class CSP_solver:
         self.impossible_combinations = set()
 
     # 100% solution: (1) PER EACH EQUATION that MUST be satisfied (i.e. each number cell on the minesweeper map), try all combinations of ones (=mines). That's what THIS function does. (2) After this function below, from all of the alternative combinations of 1s and 0s that DO satisfy the CURRENT equation, find those alternatives that are incompatible with all other equations, pairing one group's all possible alts with compatible alts of ONE other group (i.e. "groups", i.e. incompatible with ALL the alternative solutions of at least one other group) (3) from the remaining alt equations per group (i.e. PER original equation), find columns where a variable is always 0 or 1 -> it HAS to be 0 or 1 ALWAYS. Then see these new solutions, inspect the remaining equations for untrue alternatives now that we've solved a new variable (or many new variables), and keep repeating the whole loop (1),(2),(3) as long as new solutions keep coming. Stop iteration when there are no longer new solutions produced by the whole loop.
-    def absolut_brut(self, minecount=-1, need_for_minecount = False, all_unclicked = []) -> None:   # minecounting logic is used ONLY if the minecount is not changing, i.e., if CSP_solver is currently incapable of solving any more of the map (not enough information -> normal logic is not enough). In this situation, add another equation, which is unclicked_cell_1 + unclicked_cell_2 + unclicked_cell_3 + .... = total number of mines remaining in the entire map. In some cases, that helps solve the remaining situation, sometimes not.
+    def absolut_brut(self, minecount=-1, need_for_minecount = False, all_unclicked = [], number_of_unclicked_unseen_cells=-1) -> None:   # minecounting logic is used ONLY if the minecount is not changing, i.e., if CSP_solver is currently incapable of solving any more of the map (not enough information -> normal logic is not enough). In this situation, add another equation, which is unclicked_cell_1 + unclicked_cell_2 + unclicked_cell_3 + .... = total number of mines remaining in the entire map. In some cases, that helps solve the remaining situation, sometimes not.
 
         if not self.unique_equations:
             return
         
-        print("minecount from CSP_solver:", minecount)                      # the number of unlocated maps at this point
-        print("previous round minecount:", self.previous_round_minecount)
+        # print("minecount from CSP_solver:", minecount)                      # the number of unlocated maps at this point
+        # print("previous round minecount:", self.previous_round_minecount)
         
         def handle_minecount():
             print("NEED FOR MINECOUNT")
+            print("number_of_unclicked_unseen_cells:", number_of_unclicked_unseen_cells)
             total_eq = (tuple(coord for coord in all_unclicked), minecount)
-            self.handle_incoming_equations([(-1,-1, total_eq[0], total_eq[1])], reset=False)           # (x, y, variables, sum_of_variables) is the format of every equation that's fed (in a list) to 'self.handle_incoming_equations([eq1, eq2...])'. The x and y don't matter; they are the ORIGIN of the equation (origin, as in, from where on the minesweeper map the equation came from). It doesn't affect the result in any way, so I'm using -1, -1 to mark that it's not from a single origin, instead a compound (in this case; all the remaining unclicked cells)
+            # self.handle_incoming_equations([(-1,-1, total_eq[0], total_eq[1])], reset=False)           # OLD. (x, y, variables, sum_of_variables) is the format of every equation that's fed (in a list) to 'self.handle_incoming_equations([eq1, eq2...])'. The x and y don't matter; they are the ORIGIN of the equation (origin, as in, from where on the minesweeper map the equation came from). It doesn't affect the result in any way, so I'm using -1, -1 to mark that it's not from a single origin, instead a compound (in this case; all the remaining unclicked cells)
             print('total_eq:', total_eq)
             print('variables in total_eq = len(total_eq[0]):', len(total_eq[0]))
             
         if need_for_minecount:
             handle_minecount()
         self.previous_round_minecount = minecount
-        
 
         # for each separate group of eqs, for each equation (i.e. each number cell on the minesweeper map), given that each variable (= each unopened cell) is 0 or 1 (no mine or a mine), find all possible combinations of 1s and 0s that can satisfy that SINGLE equation GIVEN THAT it has sum = k (some integer number = the number of mines in those unopened surrounding cells in total!)
         def find_and_group_possible_answers_per_single_equation(groups_of_eqs:list) -> list:
@@ -186,9 +186,9 @@ class CSP_solver:
                 comp_groups_and_starting_groups.append((compatibility_groups, starting_group))
             return comp_groups_and_starting_groups
                                      
-        list_of_compGroups_startingGroup = chain_link_equations(alternative_answers_per_equation_per_set_of_eqs)
-        for compatibility_groups, starting_group in list_of_compGroups_startingGroup:
-            if compatibility_groups == 'stop':
+        compGroups_and_startingGroup = chain_link_equations(alternative_answers_per_equation_per_set_of_eqs)
+        for compatibility_groups, starting_group in compGroups_and_startingGroup:
+            if compatibility_groups == 'stop':                                  # commented out above, pay no attention to this 'stop' here
                 return                                                          # the idea here is: if simple solutions were found above, use them first (i.e. just return, stop), don't use the heavier tree building below if not necessary
 
         # every key in 'compatibility_groups' is an alt solution for one equation that must be solved one way or another. The same goes for all equation groups in each of those keys' values, BUT here I'm just looking at the keys before looking at their values.
@@ -216,57 +216,7 @@ class CSP_solver:
                         break                                                       # it's possible that one or more variable values from an alt answer (the current one) disagree with one or more alt answers that are INDIRECTLY connected to the current alt answer. Hence, they are in this case 'incompatible' (they directly disagree with each other), and the handling of this current alt solution should be prevented altogether
             return incompatible_pma
                
-        def join_comp_groups_into_solutions(compatibility_groups:dict) -> None:
-            keyVars_to_keys = keyVars_to_keys_builder(compatibility_groups)
-            n_groups = len(keyVars_to_keys.keys())
-            possible_whole_solutions = []
-            
-            def traverse(this_alt, entered_alts_for_this_build, 
-                possible_solution_build, already_handled_groups) -> None:
-
-                already_handled_groups2 = already_handled_groups.copy()
-                possible_solution_build2 = possible_solution_build.copy()
-                entered_alts_for_this_build2 = entered_alts_for_this_build.copy()                
-                
-                if this_alt in compatibility_groups:                        # If this alt solution is not a key in 'compatibility_groups', then IT IS UNTRUE as it's incompatible with one or more other groups' every possible alt answer; in that case, do NOT handle this alt at all (do not (1) mark its variables' proposed values as possible solutions, and do not (2) mark the group that it presents as handled); if the current alt is NOT present as a key of 'compatibility_groups', IT IS INCOMPATIBLE WITH AT LEAST ONE OTHER GROUP. In English, if the current alt solution is not present as a key in 'compatibility_groups', it CANNOT EVER SATISFY ALL THE EQUATIONS that we know MUST be true using at least one combination of alt solutions.
-                    group_of_this_alt = identify_group(this_alt)            # 'this_alt' is an alt answer for some group - 'identify_group(this_alt)' tells me WHICH group it belongs to. I want EXACTLY ONE alt answer for EACH group, as each group represents an original equation from the minesweeper map (a number cell, the equation of which is always true, so MUST be satisfied and MUST be compatible with all other groups!)
-                    if group_of_this_alt not in already_handled_groups2:    # NB! So, I only want EXACTLY ONE alt solution per group. If an alt solution has already been handled, DO NOT HANDLE ANOTHER; that another alt solution will be handled in a whole another iteration of this 'traverse()'. (2) Comparison of sets in python; if the values in the set are the same, then the sets are 'equal' in the == comparison. Nice.
-
-                        incompatible_alt_solution = check_for_disagreements(            # this cannot happen on the FIRST call of 'traverse()', but it CAN happen on subsequent later calls - the 'compatibility_groups' only ensure PAIR compatibility, not beyond than that!
-                            this_alt, possible_solution_build2)
-                        if incompatible_alt_solution:                                   # if this alt solution disagrees i.e. is incompatible with already-recorded alt solutions (one from each met group so far), then move on to the next 'proposed_matching_alt' (which may be of the same OR of different group!) NB! Do NOT mark the group of the current alt solution as handled if it's incompatible; this means that we still need to wait for a compatible alt to come by from this group, so I must NOT mark it as handled yet!
-                            return
-
-                        # this includes the current alt solution
-                        for var, value in this_alt:                         # (('a',0), ('b',1), ...) a 'proposed_matching_alt' has this format. It's one alt solution to an equation that's derived from the minesweeper map and which has to have ONE alt solution, the other ones being untrue.
-                            possible_solution_build2[var] = value           # there can be 1 or 2 per variable. If 2, it means that there is not enough information (yet) for solving this variable. If only 1 value, great, that means the value is now solved.
-                        
-                        already_handled_groups2.append(group_of_this_alt)   # Since the alt solution was picked, mark the respective group as handled. ATM this is unnecessary, since I'm traversing through the equations in the same chain order as they were linked earlier, but If I were to change that, then this check is needed (previously, I DID need this, but this is a good check also for debugging anyways!)
-
-                        if n_groups == len(already_handled_groups2):
-                            possible_whole_solutions.append(possible_solution_build2)
-                            return                                          # if it's done, it's done. The possible next matches would be to a completely different group, AND it's not possible to gain more solutions from this one, as new groups and their alts are only ADDED in this 'traverse()', not removed, and we've already been to all groups -> return, don't continue!
-                        
-                        new_matches = compatibility_groups[this_alt]        # continue to matches of this alt solution ONLY if none of the values of this alt solution disagree with values that have already been recorded in 'possible_solution_build' as values of the variables
-                        entered_alts_for_this_build2.add(this_alt)
-                        
-                        # only do this if the above has not been fulfilled; it's not possible to gain another answer by trying to add yet another alt solution in the case where all the equations (all groups) have already been satisfied, which is checked in the 'if' clause above. SO: for every set of new_matches, I want the info that was updated according to what happened in the specific alternative solution above; which alt solution ('proposed_matching_alt') was 'entered' (seen, processed), which 'group' (equation) in question was handled. Since all the alternatives in the above loop are indeed ALTERNATIVES, they are NOT all saved immediately! (that would be incorrect), instead that is done after the 'traverse()'s below!
-                        if new_matches:
-                            for new_match in new_matches:
-                                if new_match not in entered_alts_for_this_build2:    # technically redundant, probably almost no effect regarding computing efficiency, BUT it's nice for clarity, and showing the logic still (even if double check)
-                                    traverse(new_match, 
-                                        entered_alts_for_this_build2, possible_solution_build2, already_handled_groups2)
-                        
-            # 'starting_group' is the group from where all arrows leave, and back to which no arrows return; an alt origin for an alt rooted tree, essentially!
-            for alt_origin in starting_group:                                       # E.g.: ('d', 'e'), [(('d',1),('e',0)), (('d',0),('e',1))]. This quarantees that they build unidentical solution trees that together encompass all possible whole solutions.
-                if alt_origin in compatibility_groups:                              # some might have been filtered out as they were no longer fitting ALL other groups; the whole key has been deleted from 'compatibility_groups' if it's not compatible with ANY alt solution from its paired group (paired equation)
-                    seen_proposed_vectors = set()                                   # PER alt answer, of course - that's why it's initialized here and not at the top of this 'join_groups_into_solutions'
-                    handled_groups = []
-                    alt_solution_build = {}
-                    traverse(alt_origin, seen_proposed_vectors, 
-                        alt_solution_build, handled_groups)                         # 'traverse' builds alternative 'possible_whole_solutions' and saves all viable ones to 'possible_whole_solutions'
-
-            def handle_possible_whole_solutions():
+        def handle_possible_whole_solutions(possible_whole_solutions : list):
                 final_answers = dict()
                 new_answer_count = 0
                 for dictionary in possible_whole_solutions:
@@ -279,14 +229,154 @@ class CSP_solver:
                         elif final_answers[var] != val:
                             final_answers[var] = 'either or'                                # either this was 'either or' was here or not, the result is the same - 'either or'  
                             new_answer_count -= 1
-                for var, val in final_answers.items():
-                    if val != 'either or':
-                        self.solved_variables.add((var, val))                               # reduces redundant work in 'update_related_info...' if ALL of these are added first, before the loop below calling that function for all of those newly solved variables.
+                if new_answer_count > 0:                                                    # micro-optimization, skipping the below loop when no solutions were found
+                    for var, val in final_answers.items():
+                        if val != 'either or':
+                            self.solved_variables.add((var, val))
+                pass
+        
+        def join_comp_groups_into_solutions(compatibility_groups:dict) -> list:     # also return the whole list of 'possible_whole_solutions'; it's needed IF minecount is needed. If minecount is needed
+            keyVars_to_keys = keyVars_to_keys_builder(compatibility_groups)
+            n_groups = len(keyVars_to_keys.keys())
+            possible_whole_solutions = []
             
-            handle_possible_whole_solutions()
+            def traverse(this_alt, entered_alts_for_this_build, 
+                possible_solution_build, already_handled_groups) -> None:
+
+                already_handled_groups_local = already_handled_groups.copy()
+                possible_solution_build_local = possible_solution_build.copy()
+                entered_alts_for_this_build_local = entered_alts_for_this_build.copy()                
                 
-        for compatibility_groups, starting_group in list_of_compGroups_startingGroup:
-            join_comp_groups_into_solutions(compatibility_groups)
+                if this_alt in compatibility_groups:                        # If this alt solution is not a key in 'compatibility_groups', then IT IS UNTRUE as it's incompatible with one or more other groups' every possible alt answer; in that case, do NOT handle this alt at all (do not (1) mark its variables' proposed values as possible solutions, and do not (2) mark the group that it presents as handled); if the current alt is NOT present as a key of 'compatibility_groups', IT IS INCOMPATIBLE WITH AT LEAST ONE OTHER GROUP. In English, if the current alt solution is not present as a key in 'compatibility_groups', it CANNOT EVER SATISFY ALL THE EQUATIONS that we know MUST be true using at least one combination of alt solutions.
+                    group_of_this_alt = identify_group(this_alt)            # 'this_alt' is an alt answer for some group - 'identify_group(this_alt)' tells me WHICH group it belongs to. I want EXACTLY ONE alt answer for EACH group, as each group represents an original equation from the minesweeper map (a number cell, the equation of which is always true, so MUST be satisfied and MUST be compatible with all other groups!)
+                    if group_of_this_alt not in already_handled_groups_local:    # NB! So, I only want EXACTLY ONE alt solution per group. If an alt solution has already been handled, DO NOT HANDLE ANOTHER; that another alt solution will be handled in a whole another iteration of this 'traverse()'. (2) Comparison of sets in python; if the values in the set are the same, then the sets are 'equal' in the == comparison. Nice.
+
+                        incompatible_alt_solution = check_for_disagreements(            # this cannot happen on the FIRST call of 'traverse()', but it CAN happen on subsequent later calls - the 'compatibility_groups' only ensure PAIR compatibility, not beyond than that!
+                            this_alt, possible_solution_build_local)
+                        if incompatible_alt_solution:                                   # if this alt solution disagrees i.e. is incompatible with already-recorded alt solutions (one from each met group so far), then move on to the next 'proposed_matching_alt' (which may be of the same OR of different group!) NB! Do NOT mark the group of the current alt solution as handled if it's incompatible; this means that we still need to wait for a compatible alt to come by from this group, so I must NOT mark it as handled yet!
+                            return
+
+                        # this includes the current alt solution
+                        for var, value in this_alt:                         # (('a',0), ('b',1), ...) a 'proposed_matching_alt' has this format. It's one alt solution to an equation that's derived from the minesweeper map and which has to have ONE alt solution, the other ones being untrue.
+                            possible_solution_build_local[var] = value           # there can be 1 or 2 per variable. If 2, it means that there is not enough information (yet) for solving this variable. If only 1 value, great, that means the value is now solved.
+                        
+                        already_handled_groups_local.append(group_of_this_alt)   # Since the alt solution was picked, mark the respective group as handled. ATM this is unnecessary, since I'm traversing through the equations in the same chain order as they were linked earlier, but If I were to change that, then this check is needed (previously, I DID need this, but this is a good check also for debugging anyways!)
+
+                        if n_groups == len(already_handled_groups_local):
+                            possible_whole_solutions.append(possible_solution_build_local)
+                            return                                          # if it's done, it's done. The possible next matches would be to a completely different group, AND it's not possible to gain more solutions from this one, as new groups and their alts are only ADDED in this 'traverse()', not removed, and we've already been to all groups -> return, don't continue!
+                        
+                        new_matches = compatibility_groups[this_alt]        # continue to matches of this alt solution ONLY if none of the values of this alt solution disagree with values that have already been recorded in 'possible_solution_build' as values of the variables
+                        entered_alts_for_this_build_local.add(this_alt)
+                        
+                        # only do this if the above has not been fulfilled; it's not possible to gain another answer by trying to add yet another alt solution in the case where all the equations (all groups) have already been satisfied, which is checked in the 'if' clause above. SO: for every set of new_matches, I want the info that was updated according to what happened in the specific alternative solution above; which alt solution ('proposed_matching_alt') was 'entered' (seen, processed), which 'group' (equation) in question was handled. Since all the alternatives in the above loop are indeed ALTERNATIVES, they are NOT all saved immediately! (that would be incorrect), instead that is done after the 'traverse()'s below!
+                        if new_matches:
+                            for new_match in new_matches:
+                                if new_match not in entered_alts_for_this_build_local:    # technically redundant, probably almost no effect regarding computing efficiency, BUT it's nice for clarity, and showing the logic still (even if double check)
+                                    traverse(new_match, 
+                                        entered_alts_for_this_build_local, possible_solution_build_local, already_handled_groups_local)
+                        
+            # 'starting_group' is the group from where all arrows leave, and back to which no arrows return; an alt origin for an alt rooted tree, essentially!
+            for alt_origin in starting_group:                                       # E.g.: ('d', 'e'), [(('d',1),('e',0)), (('d',0),('e',1))]. This quarantees that they build unidentical solution trees that together encompass all possible whole solutions.
+                if alt_origin in compatibility_groups:                              # some might have been filtered out as they were no longer fitting ALL other groups; the whole key has been deleted from 'compatibility_groups' if it's not compatible with ANY alt solution from its paired group (paired equation)
+                    seen_proposed_vectors = set()                                   # PER alt answer, of course - that's why it's initialized here and not at the top of this 'join_groups_into_solutions'
+                    handled_groups = []
+                    alt_solution_build = {}
+                    traverse(alt_origin, seen_proposed_vectors, 
+                        alt_solution_build, handled_groups)                         # 'traverse' builds alternative 'possible_whole_solutions' and saves all viable ones to 'possible_whole_solutions'
+            handle_possible_whole_solutions(possible_whole_solutions)
+            return possible_whole_solutions
+                
+        eq_set_possible_solutions = []  # eg. this could be[{a:1,b:0},{a:0,b:1}] for a situation where there's one fifty-fifty ending, AND in addition an x number of unclicked unseen cells. If the minecount is 1, then all the unclicked unseen cells must be zero.
+        for compatibility_groups, starting_group in compGroups_and_startingGroup:
+            possible_whole_solutions = join_comp_groups_into_solutions(compatibility_groups)
+            eq_set_possible_solutions.append(possible_whole_solutions)
+        
+        def combine_separated_eq_set_alts_in_all_possible_combinations_and_count_their_sums_for_minecount_check(eq_set_possible_solutions:list) -> dict:   # separated sets = erilliset joukot; here it means that the solution sets do not share a single variable. These separated sets consist of all eligible alt answers per each set. If the sum of a given combination whole-front-alt-answer that's joined together here and which has one alt from each set per combo disagrees with remaining minecount later, it is impossible; discard all such whole-front alt answers. Whether that disagreement happens is found out only by summing the thus-far separated alt answer sets together - that's why I'm combining them here!
+
+            def check_nMines_length(nMines_to_frontAltSolutions) -> str:
+                nMines_length = 0
+                for key, alts in nMines_to_frontAltSolutions.items():
+                    nMines_length += len(alts)
+                n_combinations = 1
+                for set_alts in filtered_eq_set_alt_solutions:
+                    n_combinations *= len(set_alts)
+                if n_combinations != nMines_length:
+                    return 'INCORRECT'
+                return 'CORRECT'
+            
+            def remove_empty_eq_sets(eq_set_possible_solutions:list) -> list:
+                filtered_list = []
+                for setti in eq_set_possible_solutions:
+                    if len(setti) != 0:
+                        filtered_list.append(setti)
+                return filtered_list
+            
+            def sum_of(alt_solution):
+                summa = 0
+                for var, value in alt_solution.items():
+                    summa += value
+                return summa
+            
+            def append_alt_solution(current_build:list, current_summa:int, current_index:int) -> None:
+                if current_index < n_sets:
+                    for alt_solution in filtered_eq_set_alt_solutions[current_index]:
+                        current_build_local = current_build.copy()
+                        current_build_local.append(alt_solution)
+                        append_alt_solution(current_build_local, current_summa + sum_of(alt_solution), current_index + 1)
+                else:
+                    if current_summa not in nMines_to_frontAltSolutions:
+                        nMines_to_frontAltSolutions[current_summa] = []
+                    nMines_to_frontAltSolutions[current_summa].append(current_build)
+
+            filtered_eq_set_alt_solutions = remove_empty_eq_sets(eq_set_possible_solutions)    # get rid of empty eq sets, so it doesn't falsify len() of eq sets below
+            n_sets = len(filtered_eq_set_alt_solutions)
+            nMines_to_frontAltSolutions = dict()         # {number of mines : alt entire-front combined solutions with that number of mines}. Every alt solution from every separate equation set is coupled with every alt solution from every other set, to be able to construct all the possible entire-front alt solutions, the mines of which are counted - this is for being able to use remaining mine count for deducing which of these alt whole-front solutions are impossible. For each of these entire-front alt solutions, discard the impossible ones, then see if the remaining ones all agree regarding one or more variable just like previously, once again using 'handle_possible_whole_solutions()' since it's awesome c:
+            for set_alt_solution in filtered_eq_set_alt_solutions[0]:   # in the FIRST one; this is the starting point for building the entire-front alt solutions (one set alt solution from every set must be chosen)
+                append_alt_solution(current_build = [set_alt_solution], current_summa = sum_of(set_alt_solution), current_index = 1)
+            if check_nMines_length(nMines_to_frontAltSolutions) == 'INCORRECT':
+                'TROUBLE'
+                raise ValueError('WRONG RESULT IN FUNCTION combine_separated_eq_set_alts_in_all_possible_combinations_and_count_their_sums_for_minecount_check()')
+            return nMines_to_frontAltSolutions
+        
+        # for each ENTIRELY COUPLED alt whole solution, subtract it
+        def use_minecount():
+            just_checking = eq_set_possible_solutions
+            print('\nuse_minecount since no solutions were found without it')
+
+            # all these three below are about THE WHOLE front solution; solutions for the WHOLE FRONT, everything seen by 'self.front' in 'botGame.py', everything in yellow when you highlight it in the minesweeper botGame by pressing 'f'. Please try it! c:
+            alt_solutions_with_ok_minecount = []
+            largest_n_mines_in_front_alt_solutions = 0
+            smallest_n_mines_in_front_alt_solutions = self.mines_total
+            nMines_to_frontAltSolutions = combine_separated_eq_set_alts_in_all_possible_combinations_and_count_their_sums_for_minecount_check(eq_set_possible_solutions)
+
+            for n_mines, front_alt_solutions in nMines_to_frontAltSolutions.items():
+                if n_mines < smallest_n_mines_in_front_alt_solutions:
+                    smallest_n_mines_in_front_alt_solutions = n_mines
+                if n_mines > largest_n_mines_in_front_alt_solutions:
+                    largest_n_mines_in_front_alt_solutions = n_mines
+                if n_mines + number_of_unclicked_unseen_cells < minecount:              # Example: 8a. Any alt for which this happens is impossible. The max number of mines in 'unclicked unseen cells' is the number of those cells. So if this alt solution + that is less than the actual remaining minecount, then it's impossible
+                    pass    
+                elif n_mines > minecount:
+                    pass                                                                # impossible. For example; Test 8a. So, if 'n_mines' (number of mines in total in the current entire-front alt solution) + the number of unseen unclicked cells (all of which COULD have a mine, in the maximum case) is less than the remaining minecount, then this current alt solution minecount is simply too small -> impossible alt solution.
+                else:
+                    for redundant_one_item_list in front_alt_solutions:
+                        for alt_solution in redundant_one_item_list:                    # in English: why is there a list at this point? There shouldn't be a list here anymore. To-do: fix at some point
+                            alt_solutions_with_ok_minecount.append(alt_solution)        # All the alt solutions here that you see that do NOT sum up to the currently remaining minecount are such that there is also at least the number of 'minecount'-'n_mines' unclicked unseen cells remaining as well. So if here's an alt solution that has 2 mines, but there are 3 mines remaining in the minecount, then there must be at least 1 unclicked unseen cell as well for this alt solution to be ok.
+            if smallest_n_mines_in_front_alt_solutions == minecount:                    # if none of the alt solutions have less mines than the currently remaining minecount, then all the unclicked unseen cells, which are NOT a part of any of these alt solutions, must NOT have a mine, otherwise the total minecount would exceed the REAL total minecount!
+                for cell in all_unclicked:
+                    if cell not in self.variables:                                      # all cells in 'self.variables' have come through 'handle_incoming_equations', so they are seen by 'self.front'. All other 'unclicked' cells are NOT in 'self.front'.
+                        self.solved_variables.add((cell, 0))
+            handle_possible_whole_solutions(alt_solutions_with_ok_minecount)
+
+        
+        if need_for_minecount:
+            use_minecount()
+        
+        
+            
+
+        # TO-DO: save the non-complete solution candidates in 'join_comp_groups_into_solutions' 'handle_possible_whole_solutions()', and for each of the possible solutions combined with the other set's solutions, check if the number of currently non-variable-status unclicked cells (theoretically all of them can be 1, i.e., a mine) + the number of mines in the entire alt solution is less than the number of remaining mines -> impossible solution, since too few mines in total! 
         
         def solution_finder_from_compatibility_groups(compatibility_groups:dict) -> dict:
             def key_altSolution_inspector():
@@ -327,8 +417,7 @@ class CSP_solver:
                     self.variable_to_equations[var] = set()
                     self.variables.add(var)
                 self.variable_to_equations[var].add((variables, summa))     
-        pass
-            
+        pass  
 
 def format_equation_for_csp_solver(x:int, y:int, variables:tuple, surrounding_mine_count:int) -> list:
     # NB! 'variables' has to be a tuple OR something that can be converted to a tuple
@@ -599,20 +688,20 @@ FAILED tests:''')
     test_info_dict[name] = [csp, expected_result]
     
 
-    ########################## Test 6a: letters. Minecount! Make a situation where there's one number cell '1' pointing to two adjacent cells, a and b, and there's also a third cell 'c' that's not seen by any number cell; it's boxed by flags. I just ran into a situation like this and the minecount didn't work; so this is truly a test for debugging! #
+    ########################## Test 6a: letters. Minecount! Make a situation where there's one number cell '1' pointing to two adjacent cells, a and b, and there's also a third cell 'c' that's not seen by any number cell, called 'unclicked unseen' cell; it's boxed by flags so it's not adjacent to 'self.front'! I just ran into a situation like this and the minecount didn't thus work back then; so this is a test that was made for real-case debugging #########
 
     eq1     = [-1, -1, ('a', 'b'), 1]                         
 
     name = 'test 6a, letters, MINECOUNT=1. c=0 expected.'
     csp = CSP_solver()
     csp.handle_incoming_equations([eq1])
-    csp.absolut_brut(minecount=1, need_for_minecount=True, all_unclicked=['a','b','c'])                 # So, here 'a' and 'b' are seen by number cell that says '1'. So, a+b=1. But also, there's an isolated cell c in the corner, surrounded by three flags, hence not seen by any number cell. The wanted result here is that c=0, because the remaining minecount is 1, and a+b=1, so c=0.
+    csp.absolut_brut(minecount=1, need_for_minecount=True, all_unclicked=['a','b','c'], number_of_unclicked_unseen_cells=1)                 # So, here 'a' and 'b' are seen by number cell that says '1'. So, a+b=1. But also, there's an isolated cell c in the corner, surrounded by three flags, hence not seen by any number cell. The wanted result here is that c=0, because the remaining minecount is 1, and a+b=1, so c=0.
 
     expected_result = '0'                                                                               # c=0
     test_info_dict[name] = [csp, expected_result]
     
 
-    ########################## Test 7a: letters. NOTHING expected. Minecount situation without minecount! Expected: nothing (this situation needs minecount to be able to be solved) #
+    ########################## Test 7a: letters. NOTHING expected. Minecount (3 mines remaining), minecount not provided to 'absolut_brut()'. Expected: nothing. In the next example, you'll see that even minecount doesn't solve it (see 'Testaus/Esimerkkitilanteita/Test 7b unsolvable even with minecount.pdf' for this case) ##########
 
     eq1     = [-1, -1, ('a', 'b', 'c'), 1]
     eq2     = [-1, -1, ('b', 'd'), 1]
@@ -629,7 +718,7 @@ FAILED tests:''')
     test_info_dict[name] = [csp, expected_result]
     
 
-    ########################## Test 7b: letters. e0, g0, k0 expected. Minecount situation without minecount! Expected: nothing (this situation needs minecount to be able to be solved) #
+    ########################## Test 7b: letters. EVEN MINECOUNT DOESN'T SOLVE THIS! Minecount info included, but still unsolvable! So, expected: nothing ############
 
     eq1     = [-1, -1, ('a', 'b', 'c'), 1]
     eq2     = [-1, -1, ('b', 'd'), 1]
@@ -640,7 +729,7 @@ FAILED tests:''')
     name = 'Test 7b: unsolvable 2. NOTHING expected'
     csp = CSP_solver()
     csp.handle_incoming_equations([eq1, eq2, eq3, eq4, eq5])
-    csp.absolut_brut(minecount=3, need_for_minecount=True, all_unclicked='a b c d e f g h i j k'.split())
+    csp.absolut_brut(minecount=3, need_for_minecount=True, all_unclicked='a b c d e f g h i j k'.split(), number_of_unclicked_unseen_cells=3) # NB! Yes, minecount (3) is the same, by coincidence, as 'number_of_unclicked_unseen_cells'.
 
     expected_result = 'NOTHING'
     test_info_dict[name] = [csp, expected_result]
@@ -662,7 +751,7 @@ FAILED tests:''')
     name = 'Test 8a: Expert_minecount-solvable_1. c0, d1, e1, f0, g0, i0, j0, t0 expected'
     csp = CSP_solver()
     csp.handle_incoming_equations([eq1, eq2, eq3, eq4, eq5, eq6, eq7, eq8, eq9, eq10, eq11])
-    csp.absolut_brut(minecount=6, need_for_minecount=True, all_unclicked='a b c d e f g h i j k l m n o p q r s t'.split())
+    csp.absolut_brut(minecount=6, need_for_minecount=True, all_unclicked='a b c d e f g h i j k l m n o p q r s t'.split(), number_of_unclicked_unseen_cells=2)
 
     expected_result = '01100000'
     test_info_dict[name] = [csp, expected_result]
