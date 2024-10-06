@@ -1,11 +1,13 @@
 ## Tehty tällä viikolla
 
-UPDATE 6.10.2024 ~19.30: MINECOUNT TOIMII NYT KAIKISSA TILANTEISSA
-Kaikki mahdollinen logiikka toimii tällä hetkellä ja kaikki nykyiset testit menevät läpi! Olen testannut muutaman kymmentä expert-peliä ja beginner-peliä, eikä ongelmia ole.
+UPDATE 6.10.2024 ~19.30: MINECOUNT TOIMII NYT KAIKISSA TILANTEISSA.
+- Kaikki mahdollinen logiikka toimii tällä hetkellä ja kaikki nykyiset testit menevät läpi! Olen testannut muutaman kymmentä expert-peliä ja beginner-peliä, eikä ongelmia ole.
+- seuraavaksi testejä, siivoamista jne
+- allaoleva on siis tältä osin tällä hetkellä vanhentunutta tietoa
 
 - `CSP_solver`:in kaksi isoa bugia korjattu:
   - väärä sisennys `handle_possible_whole_solutions()`:issa
-- `traverse()`:ssä käytetty `.copy()` jottei lapsi-`traverse()` päivitä virheellisesti vanhempien `traverse()`:jen arvoja. En todellakaan muistanut että Python toimii tällä tavalla, ja debuggausta varten piti piirtää excelissä tilakaavio, josta huomasin lopulta, että rekursiossa vanhempaan paluussa vanhemman arvot olivat muuttuneet tilanteesta, jossa lapsi-`traverse()`:ja oli kutsuttu. Oli hankala huomata! 
+  - `traverse()`:ssä käytetty `.copy()` jottei lapsi-`traverse()` päivitä virheellisesti vanhempien `traverse()`:jen arvoja. En todellakaan muistanut että Python toimii tällä tavalla, ja debuggausta varten piti piirtää excelissä tilakaavio, josta huomasin lopulta, että rekursiossa vanhempaan paluussa vanhemman arvot olivat muuttuneet tilanteesta, jossa lapsi-`traverse()`:ja oli kutsuttu. Oli hankala huomata! 
 - `botGame.py`:ssä huomioidaan tilanne, jossa viimeiset avaamattomat ruudut jäävät boksiin lippujen taakse, eli `self_front`:in näkymättömiin; nyt jos miinoja on jäljellä nolla, kaikki avaamattomat ruudut avataan, eli tämäkin tilanne ratkeaa. Ei ollut aiemmin tullut vastaan, joten en ollut tajunnut huomioida tätä mahdollisuutta `botGame.py`:ssä
 - minecount-tilanteen testi tehty `CSP_solver`:issa, ja tämä testi menee läpi
 - nopeutettu `CSP_solver`:ia tekemällä `find_equation_groups()`, joka jakaa yhtälöt joukkoihin suoraan tai epäsuorasti yhteisten muuttujien perusteella -> `chain_link_equations()` ja seuraava `join_comp_groups_into_solutions()` jossa tarkastetaan `map`:ien avulla rakennetut alt-ratkaisupuut ovat nopeampia tämän ansiosta
