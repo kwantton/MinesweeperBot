@@ -356,17 +356,18 @@ class CSP_solver:
                 if n_mines > largest_n_mines_in_front_alt_solutions:
                     largest_n_mines_in_front_alt_solutions = n_mines
                 if n_mines + number_of_unclicked_unseen_cells < minecount:              # Example: 8a. Any alt for which this happens is impossible. The max number of mines in 'unclicked unseen cells' is the number of those cells. So if this alt solution + that is less than the actual remaining minecount, then it's impossible
-                    pass    
+                    pass
                 elif n_mines > minecount:
                     pass                                                                # impossible. For example; Test 8a. So, if 'n_mines' (number of mines in total in the current entire-front alt solution) + the number of unseen unclicked cells (all of which COULD have a mine, in the maximum case) is less than the remaining minecount, then this current alt solution minecount is simply too small -> impossible alt solution.
                 else:
-                    for redundant_one_item_list in front_alt_solutions:
-                        for alt_solution in redundant_one_item_list:                    # in English: why is there a list at this point? There shouldn't be a list here anymore. To-do: fix at some point
+                    for alt_solutions_of_this_length in front_alt_solutions:
+                        for alt_solution in alt_solutions_of_this_length:
                             alt_solutions_with_ok_minecount.append(alt_solution)        # All the alt solutions here that you see that do NOT sum up to the currently remaining minecount are such that there is also at least the number of 'minecount'-'n_mines' unclicked unseen cells remaining as well. So if here's an alt solution that has 2 mines, but there are 3 mines remaining in the minecount, then there must be at least 1 unclicked unseen cell as well for this alt solution to be ok.
             if smallest_n_mines_in_front_alt_solutions == minecount:                    # if none of the alt solutions have less mines than the currently remaining minecount, then all the unclicked unseen cells, which are NOT a part of any of these alt solutions, must NOT have a mine, otherwise the total minecount would exceed the REAL total minecount!
-                for cell in all_unclicked:
-                    if cell not in self.variables:                                      # all cells in 'self.variables' have come through 'handle_incoming_equations', so they are seen by 'self.front'. All other 'unclicked' cells are NOT in 'self.front'.
-                        self.solved_variables.add((cell, 0))
+                if number_of_unclicked_unseen_cells > 0:
+                    for cell in all_unclicked:
+                        if cell not in self.variables:                                      # all cells in 'self.variables' have come through 'handle_incoming_equations', so they are seen by 'self.front'. All other 'unclicked' cells are NOT in 'self.front'.
+                            self.solved_variables.add((cell, 0))
             handle_possible_whole_solutions(alt_solutions_with_ok_minecount)
 
         
@@ -755,6 +756,35 @@ FAILED tests:''')
 
     expected_result = '01100000'
     test_info_dict[name] = [csp, expected_result]
+
+    ########################## Test 8c: minecount helps, complex. ? expected. 0 unseen cells. ##############################
+
+    # eq1     = [-1, -1, ('a', 'b' 'c', 'd', 'e'), 2]
+    # eq2     = [-1, -1, ('d', 'e', 'f'), 1]
+    # eq3     = [-1, -1, ('e', 'f', 'g'), 1]
+    # eq4     = [-1, -1, ('g', 'h'), 1]   
+    # eq5     = [-1, -1, ('c', 'd', 'i', 'm'), 3]
+    # eq6     = [-1, -1, ('f', 'g', 'h', 'k', 'l', 'n', 'o', 'p'), 4]
+    # eq7     = [-1, -1, ('h', 'l', 'p'), 2]
+    # eq8     = [-1, -1, ('i', 'm', 'q', 'r'), 2]
+    # eq9     = [-1, -1, ('i', 'j', 'k', 'm', 'n', 'r', 's'), 3]
+    # eq10    = [-1, -1, ('l', 'p', 't'), 2]
+    # eq11    = [-1, -1, ('m', 'n', 'r', 's', 'v', 'w', 'x'), 4]
+    # eq12    = [-1, -1, ('n', 'o', 'p', 's', 't', 'x', 'y', 'z'), 4]
+    # eq13    = [-1, -1, ('p', 't', 'z', 'a1'), 2]
+    # eq14    = [-1, -1, ('t', 'z', 'a1', 'a6', 'a7', 'a8'), 1]
+    # eq15    = [-1, -1, ('a2', 'a9'), 1]
+    # eq16    = [-1, -1, ('u', 'v', 'a3'), 2]
+    # eq17    = [-1, -1, ('w', 'x', 'y', 'a4', 'a5'), 1]
+    # eq18    = [-1, -1, ('a2', 'a9'), 1]
+
+    # name = 'Test 8c: solvable only with minecount, complex. ??? expected. 0 unseen cells.'
+    # csp = CSP_solver()
+    # csp.handle_incoming_equations([eq1, eq2, eq3, eq4, eq5, eq6, eq7, eq8, eq9, eq10, eq11, eq12, eq13, eq14, eq15, eq16, eq17, eq18])
+    # csp.absolut_brut(minecount=13, need_for_minecount=True, all_unclicked='a b c d e f g h i j k l m n o p q r s t u v w x y z a1 a2 a3 a4 a5 a6 a7 a8 a9'.split(), number_of_unclicked_unseen_cells=0)
+
+    # expected_result = '??? dunno'
+    # test_info_dict[name] = [csp, expected_result]
     
     
     print_multiple_results(test_info_dict)
