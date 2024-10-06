@@ -1,5 +1,7 @@
 ## Tehty tällä viikolla
 
+UPDATE 6.10.2024 ~19.30: MINECOUNT TOIMII NYT KAIKISSA TILANTEISSA
+Kaikki mahdollinen logiikka toimii tällä hetkellä ja kaikki nykyiset testit menevät läpi! Olen testannut muutaman kymmentä expert-peliä ja beginner-peliä, eikä ongelmia ole.
 
 - `CSP_solver`:in kaksi isoa bugia korjattu:
   - väärä sisennys `handle_possible_whole_solutions()`:issa
