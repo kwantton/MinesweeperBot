@@ -5,6 +5,8 @@ UPDATE 6.10.2024 ~19.30: MINECOUNT TOIMII NYT KAIKISSA TILANTEISSA.
 - seuraavaksi testejä, siivoamista jne
 - allaoleva on siis tältä osin tällä hetkellä vanhentunutta tietoa
 
+Update loppuu tähän.
+
 - `CSP_solver`:in kaksi isoa bugia korjattu:
   - väärä sisennys `handle_possible_whole_solutions()`:issa
   - `traverse()`:ssä käytetty `.copy()` jottei lapsi-`traverse()` päivitä virheellisesti vanhempien `traverse()`:jen arvoja. En todellakaan muistanut että Python toimii tällä tavalla, ja debuggausta varten piti piirtää excelissä tilakaavio, josta huomasin lopulta, että rekursiossa vanhempaan paluussa vanhemman arvot olivat muuttuneet tilanteesta, jossa lapsi-`traverse()`:ja oli kutsuttu. Oli hankala huomata! 
