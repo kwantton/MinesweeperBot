@@ -17,11 +17,13 @@ Päädyin tekemään ratkaisijan `CSP_solver` pitkälti uudestaan niin, että
   <li> Lopulta on saatu kaikkiaan joku joukko mahdollisia ratkaisuja, jotka toteuttavat samaan aikaan kaikki alkuperäiset yhtälöt, eli joissa yksikään alt (yksi per ryhmä per ratkaisu) ei ole ristiriidassa keskenään. Jos näitä on vaikka 5 mahdollista, käydään kustakin 5 ratkaisuehdotuksesta läpi jokainen muuttuja. Jos jokin muuttuja, esim. a, on aina 1 kaikissa 5 vaihtoehtoisessa mahdollisessa ratkaisussa, on sen oltava 5 (koska mitään muuta mahdollista ratkaisua ei ole, joka kykenee toteuttamaan täsmälleen yhden vaihtoehtoisen altin kustakin ryhmästä). Tämä perustuu tietysti siihen, että on käyty läpi kaikki mahdolliset ratkaisut, ja että tiedetään että kaikki yhtälöt toteuttava ratkaisu todellakin on olemassa, koska miinat todellakin on jollakin lailla sijoitettu mappiin niin, ettei yksikään näkyvä numeroruutu valehtele. </li>
 </ol>
 
+Tehty 6.10.2024: minecountin universaali, ei-raskas versio, toimii.
+
 ## TO-DO:
 
-### minecountin parempi versio
-Tilanteissa, joissa ylläoleva ei riitä (eli jos ilman minecountia, eli mapissa jäljelläolevien miinojen kokonaismäärää, ei saada pääteltyä mitään lisää, minkä tunnistaa siitä että kaksi peräkkäistä botin rundia ei olla liputettu mitään lisää eikä avattu mitään lisää), tehdään seuraavasti: kullekin vaihtoehtoiselle kokonaisratkaisulle, joissa voi siis olla eri määrä miinoja, eli jokaiselle koko mapin tämänhetkiselle koko `self.frontin` vaihtoehtoiselle ratkaisulle joka saadaan yhdistämällä `join_comp_groups_into_solutions()`:in `handle_possible_whole_solutions()`:issa kootut mahdolliset kunkin yhtälöjoukon alt-ratkaisut yhteen, tarkistetaan seuraava:
+- lisää testejä
+- siisti koodia
+- jaa modulaarisemmaksi
+- etc
 
-kullekin vaihtoehtoiselle `self.front`:in kokonaisratkaisulle, jos
 
-| niiden 'unclicked'-ruutujen lukumäärä, joista ei tiedetä vielä mitään, eli joita `self.front` ei näe | $\cdot 1 +$ | vaihtoehtoisen koko `self.front`:in kokonaisratkaisun miinojen lukumäärä | $<$ | koko loppumapissa jäljellä olevien miinojen lukumäärä | $\Rightarrow$ tässä `self.front`:in ratkaisuehdotuksessa on liian vähän miinoja, joten se hylätään
