@@ -32,6 +32,7 @@ class CSP_solver:
             print('total_eq:', total_eq)
             print('variables in total_eq = len(total_eq[0]):', len(total_eq[0]))
             
+        
         if need_for_minecount:
             handle_minecount()
         self.previous_round_minecount = minecount

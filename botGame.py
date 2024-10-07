@@ -40,7 +40,7 @@ class Minesweeper:
         self.highlight_bot_location = False
         self.highlight_csp_solved = self.debug_csp
         self.instructions = '''
-        b : bot move
+        b or p : bot move
         f : front highlighting
         c : highlight csp-solved cells
         spacebar : new game
@@ -74,6 +74,8 @@ class Minesweeper:
         self.timer_active = False
         self.obsolete_front = set()         # after each legitimate chording, and after entering a new previously unprobed cell if it has no neighbours
         self.new_front_members = set()
+        self.last_round_opened_new = False
+        self.last_round_solved_vars = set()
         self.solver = CSP_solver(mines_total = self.mines)                          # minecount is needed in 'CSP_solver' in those rarish cases where information about the remaining minecount near the end of the game is needed to be able to solve the last few cases that would otherwise require guessing.
         
         self.minecount = self.mines
@@ -85,7 +87,7 @@ class Minesweeper:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:                                         # event.key, not event.type, sigh. I was looking for this with cats and dogs
                 self.new_game()
-            elif event.key == pygame.K_b:                                           # BOT:
+            elif event.key == pygame.K_b or event.key == pygame.K_p:                                           # BOT:
                 if not self.started:
                     self.handle_first_left_click(self.start_x, self.start_y)
                 self.bot_act()                                                      # the bot makes a move when you press b
@@ -230,7 +232,7 @@ class Minesweeper:
             self.minecount -= 1
 
     def bot_act(self) -> None:                                                          # before this, if started with 'b', there's been in order (1) 'self.handle_first_left_click()' (2) 'self.generate_map()' (3) 'self.probe()'
-        # print('\nbot_act():')                                                           # the following prints will be '- something', '- something_else'. I like this way of console printing because it makes it faster to search for the useful stuff at a given moment in the console, and makes it clear which print originates from which function.
+        # print('\nbot_act():')                                                         # the following prints will be '- something', '- something_else'. I like this way of console printing because it makes it faster to search for the useful stuff at a given moment in the console, and makes it clear which print originates from which function.
         
         width = self.width
         height = self.height
@@ -285,13 +287,16 @@ class Minesweeper:
             def check_for_stalling() -> tuple:
                 all_unclicked = []
                 need_for_minecount = False
-                if self.minecount == self.previous_round_minecount:                         # don't waste resources going through the whole map below (not terrible, but not needed. Also expert has 480 cells; don't go through them all if you don't have to) if the minecount keeps steadily decreasing; i.e., if minecount is not needed, don't use it, use 'normal' logic
+                # if not self.last_round_opened_new:
+                if self.minecount == self.previous_round_minecount:                         # if minecount decreased OR last round opened new cells, don't use minecount logic. In 'CSP_solver.py', minecount logic involves assembling total solutions out of originally separated sets, and counting the mines for the whole thing - don't do that if not absolutely necessary; it involves the aforementioned, including another recursion.
                     need_for_minecount = True
                     for x in range (width):
                         for y in range (height):
                             if self.map[y][x] == labellize('unclicked'):
                                 all_unclicked.append((x,y))                
                 self.previous_round_minecount = self.minecount                              # update for the next round, based on the current minecount
+                self.last_round_opened_new = False                                              # reset. This is set to true in 'handle_opening_a_new_cell' which only happens if a new cell is ACTUALLY opened.
+                
                 return need_for_minecount, all_unclicked
             
             # this function's "for x,y in self.front" loop finds SIMPLE non-CSP solutions: (1) where the number of neighbouring unflagged unclicked cells + flagged cells equals to the label -> flag all, and (2) if label = number of surrounding flags, then perform a chord. Then, I remove unnecessary cells from the front to cut unnecessary computing work for the linear equation CSP solver.
@@ -344,8 +349,8 @@ class Minesweeper:
                     number_of_unclicked_unseen_cells = count_unseen_unclicked_cells()
                     self.solver.absolut_brut(self.minecount, need_for_minecount, all_unclicked_cells, number_of_unclicked_unseen_cells)
                 else:
-                    self.solver.absolut_brut()
-                solved_vars = self.solver.solved_variables      # each is a tuple ((x,y), value)
+                    self.solver.absolut_brut()                      # all the minecount info is not needed, if there's no minecount solving done in CSP_solver. Default 'need_for_minecount' is False.
+                solved_vars = self.solver.solved_variables          # set of tuples: each is a tuple ((x,y), value)
                 # print('-solved_vars:', solved_vars)
                 for (x,y), value in solved_vars:
                     # print(f'- solved {x,y} = {value}')
@@ -354,7 +359,8 @@ class Minesweeper:
                     elif value == 0:                            
                         self.handle_opening_a_new_cell(x, y)    # NB! 'handle_opening_a_new_cell' adds new front members to 'self.new_front_members', NOT yet to self.front, to avoid 'Set changed size during iteration', since 'handle_opening_a_new_cell' was originally used in 'simple_solver' which iterates over 'self.front' and thus cannot directly modify 'self.front' while iterating over it without causing the error.
                         # TO-DO; now, via utilizing handle_opening_a_new_cell, obsolete front should be added from there correctly.
-                filter_front_cells()                            # TO-DO: for this to work, the 'self.front' has to be kept up-to-date. That works; it's done in 'flag_these()' and in 'handle_opening_a_new_cell()' above.
+                filter_front_cells()                                # for this to work, the 'self.front' has to be kept up-to-date. That works; it's done in 'flag_these()' and in 'handle_opening_a_new_cell()' above.
+                self.last_round_solved_vars = solved_vars
                 # print('- solved_vars:', solved_vars)
             
             if self.csp_on:
