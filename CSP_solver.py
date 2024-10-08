@@ -364,11 +364,15 @@ class CSP_solver:
                     for alt_solutions_of_this_length in front_alt_solutions:
                         for alt_solution in alt_solutions_of_this_length:
                             alt_solutions_with_ok_minecount.append(alt_solution)        # All the alt solutions here that you see that do NOT sum up to the currently remaining minecount are such that there is also at least the number of 'minecount'-'n_mines' unclicked unseen cells remaining as well. So if here's an alt solution that has 2 mines, but there are 3 mines remaining in the minecount, then there must be at least 1 unclicked unseen cell as well for this alt solution to be ok.
-            if smallest_n_mines_in_front_alt_solutions == minecount:                    # if none of the alt solutions have less mines than the currently remaining minecount, then all the unclicked unseen cells, which are NOT a part of any of these alt solutions, must NOT have a mine, otherwise the total minecount would exceed the REAL total minecount!
-                if number_of_unclicked_unseen_cells > 0:
+            if number_of_unclicked_unseen_cells > 0:
+                if smallest_n_mines_in_front_alt_solutions == minecount:                # if none of the alt solutions have less mines than the currently remaining minecount, then all the unclicked unseen cells, which are NOT a part of any of these alt solutions, must NOT have a mine, otherwise the total minecount would exceed the REAL total minecount!
                     for cell in all_unclicked:
-                        if cell not in self.variables:                                      # all cells in 'self.variables' have come through 'handle_incoming_equations', so they are seen by 'self.front'. All other 'unclicked' cells are NOT in 'self.front'.
+                        if cell not in self.variables:                                  # all cells in 'self.variables' have come through 'handle_incoming_equations', so they are seen by 'self.front'. All other 'unclicked' cells are NOT in 'self.front'.
                             self.solved_variables.add((cell, 0))
+                elif largest_n_mines_in_front_alt_solutions + number_of_unclicked_unseen_cells == minecount:
+                    for cell in all_unclicked:
+                        if cell not in self.variables:                                  # if the number of unclicked unseen + max number of mines encountered in any alt solution == currently remaining minecount, then every single cell in unclicked unseen cells must have a mine. I met one such situation in a random game.
+                            self.solved_variables.add((cell, 1))
             handle_possible_whole_solutions(alt_solutions_with_ok_minecount)
 
         

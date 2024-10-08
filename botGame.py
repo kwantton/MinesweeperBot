@@ -23,8 +23,8 @@ class Minesweeper:
         self.initialize_debug_features()
         self.font = pygame.font.Font(None, 36-int(0.5*height))
         
-        if mines >= width*height:
-            raise ValueError(f'too many mines, max is {width*height-1} for this size')
+        if mines >= width*height-9:
+            raise ValueError(f'too many mines, max is {width*height-9} for this size')
         
         self.images = {}                                # {name : loaded image}
         self.load_images()
@@ -488,8 +488,11 @@ if __name__ == '__main__':
     expert = 30,16,99
     dense_beg = 9,9,70
     less_dense_beg = 9,9,15
+    too_many_mines = 5,5,16
+    small_weirdo = 4,4,6
+    minecount_demonstration_sometimes = 5,5,15
 
     ''' ↓↓↓ STARTS A NEW MINESWEEPER with the ability to play the bot by pressing b ↓↓↓ (instructions in the game) '''
     # Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=False) # IF YOU WANT ONLY simple_solver(), which WORKS at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
-    Minesweeper(expert[0], expert[1], expert[2], csp_on=True) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
+    Minesweeper(small_weirdo[0], small_weirdo[1], small_weirdo[2], csp_on=True) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
     #           width       height      mines
