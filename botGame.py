@@ -75,7 +75,6 @@ class Minesweeper:
         self.obsolete_front = set()         # after each legitimate chording, and after entering a new previously unprobed cell if it has no neighbours
         self.new_front_members = set()
         self.last_round_opened_new = False
-        self.last_round_solved_vars = set()
         self.solver = CSP_solver(mines_total = self.mines)                          # minecount is needed in 'CSP_solver' in those rarish cases where information about the remaining minecount near the end of the game is needed to be able to solve the last few cases that would otherwise require guessing.
         
         self.minecount = self.mines
@@ -133,7 +132,9 @@ class Minesweeper:
     # based on the coordinates of the first clicked cell (mouse_x, mouse_y), place the mines elsewhere
     def generate_map(self, mouse_x:int, mouse_y:int) -> None:
         print('\ngenerate_map()')
-        available_coordinates = [(x,y) for y in range(self.height) for x in range(self.width) if (x,y) != (mouse_x, mouse_y)]
+        danger_x = set(x for x in range(self.width) if x-1 <= mouse_x <= x+1)
+        danger_y = set(y for y in range(self.height) if y-1 <= mouse_y <= y+1)
+        available_coordinates = [(x,y) for y in range(self.height) for x in range(self.width) if not x in danger_x or not y in danger_y]
         self.mine_locations = set(sample(available_coordinates, self.mines))   # NB! This line of code 'generates' the map by deciding mine locations! This samples a 'self.mines' number of mines (e.g. 99 in an expert game) from 'available_cordinates' which excludes the opening cell that was clicked.
         print(f'- clicked coordinates {mouse_x, mouse_y} and placed the mines as follows:\n', self.mine_locations)
 
@@ -351,17 +352,13 @@ class Minesweeper:
                 else:
                     self.solver.absolut_brut()                      # all the minecount info is not needed, if there's no minecount solving done in CSP_solver. Default 'need_for_minecount' is False.
                 solved_vars = self.solver.solved_variables          # set of tuples: each is a tuple ((x,y), value)
-                # print('-solved_vars:', solved_vars)
                 for (x,y), value in solved_vars:
-                    # print(f'- solved {x,y} = {value}')
                     if value == 1:
                         flag_these([(x,y)])
                     elif value == 0:                            
                         self.handle_opening_a_new_cell(x, y)    # NB! 'handle_opening_a_new_cell' adds new front members to 'self.new_front_members', NOT yet to self.front, to avoid 'Set changed size during iteration', since 'handle_opening_a_new_cell' was originally used in 'simple_solver' which iterates over 'self.front' and thus cannot directly modify 'self.front' while iterating over it without causing the error.
                         # TO-DO; now, via utilizing handle_opening_a_new_cell, obsolete front should be added from there correctly.
                 filter_front_cells()                                # for this to work, the 'self.front' has to be kept up-to-date. That works; it's done in 'flag_these()' and in 'handle_opening_a_new_cell()' above.
-                self.last_round_solved_vars = solved_vars
-                # print('- solved_vars:', solved_vars)
             
             if self.csp_on:
                 csp_solve()
