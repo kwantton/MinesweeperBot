@@ -3,7 +3,7 @@ Course _Aineopintojen harjoitustyö - algoritmit ja tekoäly_, University of Hel
 
 ## Current state (7.10.2024)
 
-Capable of solving all solvable situation, including those that need minecount.
+Capable of solving all solvable situations, including those that need minecount. Next: improve minecount time complexity, then move on to implementing guessing (which should be very easy to implement given the current functionalities of `CSP_solver`)
 
 ## Goal
 The goal is to implement a bot that's capable of solving all solvable minesweeper situations (done) using coupled subsets CSP, referring to Becerra, David J. 2015. Algorithmic Approaches to Playing Minesweeper. Bachelor's thesis, Harvard College (permalink: http://nrs.harvard.edu/urn-3:HUL.InstRepos:14398552).
