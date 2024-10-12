@@ -37,6 +37,7 @@ class Minesweeper:
         print('\ninitialize_debug_features()')
         self.show_mines = False
         self.highlight_front = False                                                # 'front' cells = number-labeled cells that neighbour unsolved cells, i.e. cells in x € {1,2,...8} that do not have x flags marked around them. When this is 'True', it draws a yellow rectangle around each such cell.
+        self.highlight_guesses = False
         self.highlight_bot_location = False
         self.highlight_csp_solved = self.debug_csp
         self.instructions = '''
@@ -44,6 +45,7 @@ class Minesweeper:
         f : front highlighting
         c : highlight csp-solved cells
         spacebar : new game
+        g : highlight guessed cells
         m : show mine locations
         q: quit'''.split('\n        ')                                              # This way of writing lists is used a lot on the 'Data analysis with Python' course, it's very handy for writing longer lists quickly. This splits at each '\n        ' to form a list.
         self.instructions_height = 20 + len(self.instructions)*30                   # pixels for the instructions bar below the minesweeper map
@@ -59,7 +61,7 @@ class Minesweeper:
         print("NEW_GAME")
         self.start_x = 0
         self.start_y = 0
-        self.front = set()                  # cells that are not finished
+        self.front = set()                  # number cells (1...8) that still provide information needed for solving / guessing as-of-yet unprobed cells
         self.opened = set()                 # all thus-far opened cells {(x0,y0), (x1,y1),...}, updated when new cells are opened
         self.unseen = set()                 # all untouched cells; not opened, not in 'self.front', and not next to 'self.front': all unclicked cells that are deeper 'in' the map. This is needed for minecount cases
 
@@ -72,9 +74,9 @@ class Minesweeper:
         self.start_time = None
         self.hit_a_mine = False
         self.timer_active = False
-        self.obsolete_front = set()         # after each legitimate chording, and after entering a new previously unprobed cell if it has no neighbours
-        self.new_front_members = set()
-        self.last_round_opened_new = False
+        self.guessed_cells = set()
+        self.obsolete_front = set()         # all those members of 'self.front' that no longer have any unclicked unflagged neighbours
+        self.new_front_members = set()                                              # this set is needed in 'add_new_front_cells_to_self_front()' for bookkeeping so that after iteration through 'self.front', the members of this set can be added to self.front. 'self.front' cannot be modified DURING iteration over itself, so that's why.
         self.solver = CSP_solver(mines_total = self.mines)                          # minecount is needed in 'CSP_solver' in those rarish cases where information about the remaining minecount near the end of the game is needed to be able to solve the last few cases that would otherwise require guessing.
         
         self.minecount = self.mines
@@ -98,6 +100,8 @@ class Minesweeper:
                 self.show_mines = not self.show_mines
             elif event.key == pygame.K_c:
                 self.highlight_csp_solved = not self.highlight_csp_solved
+            elif event.key == pygame.K_g:
+                self.highlight_guesses = not self.highlight_guesses
             elif event.key == pygame.K_q:
                 exit()
         elif event.type == pygame.MOUSEBUTTONDOWN:
@@ -183,7 +187,6 @@ class Minesweeper:
             for neighbour in neighbours:
                 self.probe(neighbour[0], neighbour[1], primary=True)            # this is normal minesweeper; whenever a 0 is clicked, all the neighbouring 0s, AND each of the neighours of each 0 are opened as well (i.e., the 0-front stops at numbers 1,2,...8). However, I can't know how many of the neighbours have already been opened, flagged, etc, so 'self.probe()' is the function to use, as it does the sorting automatically
         else:
-            # self.front.add((x,y))                                             # bookkeeping of the current frontline (rintama) of not-yet-solved parts of the map
             self.new_front_members.add((x,y))                                   # In the bot version, I can't directly do this because 'self.front' is being iterated through; you can't add new members to the iterated set during iteration, so I'm gathering the new members here to be added AFTER each entire run-through of 'self.front'
 
     def get_neighbours_of(self, x:int, y:int) -> list:                          # returns a list of tuples [(x1,y1), (x2,y2),...]
@@ -288,7 +291,6 @@ class Minesweeper:
             def check_for_stalling() -> tuple:
                 all_unclicked = []
                 need_for_minecount = False
-                # if not self.last_round_opened_new:
                 if self.minecount == self.previous_round_minecount:                         # if minecount decreased OR last round opened new cells, don't use minecount logic. In 'CSP_solver.py', minecount logic involves assembling total solutions out of originally separated sets, and counting the mines for the whole thing - don't do that if not absolutely necessary; it involves the aforementioned, including another recursion.
                     need_for_minecount = True
                     for x in range (width):
@@ -296,7 +298,6 @@ class Minesweeper:
                             if self.map[y][x] == labellize('unclicked'):
                                 all_unclicked.append((x,y))                
                 self.previous_round_minecount = self.minecount                              # update for the next round, based on the current minecount
-                self.last_round_opened_new = False                                              # reset. This is set to true in 'handle_opening_a_new_cell' which only happens if a new cell is ACTUALLY opened.
                 
                 return need_for_minecount, all_unclicked
             
@@ -311,7 +312,7 @@ class Minesweeper:
                     if label == labellize(len(unflagged_unclicked_neighbours) + number_of_surrounding_flags):   # If the number of surrounding ('unclicked' + 'flag') cells equals to the label of this (x,y) front cell in question (for example, 1 flagged + 2 unclicked = 3 = the label of the cell),
                         flag_these(unflagged_unclicked_neighbours)                          # then flag the remaining unflagged cells around the front cell in question (flag the remaining 2 unclicked cells in this example case).
 
-                    # At this point, I COULD update the 'number_of_surrounding_flags' again, since I just (potentially) placed new flags above. If I updated the number of surrounding flags here, the benefit would be a chance for the 'if' clause below to enable performing a chord already during this round instead of during the next round of simple_solver(). However, it's visually much better and clearer to proceed one step at a time, instead of chording below right away; it helps in debugging, and looks a lot nicer when looking at the bot doing its job one small step at a time.
+                    # At this point, I could, technically speaking, update the 'number_of_surrounding_flags' again, since I just (potentially) placed new flags above. Positives: if I updated the number of surrounding flags here, the benefit would be a chance for the 'if' clause below to enable performing a chord already during this round instead of during the next round of simple_solver(). However, it's visually and clearer to proceed one step at a time, instead of chording below right away; it helps in debugging, and looks a lot nicer when looking at the bot doing its job one small step at a time.
 
                     if label == labellize(number_of_surrounding_flags):                     # NB! 'if', not 'elif'. If the number of flagged neighbours equals to the label of the current front cell,
                         if len(unflagged_unclicked_neighbours) >= 1:                        # then if there also are unclicked cells around the current front cell,
@@ -356,16 +357,23 @@ class Minesweeper:
                     if value == 1:
                         flag_these([(x,y)])
                     elif value == 0:                            
-                        self.handle_opening_a_new_cell(x, y)    # NB! 'handle_opening_a_new_cell' adds new front members to 'self.new_front_members', NOT yet to self.front, to avoid 'Set changed size during iteration', since 'handle_opening_a_new_cell' was originally used in 'simple_solver' which iterates over 'self.front' and thus cannot directly modify 'self.front' while iterating over it without causing the error.
-                        # TO-DO; now, via utilizing handle_opening_a_new_cell, obsolete front should be added from there correctly.
+                        self.handle_opening_a_new_cell(x, y)        # NB! 'handle_opening_a_new_cell' adds new front members to 'self.new_front_members', NOT yet to self.front, to avoid 'Set changed size during iteration', since 'handle_opening_a_new_cell' was originally used in 'simple_solver' which iterates over 'self.front' and thus cannot directly modify 'self.front' while iterating over it without causing the error.
                 filter_front_cells()                                # for this to work, the 'self.front' has to be kept up-to-date. That works; it's done in 'flag_these()' and in 'handle_opening_a_new_cell()' above.
+            
+            def guess(cell_to_open) -> None:                        # I'm not specifying the 'cell_to_open' as string of tuple, as both can be used.
+                print("GUESS:", cell_to_open)
+                self.guessed_cells.add(cell_to_open)
+                self.probe(x=cell_to_open[0], y=cell_to_open[1])
             
             if self.csp_on:
                 csp_solve()
+            
+            if self.solver.guess:                                   # if CSP_solver has not managed to solve any new variables with 100% certainty ('normal' logic OR minecounting logic), THEN guess
+                guess(self.solver.guess)                            # 'self.solver.guess' is the variable that had the highest probability of NOT being a mine (as of 12.10.2024 at least)
 
-        def flag_these(cells) -> None:              # NB! this ensures that a flag is placed in all, only when appropriate
+        def flag_these(cells) -> None:                              # NB! this ensures that a flag is placed in all, only when appropriate
             for x,y in cells:
-                if self.map[y][x] == unclicked:     # NB! this ensures that a flag is placed in all, only when appropriate
+                if self.map[y][x] == unclicked:                     # NB! this ensures that a flag is placed in all, only when appropriate
                     self.toggle_flag(x,y)
         
         brain()
@@ -443,6 +451,11 @@ class Minesweeper:
             except:
                 pass
         
+        def highlight_guesses_black() -> None:
+            surface = transparent_highlight_surface(255,255,255,128)
+            for x,y in self.guessed_cells:
+                self.screen.blit(surface, (x*self.cell_size, y*self.cell_size + self.infobar_height))
+        
         def draw_map() -> None:
             for x in range (self.width):
                 for y in range(self.height):
@@ -472,6 +485,8 @@ class Minesweeper:
             highlight_mines_red()
         if self.highlight_csp_solved:
             highlight_csp_solved()
+        if self.highlight_guesses:
+            highlight_guesses_black()
         pygame.display.flip()                                               # display.flip() will update the contents of the entire display. display.update() enables updating of just a part IF you specify which part
         self.clock.tick(30)
     
