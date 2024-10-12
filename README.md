@@ -1,5 +1,6 @@
 # MinesweeperBot
 Course _Aineopintojen harjoitustyö - algoritmit ja tekoäly_, University of Helsinki
+see 'How_to_install.md'
 
 ## Current state (7.10.2024)
 
