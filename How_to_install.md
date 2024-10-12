@@ -1,5 +1,5 @@
 ## Linux
-1. `$ git clone --no_guessing git@github.com:kwantton/MinesweeperBot.git`
+1. `$ git clone --guessing_added git@github.com:kwantton/MinesweeperBot.git`
 2. `$ cd MinesweeperBot` (or whatever the folder is that you pulled)
 ('venv/' is in '.gitignore', as it shouldn't be pulled from GitHub. If you have `venv` for whatever reason in 'MinesweeperBot' folder, `rm .gitignore`, then follow below)
 3. `$ python -m venv venv`
