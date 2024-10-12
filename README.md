@@ -1,5 +1,7 @@
 # MinesweeperBot
 Course _Aineopintojen harjoitustyö - algoritmit ja tekoäly_, University of Helsinki
+
+## git cloning
 see 'How_to_install.md'
 
 ## Current state (7.10.2024)
