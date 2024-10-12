@@ -206,40 +206,62 @@ class CSP_solver:
                         break                                                       # it's possible that one or more variable values from an alt answer (the current one) disagree with one or more alt answers that are INDIRECTLY connected to the current alt answer. Hence, they are in this case 'incompatible' (they directly disagree with each other), and the handling of this current alt solution should be prevented altogether
             return incompatible_pma
                
-        def handle_possible_whole_solutions(possible_whole_solutions : list, called_from_minecount = False):
-                final_answers = dict()
-                counts_of_0 = dict()                                                # needed for guessing; let's find the most safe guess
-                most_zeros = 0
-                naive_safest_guess = None
-                new_answer_count = 0
-                for dictionary in possible_whole_solutions:
-                    for var, val in dictionary.items():
-                        if var not in counts_of_0:
-                            counts_of_0[var] = 0
-                        if val == 0:
-                            counts_of_0[var] += 1
-                            if counts_of_0[var] > most_zeros:
-                                most_zeros = counts_of_0[var]
-                                naive_safest_guess = var                            # why 'naive'? Because there are guesses which, even if they prove not to be a mine after guessing, tell NOTHING new about the resulting situation; NOTHING useful based on which the NEXT move could be made. This means not only is also the NEXT move a guess, but ALSO it's less safe than the 'safest' guess taken during this round as the remaining mine density is now higher in the remaining unclicked cells; i.e., it's possible, that the naive 'safest' guess during this round is IN REALITY is the LEAST SAFE guess considering also the next round! This is relatively rare, but it's possible. Checking if this worst-case-scenario happens would NOT be simple at all; it would involve checking the resulting situation (better yet, all possible resulting situations!) and determining if all of them / majority of them result in a manageable situation (i.e. no guessing required, OR a relatively safe guess required). I have no existing machinery for that, and constructing such would take a LOT of work.
-                                print('naive_safest_guess:', var)
-                        if var not in final_answers:
-                            final_answers[var] = val
-                            new_answer_count += 1
-                        elif final_answers[var] == 'either or':
-                            pass                                                    # I need this for accurate 'new_answer_count'
-                        elif final_answers[var] != val:
-                            final_answers[var] = 'either or'                        # either this was 'either or' was here or not, the result is the same - 'either or'  
-                            new_answer_count -= 1
-                if new_answer_count > 0:                                            # micro-optimization, skipping the below loop when no solutions were found
-                    for var, val in final_answers.items():
-                        if val != 'either or':
-                            self.solved_variables.add((var, val))
-                else:
-                    print('new_answer_count == 0')
-                    if called_from_minecount:
-                        print('called_from_minecount == TRUE, self.naive_safest_guess =', naive_safest_guess)
-                        self.guess = naive_safest_guess                             # 12.10.24: for guessing. If (1) normal solving doesn't help AND (2) mine counting doesn't help either, which is checked by the 'if' clause above, THEN guess the safest cell; that cell which had the highest count of 0s in all of the assembled whole solutions. This info, 'self.guess', is passed on to 'botGame.py' where the guess is made. I made a separate variable for this to be able to recognize this guessing situation in 'botGame.py' to distinguish it from normal solving; this makes it possible to add visuals, etc...
-                pass
+        def handle_possible_whole_solutions(possible_whole_solutions : list, min_n_mines_in_front = 0, called_from_minecount = False):
+            '''
+            parameters: 
+                possible_whole_solutions    : list of dictionaries, each dict is {var1 : value1, ...}
+                min_n_mines_in_front        : int. The minimum number of mines in 'self.front' in 'botGame.py'
+                called_from_minecount       : bool. If called from minecount, and no solutions are found, then guess (probe) the safest possible cell on the map.
+            '''
+            final_answers = dict()
+            n_alts = len(possible_whole_solutions)                              # number of alternative total answers. I need this for probability calculation
+            if n_alts == 0:                                                     # since I'm dividing by 'n_alts' below, I'm making sure no division by 0 is happening ever.
+                return
+            counts_of_0 = dict()                                                # needed for guessing; let's find the most safe guess
+            most_zeros = 0
+            best_chance = 0                                                     # percent P(cell is not a mine). We want the max value here, and the winner is the cell that's going to be guessed
+            new_answer_count = 0
+            naive_safest_guess = None
+            for dictionary in possible_whole_solutions:
+                for var, val in dictionary.items():
+                    if var not in counts_of_0:
+                        counts_of_0[var] = 0
+                    if val == 0:
+                        counts_of_0[var] += 1
+                        if counts_of_0[var] > most_zeros:
+                            most_zeros = counts_of_0[var]
+                            best_chance = 100*counts_of_0[var]/n_alts           # percent: in how many alt solutions is this cell not a mine, divided by the total number of alt solutions
+                            naive_safest_guess = var                            # why 'naive'? Because there are guesses which, even if they prove not to be a mine after guessing, tell NOTHING new about the resulting situation; NOTHING useful based on which the NEXT move could be made. This means not only is also the NEXT move a guess, but ALSO it's less safe than the 'safest' guess taken during this round as the remaining mine density is now higher in the remaining unclicked cells; i.e., it's possible, that the naive 'safest' guess during this round is IN REALITY is the LEAST SAFE guess considering also the next round! This is relatively rare, but it's possible. Checking if this worst-case-scenario happens would NOT be simple at all; it would involve checking the resulting situation (better yet, all possible resulting situations!) and determining if all of them / majority of them result in a manageable situation (i.e. no guessing required, OR a relatively safe guess required). I have no existing machinery for that, and constructing such would take a LOT of work.
+                            # print('naive_safest_guess:', var)
+                    if var not in final_answers:
+                        final_answers[var] = val
+                        new_answer_count += 1
+                    elif final_answers[var] == 'either or':
+                        pass                                                    # I need this for accurate 'new_answer_count'
+                    elif final_answers[var] != val:
+                        final_answers[var] = 'either or'                        # either this was 'either or' was here or not, the result is the same - 'either or'  
+                        new_answer_count -= 1
+            if new_answer_count > 0:                                            # micro-optimization, skipping the below loop when no solutions were found
+                for var, val in final_answers.items():
+                    if val != 'either or':
+                        self.solved_variables.add((var, val))
+            else:
+                print('new_answer_count == 0')
+                if called_from_minecount:                                       # => GUESS! If (1) normal solving doesn't help AND (2) mine counting doesn't help either, which is checked by the 'if' clause here, THEN guess the safest cell; that cell which had the highest count of 0s in all of the assembled whole solutions. This info, 'self.guess', is passed on to 'botGame.py' where the guess is made. I made a separate variable for this to be able to recognize this guessing situation in 'botGame.py' to distinguish it from normal solving; this makes it possible to add visuals, etc...
+                    print('called_from_minecount == TRUE')
+                    self.guess = naive_safest_guess                             # default. The below might be fals -> the default stays.
+                    if number_of_unclicked_unseen_cells > 0:                    # Can't guess unseen cell if there are no unseen unclicked cells.
+                        unclicked_unseen_cell_mine_probability_in_worst_scenario = 100-(100 *(minecount - min_n_mines_in_front) / number_of_unclicked_unseen_cells)  # 100 - percent mine density in unclicked unseen cells in the case that there's the minimum possible number of mines remaining in self.front. It's arbitrary that I chose to inspect the worst case scenario, but generally speaking it's better to opt for guessing cells of partially-known situations than random whatever-tiles in many situations, since often guessing near the front has a higher chance of uncovering more logically solvable situations. However, as that depends on pretty much everything, I repeat that this is NOT the optimal solution in many cases!
+                        if best_chance < unclicked_unseen_cell_mine_probability_in_worst_scenario:
+                            self.guess = "pick unclicked"                           # 12.10.24: for guessing. If 'unclicked' cells have the lowest mine density, then guess there. 
+                            print('self.guess: pick unclicked!')
+                    else:
+                        self.guess = naive_safest_guess
+                        print('self.guess: naive_safest_guess')
+                    print('p_success(front)  =', best_chance)
+                    if number_of_unclicked_unseen_cells > 0:
+                        print("p_success(unseen) ≥", unclicked_unseen_cell_mine_probability_in_worst_scenario)
+            pass
         
         def join_comp_groups_into_solutions(compatibility_groups:dict) -> list:     # also return the whole list of 'possible_whole_solutions'; it's needed IF minecount is needed. If minecount is needed
             keyVars_to_keys = keyVars_to_keys_builder(compatibility_groups)
@@ -253,9 +275,9 @@ class CSP_solver:
                 possible_solution_build_local = possible_solution_build.copy()
                 entered_alts_for_this_build_local = entered_alts_for_this_build.copy()                
                 
-                if this_alt in compatibility_groups:                        # If this alt solution is not a key in 'compatibility_groups', then IT IS UNTRUE as it's incompatible with one or more other groups' every possible alt answer; in that case, do NOT handle this alt at all (do not (1) mark its variables' proposed values as possible solutions, and do not (2) mark the group that it presents as handled); if the current alt is NOT present as a key of 'compatibility_groups', IT IS INCOMPATIBLE WITH AT LEAST ONE OTHER GROUP. In English, if the current alt solution is not present as a key in 'compatibility_groups', it CANNOT EVER SATISFY ALL THE EQUATIONS that we know MUST be true using at least one combination of alt solutions.
-                    group_of_this_alt = identify_group(this_alt)            # 'this_alt' is an alt answer for some group - 'identify_group(this_alt)' tells me WHICH group it belongs to. I want EXACTLY ONE alt answer for EACH group, as each group represents an original equation from the minesweeper map (a number cell, the equation of which is always true, so MUST be satisfied and MUST be compatible with all other groups!)
-                    if group_of_this_alt not in already_handled_groups_local:    # NB! So, I only want EXACTLY ONE alt solution per group. If an alt solution has already been handled, DO NOT HANDLE ANOTHER; that another alt solution will be handled in a whole another iteration of this 'traverse()'. (2) Comparison of sets in python; if the values in the set are the same, then the sets are 'equal' in the == comparison. Nice.
+                if this_alt in compatibility_groups:                            # If this alt solution is not a key in 'compatibility_groups', then IT IS UNTRUE as it's incompatible with one or more other groups' every possible alt answer; in that case, do NOT handle this alt at all (do not (1) mark its variables' proposed values as possible solutions, and do not (2) mark the group that it presents as handled); if the current alt is NOT present as a key of 'compatibility_groups', IT IS INCOMPATIBLE WITH AT LEAST ONE OTHER GROUP. In English, if the current alt solution is not present as a key in 'compatibility_groups', it CANNOT EVER SATISFY ALL THE EQUATIONS that we know MUST be true using at least one combination of alt solutions.
+                    group_of_this_alt = identify_group(this_alt)                # 'this_alt' is an alt answer for some group - 'identify_group(this_alt)' tells me WHICH group it belongs to. I want EXACTLY ONE alt answer for EACH group, as each group represents an original equation from the minesweeper map (a number cell, the equation of which is always true, so MUST be satisfied and MUST be compatible with all other groups!)
+                    if group_of_this_alt not in already_handled_groups_local:   # NB! So, I only want EXACTLY ONE alt solution per group. If an alt solution has already been handled, DO NOT HANDLE ANOTHER; that another alt solution will be handled in a whole another iteration of this 'traverse()'. (2) Comparison of sets in python; if the values in the set are the same, then the sets are 'equal' in the == comparison. Nice.
 
                         incompatible_alt_solution = check_for_disagreements(            # this cannot happen on the FIRST call of 'traverse()', but it CAN happen on subsequent later calls - the 'compatibility_groups' only ensure PAIR compatibility, not beyond than that!
                             this_alt, possible_solution_build_local)
@@ -341,11 +363,10 @@ class CSP_solver:
             for set_alt_solution in filtered_eq_set_alt_solutions[0]:   # in the FIRST one; this is the starting point for building the entire-front alt solutions (one set alt solution from every set must be chosen)
                 append_alt_solution(current_build = [set_alt_solution], current_summa = sum_of(set_alt_solution), current_index = 1)
             if check_nMines_length(nMines_to_frontAltSolutions) == 'INCORRECT':
-                'TROUBLE'
                 raise ValueError('WRONG RESULT IN FUNCTION combine_separated_eq_set_alts_in_all_possible_combinations_and_count_their_sums_for_minecount_check()')
             return nMines_to_frontAltSolutions
         
-        # for each ENTIRELY COUPLED alt whole solution, subtract it
+        # for each ENTIRELY COUPLED alt whole solution
         def use_minecount():
             print('\nuse_minecount since no solutions were found without it')
 
@@ -377,7 +398,7 @@ class CSP_solver:
                     for cell in all_unclicked:
                         if cell not in self.variables:                                  # if the number of unclicked unseen + max number of mines encountered in any alt solution == currently remaining minecount, then every single cell in unclicked unseen cells must have a mine. I met one such situation in a random game.
                             self.solved_variables.add((cell, 1))
-            handle_possible_whole_solutions(alt_solutions_with_ok_minecount, called_from_minecount=True)
+            handle_possible_whole_solutions(alt_solutions_with_ok_minecount, min_n_mines_in_front=smallest_n_mines_in_front_alt_solutions, called_from_minecount=True)
 
         
         if need_for_minecount:
@@ -794,10 +815,6 @@ FAILED tests:''')
 
     # expected_result = '??? dunno'
     # test_info_dict[name] = [csp, expected_result]
-    
-    
-    print_multiple_results(test_info_dict)
-    
     
     print_multiple_results(test_info_dict)
 

@@ -63,7 +63,6 @@ class Minesweeper:
         self.start_y = 0
         self.front = set()                  # number cells (1...8) that still provide information needed for solving / guessing as-of-yet unprobed cells
         self.opened = set()                 # all thus-far opened cells {(x0,y0), (x1,y1),...}, updated when new cells are opened
-        self.unseen = set()                 # all untouched cells; not opened, not in 'self.front', and not next to 'self.front': all unclicked cells that are deeper 'in' the map. This is needed for minecount cases
 
         self.started = False                # the mines will be placed AFTER the first click, as in real minesweeper. Otherwise you could lose on the first click. For that, we need to keep track on if the first click has already commenced or not.
         self.victory = False
@@ -278,8 +277,22 @@ class Minesweeper:
                     for x,y in get_unclicked_cells():
                         self.probe(x,y,True)
             
+            def get_unseen_unclicked_cells() -> set:
+                print("GET UNSEEN UNCLICKED CELLS")
+                unclicked_unseen_cells = set()
+                all_unclicked_cells = get_unclicked_cells()
+                adjacent_to_front = set()
+                for x,y in self.front:
+                    unclicked_front_cell_neighbours = self.get_cells_of_type(unclicked, self.get_neighbours_of(x,y))
+                    for neighbour in unclicked_front_cell_neighbours:
+                        adjacent_to_front.add(neighbour)
+                for cell in all_unclicked_cells:
+                    if cell not in adjacent_to_front:
+                        unclicked_unseen_cells.add(cell)
+                return unclicked_unseen_cells
+            
             def count_unseen_unclicked_cells() -> int:
-                print("COUNT UNSEEN UNCLICKED CELLS")
+                # print("COUNT UNSEEN UNCLICKED CELLS")
                 all_unclicked_cells = get_unclicked_cells()
                 adjacent_to_front = set()
                 for x,y in self.front:
@@ -360,8 +373,32 @@ class Minesweeper:
                         self.handle_opening_a_new_cell(x, y)        # NB! 'handle_opening_a_new_cell' adds new front members to 'self.new_front_members', NOT yet to self.front, to avoid 'Set changed size during iteration', since 'handle_opening_a_new_cell' was originally used in 'simple_solver' which iterates over 'self.front' and thus cannot directly modify 'self.front' while iterating over it without causing the error.
                 filter_front_cells()                                # for this to work, the 'self.front' has to be kept up-to-date. That works; it's done in 'flag_these()' and in 'handle_opening_a_new_cell()' above.
             
+            def pick_optimal_unclicked_unseen_cell_for_guessing() -> tuple:  # is this really 'optimal'? No, it's only optimal in some cases. Often it would be better to pick a cell right AFTER the cells seen by self.front, to get more information about the unclicked cells seen by self.front, but beforehand-evaluation of optimal guesses in those cases gets really complex really fast; I don't have the machinery for that kind of advanced logic. Better to use a human for that c:
+                '''
+                parameters: none
+                returns:    the cell (can be string or tuple!) which should be guessed next 
+                '''
+                uu_cells = get_unseen_unclicked_cells()
+                top_left = 0,0
+                top_right = self.width-1, 0
+                bottom_left = 0, self.height-1
+                bottom_right = self.width-1, self.height-1
+                highest_chance_of_zero = top_left, top_right, bottom_left, bottom_right # indeed, highest chance of zero WITHOUT considering unclicked cells seen by self.front. Are these magically more safe to click, however? No, but the chance of 0 is highest in the corners, since they only have 3 neighbours! Why do I want a 0? Because it has the highest chance of uncovering usable logic.
+                for candidate in highest_chance_of_zero:
+                    if candidate in uu_cells:
+                        return candidate                            # get the first one at random
+                else:
+                    for coord in uu_cells:                          # Just get the first one. How else to conveniently get the first cell in a set, I don't know (there's no index). So this just guesses the first one, whatever it may be.
+                        return coord                                # get the first one at random
+                
             def guess(cell_to_open) -> None:                        # I'm not specifying the 'cell_to_open' as string of tuple, as both can be used.
+                '''
+                parameters: cell_to_open; can be string or tuple
+                returns:    None. The functionality is to perform guessing
+                '''
                 print("GUESS:", cell_to_open)
+                if cell_to_open == 'pick unclicked':
+                    cell_to_open = pick_optimal_unclicked_unseen_cell_for_guessing()
                 self.guessed_cells.add(cell_to_open)
                 self.probe(x=cell_to_open[0], y=cell_to_open[1])
             
@@ -452,7 +489,7 @@ class Minesweeper:
                 pass
         
         def highlight_guesses_black() -> None:
-            surface = transparent_highlight_surface(255,255,255,128)
+            surface = transparent_highlight_surface(120,0,120,100)
             for x,y in self.guessed_cells:
                 self.screen.blit(surface, (x*self.cell_size, y*self.cell_size + self.infobar_height))
         
