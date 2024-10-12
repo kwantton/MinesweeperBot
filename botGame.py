@@ -1,6 +1,6 @@
 import pygame
 from random import sample
-from constraint import Problem                          # this can be used to solve groups of CSP-equations (CSP = constraint satisfaction problem)
+from constraint import Problem                          # this could be used (not done at the moment if grey) to solve groups of CSP-equations (CSP = constraint satisfaction problem)
 from CSP_solver import CSP_solver, format_equation_for_csp_solver
 from cell_id_names import flag, unclicked, mine, safe, labellize, read_number_from_label
 
@@ -494,5 +494,5 @@ if __name__ == '__main__':
 
     ''' ↓↓↓ STARTS A NEW MINESWEEPER with the ability to play the bot by pressing b ↓↓↓ (instructions in the game) '''
     # Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=False) # IF YOU WANT ONLY simple_solver(), which WORKS at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
-    Minesweeper(small_weirdo[0], small_weirdo[1], small_weirdo[2], csp_on=True) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
+    Minesweeper(expert[0], expert[1], expert[2], csp_on=True) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
     #           width       height      mines
