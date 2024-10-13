@@ -490,11 +490,11 @@ class Minesweeper:
             self.screen.blit(minecount_success_surface, (self.cell_size*self.width-500, 10))
         
         def write_p_success_front():
-            p_success_surface = self.font.render(f'Front : {self.solver.p_success_front} % safe', True, (255,255,255))
+            p_success_surface = self.font.render(f'Front ≤ {self.solver.p_success_front} % safe', True, (255,255,255))
             self.screen.blit(p_success_surface, (self.cell_size*self.width-500, 10))
 
         def write_p_success_unseen():
-            p_success_surface = self.font.render(f'Other: {self.solver.p_success_unseen} % safe', True, (255,255,255))
+            p_success_surface = self.font.render(f'Other ≥ {self.solver.p_success_unseen} % safe', True, (255,255,255))
             self.screen.blit(p_success_surface, (self.cell_size*self.width-500, 30))
 
         def write_unclicked_cell_count():

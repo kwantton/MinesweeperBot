@@ -1,6 +1,5 @@
 '''to-do:
-- smart minecount: for all the total alt solutions, subtract them from the total minecount and/or see if the min sum of mines is too high regarding minecount?
-- even faster?
+- smart minecount: separate separated equation sets instead of combining them for minecount, as is done currently. This improves time complexity crucially in worst cases
 - more tests, also on 'botGame.py' side
 '''
 from itertools import combinations
@@ -219,7 +218,23 @@ class CSP_solver:
                         break                                                       # it's possible that one or more variable values from an alt answer (the current one) disagree with one or more alt answers that are INDIRECTLY connected to the current alt answer. Hence, they are in this case 'incompatible' (they directly disagree with each other), and the handling of this current alt solution should be prevented altogether
             return incompatible_pma
                
-        def handle_possible_whole_solutions(possible_whole_solutions : list, min_n_mines_in_front = 0):
+        def guess(naive_safest_guess, min_n_mines_in_front, best_chance):
+            print('GUESSING IS NEEDED:')
+            self.guess = naive_safest_guess                             # default. The below might be fals -> the default stays.
+            self.front_guess = naive_safest_guess                       # as a backup to 'botGame.py' in case there are no unseen cells at all
+            self.choice = 'FRONT'
+            if number_of_unclicked_unseen_cells > 0:                    # Can't guess unseen cell if there are no unseen unclicked cells.
+                unclicked_unseen_cell_safety_in_worst_scenario = 100 - (100 *(minecount - min_n_mines_in_front) / number_of_unclicked_unseen_cells)  # 100 - percent mine density in unclicked unseen cells in the case that there's the minimum possible number of mines remaining in self.front. It's arbitrary that I chose to inspect the worst case scenario, but generally speaking it's better to opt for guessing cells of partially-known situations than random whatever-tiles in many situations, since often guessing near the front has a higher chance of uncovering more logically solvable situations. However, as that depends on pretty much everything, I repeat that this is NOT the optimal solution in many cases!
+                if best_chance < unclicked_unseen_cell_safety_in_worst_scenario:
+                    self.guess = "pick unclicked"                           # 12.10.24: for guessing. If 'unclicked' cells have the lowest mine density, then guess there. 
+                    self.choice = 'UNSEEN'
+                self.p_success_unseen = round(unclicked_unseen_cell_safety_in_worst_scenario, 1)
+                print("- p_success(unseen) ≥", self.p_success_unseen, '%')  # TO-DO: negative values c:
+            self.p_success_front = round(best_chance, 1)
+            print('- p_success(front)  =', self.p_success_front, '%')
+            print('- guess:', self.choice)
+        
+        def handle_possible_whole_solutions(possible_whole_solutions : list, min_n_mines_in_front = 0, called_from_minecount = False):
             '''
             parameters: 
                 possible_whole_solutions    : list of dictionaries, each dict is {var1 : value1, ...}
@@ -236,16 +251,15 @@ class CSP_solver:
             naive_safest_guess = None
             for dictionary in possible_whole_solutions:
                 for var, val in dictionary.items():
-                    if not self.solved_new_vars_during_this_round:                       # this can happen in 'use_minecount()' RIGHT before calling
-                        if var not in counts_of_0:
-                            counts_of_0[var] = 0
-                        if val == 0:
-                            counts_of_0[var] += 1
-                            if counts_of_0[var] > most_zeros:
-                                most_zeros = counts_of_0[var]
-                                best_chance = 100*counts_of_0[var]/n_alts           # percent: in how many alt solutions is this cell not a mine, divided by the total number of alt solutions
-                                naive_safest_guess = var                            # why 'naive'? Because there are guesses which, even if they prove not to be a mine after guessing, tell NOTHING new about the resulting situation; NOTHING useful based on which the NEXT move could be made. This means not only is also the NEXT move a guess, but ALSO it's less safe than the 'safest' guess taken during this round as the remaining mine density is now higher in the remaining unclicked cells; i.e., it's possible, that the naive 'safest' guess during this round is IN REALITY is the LEAST SAFE guess considering also the next round! This is relatively rare, but it's possible. Checking if this worst-case-scenario happens would NOT be simple at all; it would involve checking the resulting situation (better yet, all possible resulting situations!) and determining if all of them / majority of them result in a manageable situation (i.e. no guessing required, OR a relatively safe guess required). I have no existing machinery for that, and constructing such would take a LOT of work.
-                                # print('naive_safest_guess:', var)
+                    if var not in counts_of_0:
+                        counts_of_0[var] = 0
+                    if val == 0:
+                        counts_of_0[var] += 1
+                        if counts_of_0[var] > most_zeros:
+                            most_zeros = counts_of_0[var]
+                            best_chance = 100*counts_of_0[var]/n_alts           # percent: in how many alt solutions is this cell not a mine, divided by the total number of alt solutions
+                            naive_safest_guess = var                            # why 'naive'? Because there are guesses which, even if they prove not to be a mine after guessing, tell NOTHING new about the resulting situation; NOTHING useful based on which the NEXT move could be made. This means not only is also the NEXT move a guess, but ALSO it's less safe than the 'safest' guess taken during this round as the remaining mine density is now higher in the remaining unclicked cells; i.e., it's possible, that the naive 'safest' guess during this round is IN REALITY is the LEAST SAFE guess considering also the next round! This is relatively rare, but it's possible. Checking if this worst-case-scenario happens would NOT be simple at all; it would involve checking the resulting situation (better yet, all possible resulting situations!) and determining if all of them / majority of them result in a manageable situation (i.e. no guessing required, OR a relatively safe guess required). I have no existing machinery for that, and constructing such would take a LOT of work.
+                            # print('naive_safest_guess:', var)
                     if var not in final_answers:
                         final_answers[var] = val
                         new_answer_count += 1
@@ -262,20 +276,9 @@ class CSP_solver:
             else:
                 print('new_answer_count == 0')
                 if not self.solved_new_vars_during_this_round:                  # => GUESS! If (1) normal solving doesn't help AND (2) mine counting doesn't help either, which is checked by the 'if' clause here, THEN guess the safest cell; that cell which had the highest count of 0s in all of the assembled whole solutions. This info, 'self.guess', is passed on to 'botGame.py' where the guess is made. I made a separate variable for this to be able to recognize this guessing situation in 'botGame.py' to distinguish it from normal solving; this makes it possible to add visuals, etc...
-                    print('GUESSING IS NEEDED:')
-                    self.guess = naive_safest_guess                             # default. The below might be fals -> the default stays.
-                    self.front_guess = naive_safest_guess                       # as a backup to 'botGame.py' in case there are no unseen cells at all
-                    self.choice = 'FRONT'
-                    if number_of_unclicked_unseen_cells > 0:                    # Can't guess unseen cell if there are no unseen unclicked cells.
-                        unclicked_unseen_cell_safety_in_worst_scenario = 100-(100 *(minecount - min_n_mines_in_front) / number_of_unclicked_unseen_cells)  # 100 - percent mine density in unclicked unseen cells in the case that there's the minimum possible number of mines remaining in self.front. It's arbitrary that I chose to inspect the worst case scenario, but generally speaking it's better to opt for guessing cells of partially-known situations than random whatever-tiles in many situations, since often guessing near the front has a higher chance of uncovering more logically solvable situations. However, as that depends on pretty much everything, I repeat that this is NOT the optimal solution in many cases!
-                        if best_chance < unclicked_unseen_cell_safety_in_worst_scenario:
-                            self.guess = "pick unclicked"                           # 12.10.24: for guessing. If 'unclicked' cells have the lowest mine density, then guess there. 
-                            self.choice = 'UNSEEN'
-                        self.p_success_unseen = round(unclicked_unseen_cell_safety_in_worst_scenario, 1)
-                        print("- p_success(unseen) ≥", self.p_success_unseen, '%')
-                    self.p_success_front = round(best_chance, 1)
-                    print('- p_success(front)  =', self.p_success_front, '%')
-                    print('- guess:', self.choice)
+                    if called_from_minecount:                                   # I'm utilizing this 'handle_possible_whole_solutions()' twice: the first time, it's called before it's even known, if minecount is needed. So, by default, this is 'called_from_minecount = False'. The second time, this is called from minecount, and then, 'called_from_minecount = True'. THIS IS NEEDED TO PREVENT GUESSING BEFORE (1) new solutions have been found, (2) MINECOUNT HAS BEEN UTILIZED.
+                        guess(naive_safest_guess, min_n_mines_in_front, best_chance)
+                    
         
         def join_comp_groups_into_solutions(compatibility_groups:dict) -> list:     # also return the whole list of 'possible_whole_solutions'; it's needed IF minecount is needed. If minecount is needed
             keyVars_to_keys = keyVars_to_keys_builder(compatibility_groups)
@@ -414,13 +417,13 @@ class CSP_solver:
                         if cell not in self.variables:                                  # if the number of unclicked unseen + max number of mines encountered in any alt solution == currently remaining minecount, then every single cell in unclicked unseen cells must have a mine. I met one such situation in a random game.
                             self.solved_variables.add((cell, 1))
                             self.solved_new_vars_during_this_round = True
-            # TO-DO: check, in 'handle_possible...' below, if at least one new variable was solved above so that the guessing machinery is not utilized for 'guessing' an actually 100% safe mine! It wastes computation AND produces false message of 'guessing' when in reality it's not guessing, unless that checking is done.
             if self.solved_new_vars_during_this_round:
                 self.minecount_successful = True                                        # used in 'botGame.py' for printing 'minecount successful' when it's used. Convenient for debugging!
-            handle_possible_whole_solutions(alt_solutions_with_ok_minecount, min_n_mines_in_front = smallest_n_mines_in_front_alt_solutions)
+            handle_possible_whole_solutions(alt_solutions_with_ok_minecount, 
+                min_n_mines_in_front = smallest_n_mines_in_front_alt_solutions, called_from_minecount=True)
 
         
-        # TO-DO! Check if this works. Make it work by setting this to 'true' THE VERY SECOND that any variable is solved (using normal solving BEFORE minecount, AND in minecount also, above, if that helps solve new variables)
+        # 'self.solved_new_vars_during_this_round' is set to 'True' the very second that a new variable has been solved, each round of absolut_brut() in two possible situations: in (1) 'handle_possible_whole_solutions()' that was done previously, when any new variable is solved (using normal solving BEFORE minecount, and (2) If non-minecount logic wasn't enough, then I'm using 'use_minecount()' that's called here, and that also marks newly solved variables as True, so that guessing is NOT done. If not solved new, then 'handle_possible_whole_solutions()' is called again, there check for new solutions again, and if still not (3rd attempt, kind of), then guessing is done.
         if not self.solved_new_vars_during_this_round:
             use_minecount()
 
