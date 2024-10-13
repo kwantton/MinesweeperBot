@@ -8,47 +8,44 @@ from itertools import combinations
 class CSP_solver:
     def __init__(self, mines_total = float("inf")):
 
-        self.guess = None                                               # 12.10.24: for guessing. If (1) normal solving doesn't help AND (2) mine counting doesn't help either, THEN guess the safest cell. This info, 'self.guess', is passed on to 'botGame.py' where the guess is made. I made a separate variable for this to be able to recognize this guessing situation in 'botGame.py' to distinguish it from normal solving; this makes it possible to add visuals, etc...
-        self.choice = None                                              # either 'FRONT' or 'UNSEEN'; is the next guess located next to 'self.front' (botGame.py has 'self.front') or in the cells unseen by self.front? This is for choice of guessing, and for passing this info to 'botGame.py' after the choice has been made.
+        self.guess = None                                               # 12.10.24: The safest cell to guess is saved here for use in botGame.py, if there is a need to guess. If (1) normal solving doesn't help AND (2) mine counting doesn't help either, THEN guess the safest cell. This info, 'self.guess', is passed on to 'botGame.py' where the guess is made. I made a separate variable for this to be able to recognize this guessing situation in 'botGame.py' to distinguish it from normal solving; this makes it possible to add visuals, etc...
+        self.choice = None                                              # either 'FRONT' or 'UNSEEN'; this tells you if the next guess is located next to 'self.front' (botGame.py has 'self.front') or in the cells unseen by self.front ('unseen unclicked')? This is for choice of guessing, and for passing this info to 'botGame.py' after the choice has been made. This is to describe it for printing.
         self.variables = set()                                          # ALL variables, solved or not
-        self.p_success_front = None                                     # initialize. Otherwise 'draw' section in 'pyGame.py' complains that there's no such attribute
-        self.p_success_unseen = None                                    # initialize
+        self.front_guess = None                                         # the safest front guess cell is saved here for use in botGame.py
+        self.p_success_front = None                                     # initialize. Otherwise 'draw' section in 'pyGame.py' complains that there's no such attribute. This is the highest probability that the most safe unclicked cell next to self.front is safe (has no mine).
+        self.p_success_unseen = None                                    # initialize. Equal probability for each of the unclicked unseen cells to NOT be a mine at the moment
         self.unique_equations = set()                                   # { ((var1, var2, ..), sum_of_mines_in_vars), (...) }. Each var (variable) has format (x,y) of that cell's location; cell with a number label 1...8 = var. Here, I want uniqe EQUATIONS, not unique LOCATIONS, and therefore origin-(x,y) is not stored here. It's possible to get the same equation for example from two different sides, and via multiple different calculation routes, and it's of course possible to mistakenly try to add the same equation multiple times; that's another reason to use a set() here, the main reason being fast search from this hashed set.        
         self.solved_variables = set()                                   # ((x,y), value); the name of the variable is (x,y) where x and y are its location in the minesweeper map (if applicable), and the value of the variable is either 0 or 1, if everything is ok (each variable is one cell in the minesweeper map, and its value is the number of mines in the cell; 0 or 1, that is)
         self.mines_total = mines_total
-        self.previous_round_minecount = -1                              # if this stays the same for 2 rounds, then use minecount
         self.minecount_successful = False
         self.impossible_combinations = set()
 
     def reset_variables(self):
         self.guess = None                                               # resetting this to 'None' at the start of every round of 'absolut_brut()', in case the previous round was a guess. (12.10.2024): this is the default value. If even mine counting doesn't help, then this is set to True in 'handle_possible_whole_solutions()'. That info is then read in 'botGame.py' to handle the guessing.
         self.choice = None                                                      
+        self.front_guess = None
         self.p_success_front = None                                             
         self.p_success_unseen = None                                            
         self.minecount_successful = False
 
-    # 100% solution: (1) PER EACH EQUATION that MUST be satisfied (i.e. each number cell on the minesweeper map), try all combinations of ones (=mines). That's what THIS function does. (2) After this function below, from all of the alternative combinations of 1s and 0s that DO satisfy the CURRENT equation, find those alternatives that are incompatible with all other equations, pairing one group's all possible alts with compatible alts of ONE other group (i.e. "groups", i.e. incompatible with ALL the alternative solutions of at least one other group) (3) from the remaining alt equations per group (i.e. PER original equation), find columns where a variable is always 0 or 1 -> it HAS to be 0 or 1 ALWAYS. Then see these new solutions, inspect the remaining equations for untrue alternatives now that we've solved a new variable (or many new variables), and keep repeating the whole loop (1),(2),(3) as long as new solutions keep coming. Stop iteration when there are no longer new solutions produced by the whole loop.
-    def absolut_brut(self, minecount=-1, need_for_minecount = False, all_unclicked = [], number_of_unclicked_unseen_cells=-1) -> None:   # minecounting logic is used ONLY if the minecount is not changing, i.e., if CSP_solver is currently incapable of solving any more of the map without minecount (not enough information -> 'normal' logic is not enough). In this situation, use information that unclicked_cell_1 + unclicked_cell_2 + unclicked_cell_3 + .... = total number of mines remaining in the entire map (HOWEVER! that equation is not used; it would be too slow, extremely slow at large numbers of unclicked cells remaining). In some cases, that helps solve the remaining situation, sometimes not.
+    # 100% solution: (0) group equations to sets; all the members of one set share variables directly or indirectly with each other (1) PER EACH EQUATION (in each set, doesn't matter at this moment) that MUST be satisfied (i.e. each number cell on the minesweeper map), try all combinations of ones (=mines) (2) from all of the alternative combinations of 1s and 0s that DO satisfy the CURRENT equation, find those alternatives that are incompatible with all alt answers from ONE OTHER (random) equation that is in the same equation set (shares variables directly or indirectly with other members of that equation set), pairing one group's all possible alts with compatible alts of ONE other group (i.e. "groups", i.e. incompatible with ALL the alternative solutions of at least one other group) (3) from the remaining alt equations per group (i.e. PER original equation), find columns where a variable is always 0 or 1 -> it HAS to be 0 or 1 ALWAYS. Then see these new solutions, inspect the remaining equations for untrue alternatives now that we've solved a new variable (or many new variables), and keep repeating the whole loop (1),(2),(3) as long as new solutions keep coming. Stop iteration when there are no longer new solutions produced by the whole loop.
+    def absolut_brut(self, minecount=-1, need_for_minecount = False, all_unclicked = [], number_of_unclicked_unseen_cells = -1, n_unclicked = -1) -> None:   # minecounting logic is used ONLY if the minecount is not changing, i.e., if CSP_solver is currently incapable of solving any more of the map without minecount (not enough information -> 'normal' logic is not enough). In this situation, use information that unclicked_cell_1 + unclicked_cell_2 + unclicked_cell_3 + .... = total number of mines remaining in the entire map (HOWEVER! that equation is not used; it would be too slow, extremely slow at large numbers of unclicked cells remaining). In some cases, that helps solve the remaining situation, sometimes not.
 
         self.reset_variables()
         if not self.unique_equations:
             return
         
-        # print("minecount from CSP_solver:", minecount)                        # the number of unlocated maps at this point
-        # print("previous round minecount:", self.previous_round_minecount)
-        
-        def handle_minecount():
+        def print_minecount_things() -> None:
+            # atm this only prints. Previously was needed.
             print("NEED FOR MINECOUNT")
             print("number_of_unclicked_unseen_cells:", number_of_unclicked_unseen_cells)
             total_eq = (tuple(coord for coord in all_unclicked), minecount)
-            # self.handle_incoming_equations([(-1,-1, total_eq[0], total_eq[1])], reset=False)           # OLD. (x, y, variables, sum_of_variables) is the format of every equation that's fed (in a list) to 'self.handle_incoming_equations([eq1, eq2...])'. The x and y don't matter; they are the ORIGIN of the equation (origin, as in, from where on the minesweeper map the equation came from). It doesn't affect the result in any way, so I'm using -1, -1 to mark that it's not from a single origin, instead a compound (in this case; all the remaining unclicked cells)
             print('total_eq:', total_eq)
             print('variables in total_eq = len(total_eq[0]):', len(total_eq[0]))
-            
+
         
         if need_for_minecount:
-            handle_minecount()
-        self.previous_round_minecount = minecount
+            print_minecount_things()
 
         # for each separate group of eqs, for each equation (i.e. each number cell on the minesweeper map), given that each variable (= each unopened cell) is 0 or 1 (no mine or a mine), find all possible combinations of 1s and 0s that can satisfy that SINGLE equation GIVEN THAT it has sum = k (some integer number = the number of mines in those unopened surrounding cells in total!)
         def find_and_group_possible_answers_per_single_equation(groups_of_eqs:list) -> list:
@@ -232,15 +229,16 @@ class CSP_solver:
             naive_safest_guess = None
             for dictionary in possible_whole_solutions:
                 for var, val in dictionary.items():
-                    if var not in counts_of_0:
-                        counts_of_0[var] = 0
-                    if val == 0:
-                        counts_of_0[var] += 1
-                        if counts_of_0[var] > most_zeros:
-                            most_zeros = counts_of_0[var]
-                            best_chance = 100*counts_of_0[var]/n_alts           # percent: in how many alt solutions is this cell not a mine, divided by the total number of alt solutions
-                            naive_safest_guess = var                            # why 'naive'? Because there are guesses which, even if they prove not to be a mine after guessing, tell NOTHING new about the resulting situation; NOTHING useful based on which the NEXT move could be made. This means not only is also the NEXT move a guess, but ALSO it's less safe than the 'safest' guess taken during this round as the remaining mine density is now higher in the remaining unclicked cells; i.e., it's possible, that the naive 'safest' guess during this round is IN REALITY is the LEAST SAFE guess considering also the next round! This is relatively rare, but it's possible. Checking if this worst-case-scenario happens would NOT be simple at all; it would involve checking the resulting situation (better yet, all possible resulting situations!) and determining if all of them / majority of them result in a manageable situation (i.e. no guessing required, OR a relatively safe guess required). I have no existing machinery for that, and constructing such would take a LOT of work.
-                            # print('naive_safest_guess:', var)
+                    if called_from_minecount:
+                        if var not in counts_of_0:
+                            counts_of_0[var] = 0
+                        if val == 0:
+                            counts_of_0[var] += 1
+                            if counts_of_0[var] > most_zeros:
+                                most_zeros = counts_of_0[var]
+                                best_chance = 100*counts_of_0[var]/n_alts           # percent: in how many alt solutions is this cell not a mine, divided by the total number of alt solutions
+                                naive_safest_guess = var                            # why 'naive'? Because there are guesses which, even if they prove not to be a mine after guessing, tell NOTHING new about the resulting situation; NOTHING useful based on which the NEXT move could be made. This means not only is also the NEXT move a guess, but ALSO it's less safe than the 'safest' guess taken during this round as the remaining mine density is now higher in the remaining unclicked cells; i.e., it's possible, that the naive 'safest' guess during this round is IN REALITY is the LEAST SAFE guess considering also the next round! This is relatively rare, but it's possible. Checking if this worst-case-scenario happens would NOT be simple at all; it would involve checking the resulting situation (better yet, all possible resulting situations!) and determining if all of them / majority of them result in a manageable situation (i.e. no guessing required, OR a relatively safe guess required). I have no existing machinery for that, and constructing such would take a LOT of work.
+                                # print('naive_safest_guess:', var)
                     if var not in final_answers:
                         final_answers[var] = val
                         new_answer_count += 1
@@ -260,22 +258,19 @@ class CSP_solver:
                 if called_from_minecount:                                       # => GUESS! If (1) normal solving doesn't help AND (2) mine counting doesn't help either, which is checked by the 'if' clause here, THEN guess the safest cell; that cell which had the highest count of 0s in all of the assembled whole solutions. This info, 'self.guess', is passed on to 'botGame.py' where the guess is made. I made a separate variable for this to be able to recognize this guessing situation in 'botGame.py' to distinguish it from normal solving; this makes it possible to add visuals, etc...
                     print('GUESS:')
                     self.guess = naive_safest_guess                             # default. The below might be fals -> the default stays.
+                    self.front_guess = naive_safest_guess                       # as a backup to 'botGame.py' in case there are no unseen cells at all
                     self.choice = 'FRONT'
                     if number_of_unclicked_unseen_cells > 0:                    # Can't guess unseen cell if there are no unseen unclicked cells.
-                        unclicked_unseen_cell_mine_probability_in_worst_scenario = 100-(100 *(minecount - min_n_mines_in_front) / number_of_unclicked_unseen_cells)  # 100 - percent mine density in unclicked unseen cells in the case that there's the minimum possible number of mines remaining in self.front. It's arbitrary that I chose to inspect the worst case scenario, but generally speaking it's better to opt for guessing cells of partially-known situations than random whatever-tiles in many situations, since often guessing near the front has a higher chance of uncovering more logically solvable situations. However, as that depends on pretty much everything, I repeat that this is NOT the optimal solution in many cases!
-                        if best_chance < unclicked_unseen_cell_mine_probability_in_worst_scenario:
+                        unclicked_unseen_cell_safety_in_worst_scenario = 100-(100 *(minecount - min_n_mines_in_front) / number_of_unclicked_unseen_cells)  # 100 - percent mine density in unclicked unseen cells in the case that there's the minimum possible number of mines remaining in self.front. It's arbitrary that I chose to inspect the worst case scenario, but generally speaking it's better to opt for guessing cells of partially-known situations than random whatever-tiles in many situations, since often guessing near the front has a higher chance of uncovering more logically solvable situations. However, as that depends on pretty much everything, I repeat that this is NOT the optimal solution in many cases!
+                        if best_chance < unclicked_unseen_cell_safety_in_worst_scenario:
                             self.guess = "pick unclicked"                           # 12.10.24: for guessing. If 'unclicked' cells have the lowest mine density, then guess there. 
                             self.choice = 'UNSEEN'
-                    else:
-                        self.guess = naive_safest_guess
-                        self.choice = 'FRONT'
                     self.p_success_front = round(best_chance, 1)
                     print('- p_success(front)  =', self.p_success_front, '%')
                     if number_of_unclicked_unseen_cells > 0:
-                        self.p_success_unseen = round(unclicked_unseen_cell_mine_probability_in_worst_scenario, 1)
+                        self.p_success_unseen = round(unclicked_unseen_cell_safety_in_worst_scenario, 1)
                         print("- p_success(unseen) ≥", self.p_success_unseen, '%')
                     print('- guess:', self.choice)
-            pass
         
         def join_comp_groups_into_solutions(compatibility_groups:dict) -> list:     # also return the whole list of 'possible_whole_solutions'; it's needed IF minecount is needed. If minecount is needed
             keyVars_to_keys = keyVars_to_keys_builder(compatibility_groups)
@@ -412,7 +407,7 @@ class CSP_solver:
                     for cell in all_unclicked:
                         if cell not in self.variables:                                  # if the number of unclicked unseen + max number of mines encountered in any alt solution == currently remaining minecount, then every single cell in unclicked unseen cells must have a mine. I met one such situation in a random game.
                             self.solved_variables.add((cell, 1))
-            handle_possible_whole_solutions(alt_solutions_with_ok_minecount, min_n_mines_in_front=smallest_n_mines_in_front_alt_solutions, called_from_minecount=True)
+            handle_possible_whole_solutions(alt_solutions_with_ok_minecount, min_n_mines_in_front = smallest_n_mines_in_front_alt_solutions, called_from_minecount = True)
 
         
         if need_for_minecount:
