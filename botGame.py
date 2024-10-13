@@ -14,12 +14,12 @@ class Minesweeper:
         # NB! Put here ONLY those that are not reset at every 'new_game()'
         self.mines = mines
         self.width = width
-        self.cell_size = 50-int(0.8*height)             # how many px in height and width should each cell be?
         self.csp_on = csp_on
         self.height = height                            # map height measured in rows
         self.infobar_height = 100                       # pixels for the infobar above the minesweeper map
         self.debug_csp = debug_csp
         self.clock = pygame.time.Clock()
+        self.cell_size = 50-int(0.8*height)             # how many px in height and width should each cell be?
         self.initialize_debug_features()
         self.font = pygame.font.Font(None, 36-int(0.5*height))
         
@@ -76,6 +76,7 @@ class Minesweeper:
         self.guessed_cells = set()
         self.obsolete_front = set()         # all those members of 'self.front' that no longer have any unclicked unflagged neighbours
         self.new_front_members = set()                                              # this set is needed in 'add_new_front_cells_to_self_front()' for bookkeeping so that after iteration through 'self.front', the members of this set can be added to self.front. 'self.front' cannot be modified DURING iteration over itself, so that's why.
+        self.unclicked = self.width * self.height
         self.solver = CSP_solver(mines_total = self.mines)                          # minecount is needed in 'CSP_solver' in those rarish cases where information about the remaining minecount near the end of the game is needed to be able to solve the last few cases that would otherwise require guessing.
         
         self.minecount = self.mines
@@ -143,11 +144,11 @@ class Minesweeper:
 
     def probe(self, x:int, y:int, primary=False) -> None:           # if primary = False, then don't go to 'handle_probing_of_already_opened_cell', otherwise it can loop and cause another chord! The chording is meant ONLY for actual chording
         # print(f'\nprobe({x,y}, from primary={primary});')
-
         if self.map[y][x] == flag:                                  # NB! This has to come first, as this is most probably in 'self.mine_locations'; If you left click on a red flag (i.e. 'probe' a flagged cell), it does nothing (like in real minesweeper)
             return
         elif (x, y) in self.mine_locations:                         # NB! This has to come before the 'unclicked' check; otherwise the next would be true, as all mine-containing cells are 'unclicked' (the tile's name is 'unclicked'!) before clicking c:
             self.map[y][x] = mine
+            self.unclicked -= 1
             self.game_over(x,y)
             return
         elif self.map[y][x] == unclicked:
@@ -160,7 +161,7 @@ class Minesweeper:
         print('game_over(): HIT A MINE AT COORDINATES:', (x, y))
         self.hit_a_mine = True
         self.timer_active = False
-        self.draw_display()       
+        self.draw_display()                                                     # for precise ending time, maybe something else too, I can't remember...
 
     def handle_probing_of_already_opened_cell(self, x:int, y:int) -> None:      # this kind of a probing (when humans play) is either a chording, or a wasted click (it doesn't do anything)
         # print('\nhandle_probing_of_already_opened_cell()')
@@ -174,6 +175,7 @@ class Minesweeper:
 
     def handle_opening_a_new_cell(self, x:int, y:int) -> None:                  # ALL NEW CELL OPENINGS GO HERE, doesn't matter how the cell was opened (player/bot/single click/chord)
         # print('\nhandle_opening_of_a_new_cell()')
+        self.unclicked -= 1
         self.opened.add((x, y))                                                 # why: in case a zero is clicked open, I'm using handle_click recursively to open up all the surrounding cells that are not mines. For that, this list is needed, so that an endless recursion doesn't occur.
         neighbours = self.get_neighbours_of(x, y)
 
@@ -229,9 +231,11 @@ class Minesweeper:
     def toggle_flag(self, x:int, y:int) -> None:
         if self.map[y][x] == flag:
             self.map[y][x] = unclicked
+            self.unclicked += 1
             self.minecount += 1                                                         # 'minecount' is the number visible on top left of the infobar. It simply is self.mines - 'the Number Of Flags On The Map Currently'
         elif self.map[y][x] == unclicked:
             self.map[y][x] = flag
+            self.unclicked -= 1
             self.minecount -= 1
 
     def bot_act(self) -> None:                                                          # before this, if started with 'b', there's been in order (1) 'self.handle_first_left_click()' (2) 'self.generate_map()' (3) 'self.probe()'
@@ -278,7 +282,6 @@ class Minesweeper:
                         self.probe(x,y,True)
             
             def get_unseen_unclicked_cells() -> set:
-                print("GET UNSEEN UNCLICKED CELLS")
                 unclicked_unseen_cells = set()
                 all_unclicked_cells = get_unclicked_cells()
                 adjacent_to_front = set()
@@ -369,8 +372,9 @@ class Minesweeper:
                 for (x,y), value in solved_vars:
                     if value == 1:
                         flag_these([(x,y)])
-                    elif value == 0:                            
-                        self.handle_opening_a_new_cell(x, y)        # NB! 'handle_opening_a_new_cell' adds new front members to 'self.new_front_members', NOT yet to self.front, to avoid 'Set changed size during iteration', since 'handle_opening_a_new_cell' was originally used in 'simple_solver' which iterates over 'self.front' and thus cannot directly modify 'self.front' while iterating over it without causing the error.
+                    elif value == 0:    
+                        # NB! I had 'self.handle_opening_a_new_cell' previously, by accident.                        
+                        self.probe(x, y)        # NB! 'handle_opening_a_new_cell' adds new front members to 'self.new_front_members', NOT yet to self.front, to avoid 'Set changed size during iteration', since 'handle_opening_a_new_cell' was originally used in 'simple_solver' which iterates over 'self.front' and thus cannot directly modify 'self.front' while iterating over it without causing the error.
                 filter_front_cells()                                # for this to work, the 'self.front' has to be kept up-to-date. That works; it's done in 'flag_these()' and in 'handle_opening_a_new_cell()' above.
             
             def pick_optimal_unclicked_unseen_cell_for_guessing() -> tuple:  # is this really 'optimal'? No, it's only optimal in some cases. Often it would be better to pick a cell right AFTER the cells seen by self.front, to get more information about the unclicked cells seen by self.front, but beforehand-evaluation of optimal guesses in those cases gets really complex really fast; I don't have the machinery for that kind of advanced logic. Better to use a human for that c:
@@ -388,15 +392,21 @@ class Minesweeper:
                     if candidate in uu_cells:
                         return candidate                            # get the first one at random
                 else:
-                    for coord in uu_cells:                          # Just get the first one. How else to conveniently get the first cell in a set, I don't know (there's no index). So this just guesses the first one, whatever it may be.
-                        return coord                                # get the first one at random
+                    for cell in self.front:
+                        neighbours = self.get_neighbours_of(x=cell[0], y=cell[1])
+                        for x, y in neighbours:
+                            if self.map[y][x] == unclicked:
+                                n_2 = self.get_neighbours_of(x, y)
+                                for n in n_2:
+                                    if n in uu_cells:
+                                        print('returning neighbour of neighbour of self.front cell')    # this often reveals more about the situation at 'self.front'. A generally 'good' strategy. Always optimal? No.
+                                        return n
                 
             def guess(cell_to_open) -> None:                        # I'm not specifying the 'cell_to_open' as string of tuple, as both can be used.
                 '''
                 parameters: cell_to_open; can be string or tuple
                 returns:    None. The functionality is to perform guessing
                 '''
-                print("GUESS:", cell_to_open)
                 if cell_to_open == 'pick unclicked':
                     cell_to_open = pick_optimal_unclicked_unseen_cell_for_guessing()
                 self.guessed_cells.add(cell_to_open)
@@ -493,6 +503,29 @@ class Minesweeper:
             for x,y in self.guessed_cells:
                 self.screen.blit(surface, (x*self.cell_size, y*self.cell_size + self.infobar_height))
         
+        def write_minecount_success():
+            minecount_success_surface = self.font.render(f'minecount success', True, (255,255,255))
+            self.screen.blit(minecount_success_surface, (self.cell_size*self.width-500, 10))
+        
+        def write_p_success_front():
+            p_success_surface = self.font.render(f'Front : {self.solver.p_success_front} % safe', True, (255,255,255))
+            self.screen.blit(p_success_surface, (self.cell_size*self.width-500, 10))
+
+        def write_p_success_unseen():
+            p_success_surface = self.font.render(f'Other: {self.solver.p_success_unseen} % safe', True, (255,255,255))
+            self.screen.blit(p_success_surface, (self.cell_size*self.width-500, 30))
+
+        def write_unclicked_cell_count():
+            p_success_surface = self.font.render(f'unclicked cells: {self.unclicked}', True, (255,255,255))
+            self.screen.blit(p_success_surface, (300, 10))
+        
+        def write_choice():
+            choice = 'front'
+            if self.solver.choice == 'UNSEEN':
+                choice = 'other'
+            choice_surface = self.font.render(f'pick: {choice}', True, (255,255,255))
+            self.screen.blit(choice_surface, (self.cell_size*self.width-500, 50))
+
         def draw_map() -> None:
             for x in range (self.width):
                 for y in range(self.height):
@@ -514,6 +547,7 @@ class Minesweeper:
         draw_timer()
         draw_map()
         draw_instructions_bar()
+        write_unclicked_cell_count()
         if self.highlight_front:
             highlight_front_cells_yellow()
         if self.highlight_bot_location:
@@ -524,6 +558,16 @@ class Minesweeper:
             highlight_csp_solved()
         if self.highlight_guesses:
             highlight_guesses_black()
+        if self.solver.minecount_successful:                                 # if minecount() in CSP_solver solved variables succesfully, then write 'minecount' in the upper bar. Else, guessing, and write that info instead.
+            write_minecount_success()
+        else:
+            if self.solver.p_success_front:
+                write_p_success_front()
+            if self.solver.p_success_unseen:
+                write_p_success_unseen()
+            if self.solver.choice:
+                write_choice()
+
         pygame.display.flip()                                               # display.flip() will update the contents of the entire display. display.update() enables updating of just a part IF you specify which part
         self.clock.tick(30)
     
