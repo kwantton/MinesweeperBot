@@ -7,7 +7,7 @@
 ## Tehty tällä viikolla
 
 6.10.2024 ~19.30: MINECOUNT TOIMII NYT KAIKISSA TILANTEISSA.
-- Kaikki mahdollinen logiikka (logiikka = ei arvaukset, koska täydellisiä arvauksia ei ole edes mahdollista laskea kohtuullisessa ajassa; ei voida tehdä miinaharavamapista shakkimappia ja ottaa huomioon joka ikistä mahdollista tulosta (mitä numeroita missäkin, mitä miinoja missäkin) koko pelin kaikkien mahdollisten lopputulosten loppuun asti) toimii tällä hetkellä ja kaikki nykyiset testit menevät läpi! Olen testannut muutaman sataa expert-peliä ja beginner-peliä, eikä ongelmia ole.
+- Kaikki mahdollinen logiikka (logiikka = ei arvaukset, koska täydellisiä arvauksia ei ole edes mahdollista laskea kohtuullisessa ajassa; ei voida tehdä miinaharavamapista shakkimappia ja ottaa huomioon joka ikistä mahdollista tulosta (mitä numeroita missäkin, mitä miinoja missäkin) koko pelin kaikkien mahdollisten lopputulosten loppuun asti) toimii tällä hetkellä ja kaikki nykyiset testit menevät läpi! Olen testannut muutaman sataa (13.10.) expert-peliä ja beginner-peliä, eikä ongelmia ole.
 - seuraavaksi testejä, siivoamista jne
 
 13.10.2024
