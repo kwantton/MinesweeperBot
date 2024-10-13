@@ -65,7 +65,6 @@ class Minesweeper:
 
         self.started = False                # the mines will be placed AFTER the first click, as in real minesweeper. Otherwise you could lose on the first click. For that, we need to keep track on if the first click has already commenced or not.
         self.victory = False
-        self.finished = set()               # cells where label is 0 OR the number of surrounding mines = label
         self.current_time = 0
         self.elapsed_time = 0
         self.mouse_pos = (0,0)
@@ -89,10 +88,11 @@ class Minesweeper:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:                                         # event.key, not event.type, sigh. I was looking for this with cats and dogs
                 self.new_game()
-            elif event.key == pygame.K_b or event.key == pygame.K_p:                                           # BOT:
-                if not self.started:
-                    self.handle_first_left_click(self.start_x, self.start_y)
-                self.bot_act()                                                      # the bot makes a move when you press b
+            elif event.key == pygame.K_b or event.key == pygame.K_p:   
+                if not (self.hit_a_mine or self.victory):                           # I want to enable smashing 'b' and 'p' repeatedly without risking of error; after hitting a mine, smashing 'p' or 'b' can result in error (and can cause (more) lag)
+                    if not self.started:
+                        self.handle_first_left_click(self.start_x, self.start_y)
+                    self.bot_act()                                                      # the bot makes a move when you press b
             elif event.key == pygame.K_f:
                 self.highlight_front = not self.highlight_front                     # toggle debug; highlighting the frontline (rintama) of not-yet-solved portion of the map, on/off toggle
             elif event.key == pygame.K_m:
