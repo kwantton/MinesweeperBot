@@ -3,7 +3,7 @@ Course _Aineopintojen harjoitustyö - algoritmit ja tekoäly_, University of Hel
 
 ## git cloning
 
-see 'How_to_install.md'
+see 'how_to_clone.md'
 
 ## Current state (13.10.2024)
 
