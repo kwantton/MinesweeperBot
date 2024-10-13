@@ -42,7 +42,6 @@ class CSP_solver:
             total_eq = (tuple(coord for coord in all_unclicked), minecount)
             print('total_eq:', total_eq)
             print('variables in total_eq = len(total_eq[0]):', len(total_eq[0]))
-
         
         if need_for_minecount:
             print_minecount_things()
@@ -265,11 +264,10 @@ class CSP_solver:
                         if best_chance < unclicked_unseen_cell_safety_in_worst_scenario:
                             self.guess = "pick unclicked"                           # 12.10.24: for guessing. If 'unclicked' cells have the lowest mine density, then guess there. 
                             self.choice = 'UNSEEN'
-                    self.p_success_front = round(best_chance, 1)
-                    print('- p_success(front)  =', self.p_success_front, '%')
-                    if number_of_unclicked_unseen_cells > 0:
                         self.p_success_unseen = round(unclicked_unseen_cell_safety_in_worst_scenario, 1)
                         print("- p_success(unseen) ≥", self.p_success_unseen, '%')
+                    self.p_success_front = round(best_chance, 1)
+                    print('- p_success(front)  =', self.p_success_front, '%')
                     print('- guess:', self.choice)
         
         def join_comp_groups_into_solutions(compatibility_groups:dict) -> list:     # also return the whole list of 'possible_whole_solutions'; it's needed IF minecount is needed. If minecount is needed
@@ -412,35 +410,6 @@ class CSP_solver:
         
         if need_for_minecount:
             use_minecount()
-            
-
-        # TO-DO: save the non-complete solution candidates in 'join_comp_groups_into_solutions' 'handle_possible_whole_solutions()', and for each of the possible solutions combined with the other set's solutions, check if the number of currently non-variable-status unclicked cells (theoretically all of them can be 1, i.e., a mine) + the number of mines in the entire alt solution is less than the number of remaining mines -> impossible solution, since too few mines in total! 
-        
-        def solution_finder_from_compatibility_groups(compatibility_groups:dict) -> dict:
-            def key_altSolution_inspector():
-                new_solutions = set()
-                keyVars_to_keys = keyVars_to_keys_builder(compatibility_groups)
-                for keyVars, proposed_values in keyVars_to_keys.items():            # each item in 'keyVars' represents a unique equation from the minesweeper map; so each item in 'keyVars' MUST be satisfied one way or another.
-                    if len(proposed_values) == 1:
-                        for var, value in proposed_values[0]:
-                            if (var, value) not in self.solved_variables:
-                                self.solved_variables.add((var,value))
-                                new_solutions.add((var,value))                      # I need to know if it ACTUALLY solved something new!
-                    else:
-                        var_to_possibleValues = dict()                              # for each proposed ((var1,value1), (var2,value2), ...), here called a 'vector', record the value. Since all these vectors now inspected are derived from a single equation that MUST be solved, then if all the suggested values are equal for a variable, it MUST be solved as that value, as otherwise the equation could not be solved. Use debugger if this is unclear, it shows very clearly what's happening here c:
-                        for proposed_vector in proposed_values:                     # NB! This gathers all possible values for each variable (i.e., 0, or 1, or 0 and 1 per variable!) for ALL the proposed vectors per key; so
-                            for var,value in proposed_vector:
-                                if var not in var_to_possibleValues:
-                                    var_to_possibleValues[var] = []
-                                if value not in var_to_possibleValues[var]:         # I wanted to use a list instead of a set because [can't-remember-why!]. That's why I HAVE to check if the value is already in the list.
-                                    var_to_possibleValues[var].append(value)
-                        for var,values in var_to_possibleValues.items():
-                            if len(values) == 1:
-                                if (var, value) not in self.solved_variables:
-                                    self.solved_variables.add((var, values[0]))
-                                    new_solutions.add((var,values[0]))
-                return new_solutions
-        # solution_finder_from_compatibility_groups(compatibility_groups)       # works, but I'm not using it.
 
     # NB! This is called, when adding new equations for the first time, AND after finding new variables IF the related equations are (1) new and (2) do not become single solved variables as well (i.e. if the related equations are not reduced from equations like a+b=1 to just solved single variables like b=1). Hence, sometimes the 'self.update_equation(equation)' is necessary.
     def handle_incoming_equations(self, equations:list, reset=True) -> None:    # equations = [(x, y, ((x1, y1), (x2, y2), ...), summa), ...]; so each equation is a tuple of of x, y, unflagged unclicked neighbours (coordinates; unique variables, that is!), and the label of the cell (1,2,...8)
