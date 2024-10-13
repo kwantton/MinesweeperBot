@@ -502,9 +502,9 @@ class Minesweeper:
             self.screen.blit(p_success_surface, (300, 10))
         
         def write_choice():
-            choice = 'front'
-            if self.solver.choice == 'UNSEEN':
-                choice = 'other'
+            choice = 'other'
+            if self.solver.choice == 'FRONT':
+                choice = 'safest cell from front'
             choice_surface = self.font.render(f'pick: {choice}', True, (255,255,255))
             self.screen.blit(choice_surface, (self.cell_size*self.width-500, 50))
 

@@ -377,8 +377,9 @@ class CSP_solver:
             filtered_eq_set_alt_solutions = remove_empty_eq_sets(eq_set_possible_solutions)    # get rid of empty eq sets, so it doesn't falsify len() of eq sets below
             n_sets = len(filtered_eq_set_alt_solutions)
             nMines_to_frontAltSolutions = dict()         # {number of mines : alt entire-front combined solutions with that number of mines}. Every alt solution from every separate equation set is coupled with every alt solution from every other set, to be able to construct all the possible entire-front alt solutions, the mines of which are counted - this is for being able to use remaining mine count for deducing which of these alt whole-front solutions are impossible. For each of these entire-front alt solutions, discard the impossible ones, then see if the remaining ones all agree regarding one or more variable just like previously, once again using 'handle_possible_whole_solutions()' since it's awesome c:
-            for set_alt_solution in filtered_eq_set_alt_solutions[0]:   # in the FIRST one; this is the starting point for building the entire-front alt solutions (one set alt solution from every set must be chosen)
-                append_alt_solution(current_build = [set_alt_solution], current_summa = sum_of(set_alt_solution), current_index = 1)
+            if len(filtered_eq_set_alt_solutions) > 0:                      # in case you continue to 'b' after hitting a mine in 'botGame', this length can be zero (I've seen it happen). Normally, this NEVER happens, though.
+                for set_alt_solution in filtered_eq_set_alt_solutions[0]:   # in the FIRST one; this is the starting point for building the entire-front alt solutions (one set alt solution from every set must be chosen)
+                    append_alt_solution(current_build = [set_alt_solution], current_summa = sum_of(set_alt_solution), current_index = 1)
             if check_nMines_length(nMines_to_frontAltSolutions) == 'INCORRECT':
                 raise ValueError('WRONG RESULT IN FUNCTION combine_separated_eq_set_alts_in_all_possible_combinations_and_count_their_sums_for_minecount_check()')
             return nMines_to_frontAltSolutions
