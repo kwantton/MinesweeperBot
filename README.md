@@ -9,12 +9,12 @@ see 'how_to_clone.md'
 
 Capable of solving all solvable situations, including those that need minecount. 
 Capable of guessing, choosing the better alternative from near-front cells or from other cells ('unseen unclicked') based on probabilities acquired from minecount functionalities and from the number of remaining mines (remaining minecount) and remaining unseen unclicked cells.
-Next: improve minecount time complexity. This is done by separating the minecount situations - I had joined them together at the time, which of course was not a good idea, so at some point I will have to fix that by taking the separated fronts (separated eq sets) apart again before minecount and therefore also before guessing calculations. It will take many days, but I have to do it at some point.
+I am now using separated sets also for minecount and guessing situations. Next: testing, and possibly improve non-minecount situations by utilizing the same method as in minecount situations (of not going through alt solutions when looking for variables that are always 1 or 0, instead just directly counting them on the go)
 
 ## Goal
 The goal is to implement a bot that's capable of solving all solvable minesweeper situations (done) using coupled subsets CSP, referring to Becerra, David J. 2015. Algorithmic Approaches to Playing Minesweeper. Bachelor's thesis, Harvard College (permalink: http://nrs.harvard.edu/urn-3:HUL.InstRepos:14398552).
 
-If possible, should be even more efficient (to-do). At the moment, capable of handling expert maps, but in wilder situations than what one usually encounters in expert, it could become unusably slow and RAM-exhaustive (e.g. several disconnected fronts in a minecount situation).
+If possible, should be even more efficient (to-do). At the moment, capable of handling expert maps, but in the wilder situations than what one usually encounters in expert, it could become unusably slow and quite RAM-exhaustive.
 
 ## Ideas
 - Important: like described in 'current state', in minecount needed -situations, I'm unnecessarily combining the separated sets for getting the alt minecount per entire-front alt answer. I could just use the minecounts per alt in the separated sets instead of combining first (no need to do that!), summing them up, this way virtually "combining" the alt answers per set for minecount inspection without actual combinations, the making of which takes a lot of computation and time -> some minecount situations would be dozens..thousands...more times faster. I'll do this once I have time from LaMa and todari-IIa
