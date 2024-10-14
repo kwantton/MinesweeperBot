@@ -369,6 +369,90 @@ class CSP_solver:
             if check_nMines_length(nMines_to_frontAltSolutions) == 'INCORRECT':
                 raise ValueError('WRONG RESULT IN FUNCTION combine_separated_eq_set_alts_in_all_possible_combinations_and_count_their_sums_for_minecount_check()')
             return nMines_to_frontAltSolutions
+
+        # NEW! This function is PER ONE eq_set instead of the old one, which built solutions and their sums for ALL sets
+        def count_mines_of_set_alt_solutions_for_minecount_check(eq_set_alt_solutions:list) -> tuple:   # separated sets = erilliset joukot; here it means that the solution sets do not share a single variable. These separated sets consist of all eligible alt answers per each set. If the sum of a given combination whole-front-alt-answer that's joined together here and which has one alt from each set per combo disagrees with remaining minecount later, it is impossible; discard all such whole-front alt answers. Whether that disagreement happens is found out only by summing the thus-far separated alt answer sets together - that's why I'm combining them here!
+            '''
+            returns: tuple (nMines_to_setAltSolutions, min_minecount, max_minecount). 
+            The 1. one is a ditionary with 
+            { number of mines in the alt solution to this set : [alt solution to this set #1, alt solution to this set #2, ...], .... }. This contains ALL the alt solutions to this set! It's just divided by number of mines. That will come in handy later, when inspecting the whole-front alt answers regarding minecount; this makes it a lot faster to discard bad answers before the actual 'construction' even begins.
+            The 2. one is the min number of mines that was found in any of the alt solutions to this set. This is needed for minecount.
+            The 3. one is the max number of mines that was found in any of the alt solutions to this set. Likewise, for minecount.
+            '''
+            # needed; for each alt build, I need the sum of the build. I have one or more alt_solutions per each equation, and one or more equations per this set-in-question.
+            def count_mines(alt_solution):
+                mines = 0
+                for var, value in alt_solution.items():
+                    mines += value
+                return mines
+
+            # needed: (1) build the solution by choosing all alt combinations PER this set-in-question, (2) count the sum for each build
+            def handle_alt_solution(set_alt_solution:list, n_mines:int, min_minecount, max_minecount) -> None:
+                if n_mines < min_minecount:
+                    min_minecount = n_mines
+                if n_mines > max_minecount:
+                    max_minecount = n_mines
+                if n_mines not in nMines_to_setAltSolutions:
+                    nMines_to_setAltSolutions[n_mines] = []
+                nMines_to_setAltSolutions[n_mines].append(set_alt_solution)
+                return min_minecount, max_minecount
+
+            # I also need this. I could just return: (nMines_to_setAltSolutions, min_minecount, max_minecount). That would do it!
+            max_minecount = 0
+            min_minecount = float('inf')
+            nMines_to_setAltSolutions = dict()                      # {number of mines : alt entire-front combined solutions with that number of mines}. Every alt solution from every separate equation set is coupled with every alt solution from every other set, to be able to construct all the possible entire-front alt solutions, the mines of which are counted - this is for being able to use remaining mine count for deducing which of these alt whole-front solutions are impossible. For each of these entire-front alt solutions, discard the impossible ones, then see if the remaining ones all agree regarding one or more variable just like previously, once again using 'handle_possible_whole_solutions()' since it's awesome c:
+            for set_alt_solution in eq_set_alt_solutions:           # for in the FIRST equation; this is the starting point for building the entire-front alt solutions (one set alt solution from every set must be chosen)
+                min_minecount, max_minecount = handle_alt_solution(set_alt_solution, 
+                    count_mines(set_alt_solution), min_minecount, max_minecount)
+            return nMines_to_setAltSolutions, min_minecount, max_minecount
+        
+        # NEW! If possible, return 'nMines_to_frontAltSolutions' like it was before.
+        def sum_up_and_check_minecount(alt_set_SolutionsMinminesMaxmines:list,
+            smallest_n_mines_in_front_alt_solutions:int, largest_n_mines_in_front_alt_solutions:int) -> dict:
+
+            def get_nMines_to_frontAltSolutions() -> dict:
+                nMines_to_frontAltSolutions = dict()
+                # for nMines_to_setAltSolutions, min_minecount, max_minecount in alt_set_SolutionsMinminesMaxmines:
+                return nMines_to_frontAltSolutions
+
+            only_min_sum_is_ok =only_max_sum_is_ok =  False
+            if number_of_unclicked_unseen_cells > 0:
+                if smallest_n_mines_in_front_alt_solutions == minecount:                # if none of the alt solutions have less mines than the currently remaining minecount, then all the unclicked unseen cells, which are NOT a part of any of these alt solutions, must NOT have a mine, otherwise the total minecount would exceed the REAL total minecount!
+                    only_min_sum_is_ok = True
+                    for cell in all_unclicked:
+                        if cell not in self.variables:                                  # NB! All cells in 'self.variables' have come through 'handle_incoming_equations', so they are seen by 'self.front'. All other 'unclicked' cells are NOT in 'self.front'.
+                            self.solved_variables.add((cell, 0))
+                            self.solved_new_vars_during_this_round = True
+                elif largest_n_mines_in_front_alt_solutions + number_of_unclicked_unseen_cells == minecount:    # -> every unseen cell must be a mine, see below comment
+                    only_max_sum_is_ok = True
+                    for cell in all_unclicked:
+                        if cell not in self.variables:                                  # NB! All cells in 'self.variables' have come through 'handle_incoming_equations', so they are seen by 'self.front'. All other 'unclicked' cells are NOT in 'self.front'.
+                            self.solved_variables.add((cell, 1))                        # if the number of unclicked unseen + max number of mines encountered in any alt solution == currently remaining minecount, then every single cell in unclicked unseen cells must have a mine. I met one such situation in a random game.
+                            self.solved_new_vars_during_this_round = True
+            if self.solved_new_vars_during_this_round:
+                self.minecount_successful = True                                        # used in 'botGame.py' for printing 'minecount successful' when it's used. Convenient for debugging!
+            
+            alt_solutions_with_ok_minecount = []
+
+            if only_min_sum_is_ok:
+                pass
+            elif only_max_sum_is_ok:
+                pass
+            else:
+                nMines_to_frontAltSolutions = get_nMines_to_frontAltSolutions()
+                for n_mines, front_alt_solutions in nMines_to_frontAltSolutions.items():
+                    if n_mines + number_of_unclicked_unseen_cells < minecount:              # Example: 8a. Any alt for which this happens is impossible. The max number of mines in 'unclicked unseen cells' is the number of those cells. So if this alt solution + that is less than the actual remaining minecount, then it's impossible
+                        pass
+                    elif n_mines > minecount:
+                        pass                                                                # impossible. For example; Test 8a. So, if 'n_mines' (number of mines in total in the current entire-front alt solution) + the number of unseen unclicked cells (all of which COULD have a mine, in the maximum case) is less than the remaining minecount, then this current alt solution minecount is simply too small -> impossible alt solution.
+                    else:
+                        for alt_solutions_of_this_length in front_alt_solutions:
+                            for alt_solution in alt_solutions_of_this_length:
+                                alt_solutions_with_ok_minecount.append(alt_solution)        # All the alt solutions here that you see that do NOT sum up to the currently remaining minecount are such that there is also at least the number of 'minecount'-'n_mines' unclicked unseen cells remaining as well. So if here's an alt solution that has 2 mines, but there are 3 mines remaining in the minecount, then there must be at least 1 unclicked unseen cell as well for this alt solution to be ok.
+
+            handle_possible_whole_solutions(alt_solutions_with_ok_minecount, 
+                min_n_mines_in_front = smallest_n_mines_in_front_alt_solutions, called_from_minecount = True)
+
         
         # for each ENTIRELY COUPLED alt whole solution
         def use_minecount(eq_set_possible_solutions : list) -> None:
@@ -376,9 +460,25 @@ class CSP_solver:
 
             # all these three below are about THE WHOLE front solution; solutions for the WHOLE FRONT, everything seen by 'self.front' in 'botGame.py', everything in yellow when you highlight it in the minesweeper botGame by pressing 'f'. Please try it! c:
             alt_solutions_with_ok_minecount = []
-            largest_n_mines_in_front_alt_solutions = 0
-            smallest_n_mines_in_front_alt_solutions = self.mines_total
+            smallest_n_mines_in_front_alt_solutions = largest_n_mines_in_front_alt_solutions = 0
+            
+            # OLD
             nMines_to_frontAltSolutions = combine_separated_eq_set_alts_in_all_possible_combinations_and_count_their_sums_for_minecount_check(eq_set_possible_solutions)
+            
+            # NEW!
+            # consists of triples: (dict, Minmines, Maxmines), for each eq set alt solution. This info is needed in minecount solving later.
+            alt_set_SolutionsMinminesMaxmines = []
+            for eq_set in eq_set_possible_solutions:
+                result = count_mines_of_set_alt_solutions_for_minecount_check(eq_set)
+                nMines_to_setAltSolutions, min_minecount, max_minecount = result
+                largest_n_mines_in_front_alt_solutions += max_minecount
+                smallest_n_mines_in_front_alt_solutions += min_minecount
+                alt_set_SolutionsMinminesMaxmines.append(result)
+            pass
+            # TO-DO: get all possible minecount sums; one for each combination of set alt solutions (one alt per separate eq set). Then inspect each corresponding solution using the machinery below, as it works (it's been tested meticulously before already)
+            sum_up_and_check_minecount(alt_set_SolutionsMinminesMaxmines,
+                smallest_n_mines_in_front_alt_solutions, largest_n_mines_in_front_alt_solutions)
+                
 
             for n_mines, front_alt_solutions in nMines_to_frontAltSolutions.items():
                 if n_mines < smallest_n_mines_in_front_alt_solutions:
