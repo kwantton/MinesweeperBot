@@ -202,7 +202,7 @@ class CSP_solver:
             print('- p_success(front)  ≤', self.p_success_front, '%')
             print('- guess:', self.choice)
         
-        def handle_possible_whole_solutions(possible_whole_solutions : list, min_n_mines_in_front = 0, called_from_minecount = False):
+        def handle_possible_whole_solutions(possible_whole_solutions : list, min_n_mines_in_front = 0):
             '''
             parameters: 
                 possible_whole_solutions    : list of dictionaries, each dict is {var1 : value1, ...}
@@ -212,22 +212,10 @@ class CSP_solver:
             n_alts = len(possible_whole_solutions)                              # number of alternative total answers. I need this for probability calculation
             if n_alts == 0:                                                     # since I'm dividing by 'n_alts' below, I'm making sure no division by 0 is happening ever.
                 return
-            most_zeros = 0
-            best_chance = 0                                                     # percent P(cell is not a mine). We want the max value here, and the winner is the cell that's going to be guessed
-            counts_of_0 = dict()                                                # needed for guessing; let's find the most safe guess
             new_answer_count = 0
             naive_safest_guess = None
             for dictionary in possible_whole_solutions:
                 for var, val in dictionary.items():
-                    if var not in counts_of_0:
-                        counts_of_0[var] = 0
-                    if val == 0:
-                        counts_of_0[var] += 1
-                        if counts_of_0[var] > most_zeros:
-                            most_zeros = counts_of_0[var]
-                            best_chance = 100*counts_of_0[var]/n_alts           # percent: in how many alt solutions is this cell not a mine, divided by the total number of alt solutions
-                            naive_safest_guess = var                            # why 'naive'? Because there are guesses which, even if they prove not to be a mine after guessing, tell NOTHING new about the resulting situation; NOTHING useful based on which the NEXT move could be made. This means not only is also the NEXT move a guess, but ALSO it's less safe than the 'safest' guess taken during this round as the remaining mine density is now higher in the remaining unclicked cells; i.e., it's possible, that the naive 'safest' guess during this round is IN REALITY is the LEAST SAFE guess considering also the next round! This is relatively rare, but it's possible. Checking if this worst-case-scenario happens would NOT be simple at all; it would involve checking the resulting situation (better yet, all possible resulting situations!) and determining if all of them / majority of them result in a manageable situation (i.e. no guessing required, OR a relatively safe guess required). I have no existing machinery for that, and constructing such would take a LOT of work.
-                            # print('naive_safest_guess:', var)
                     if var not in final_answers:
                         final_answers[var] = val
                         new_answer_count += 1
@@ -241,11 +229,6 @@ class CSP_solver:
                     if val != 'either or':
                         self.solved_variables.add((var, val))
                         self.solved_new_vars_during_this_round = True
-            else:
-                print('new_answer_count == 0')
-                if not self.solved_new_vars_during_this_round:                  # => GUESS! If (1) normal solving doesn't help AND (2) mine counting doesn't help either, which is checked by the 'if' clause here, THEN guess the safest cell; that cell which had the highest count of 0s in all of the assembled whole solutions. This info, 'self.guess', is passed on to 'botGame.py' where the guess is made. I made a separate variable for this to be able to recognize this guessing situation in 'botGame.py' to distinguish it from normal solving; this makes it possible to add visuals, etc...
-                    if called_from_minecount:                                   # I'm utilizing this 'handle_possible_whole_solutions()' twice: the first time, it's called before it's even known, if minecount is needed. So, by default, this is 'called_from_minecount = False'. The second time, this is called from minecount, and then, 'called_from_minecount = True'. THIS IS NEEDED TO PREVENT GUESSING BEFORE (1) new solutions have been found, (2) MINECOUNT HAS BEEN UTILIZED.
-                        choose_best_guess(naive_safest_guess, min_n_mines_in_front, best_chance)
         
         # every key in 'compatibility_groups' is an alt solution for one equation that must be solved one way or another. The same goes for all equation groups in each of those keys' values, BUT here I'm just looking at the keys before looking at their values.
         def keyVars_to_keys_builder(compatibility_groups:dict) -> dict:
@@ -501,12 +484,15 @@ class CSP_solver:
                 smallest_n_mines_in_front_alt_solutions, largest_n_mines_in_front_alt_solutions)
 
         def handle_flag_box() -> None:
+            print('handle_flag_box()')
             if len(all_unclicked) > 0:
                 if minecount == 0:
                     for cell in all_unclicked:
+                        print('- marking var as 0')
                         self.solved_variables.add((cell, 0))
                 else:
                     # Both of these below work. The non-commented one is a lot more straightforward, though, and saves work.
+                    print('- self.guess:', all_unclicked[0])
                     self.guess = all_unclicked[0]                                                   # in this situation, you have to guess, as the contents of the 'flag box' are a mystery
                     # self.unique_equations = { (tuple(var for var in all_unclicked), minecount)}   # There's a chance for 'self.front' not existing in a case where the game is not finished, i.e. there are non-mine cells in that flag box
                 return
@@ -523,7 +509,7 @@ class CSP_solver:
             # (0) reset variables
             self.reset_variables_before_csp_solving()
 
-            # (0.1) check for an ultra-rare situation
+            # (0.1) check for an ultra-rare situation which I'm calling a 'flag box', where 'self.front' of 'botGame.py' has been emptied, hence there are no 'self.unique_equations' here, and there's a wall of flags preventing seeing to the other side at all. See more explanation in the function 'handle_flag_box()'. I ran into this flag box after around 650 expert games. Yes, I manually pushed 'b' and 'p' for 650 expert games c: yes, I need help c:
             if not self.unique_equations:                                                               # if there is no 'self.front' at all, there are no 'self.unique_equations' fed into this 'CSP_solver.py' from 'botGame.py'; this can happen when a 'flag box' / 'flag shield' is born in the game, in very rare situations (I just came up with that word, btw) but everything around it has been solved, so that the inner, unseen contents of the flag box are a complete mystery. If that mystery has at least one unclicked cell without a mine, we have to guess somewhere in the box. If the box had only mines, the game would be complete, and nothing would need to be done!
                 handle_flag_box()
                 return
@@ -902,15 +888,28 @@ FAILED tests:''')
     expected_result = '01100000'
     test_info_dict[name] = [csp, expected_result]
 
-    ########################## Test 9: Flag box; a=0 expected. An ultra-rare situation where 'self.front' is empty, but there are still unclicked cells ##############################
+    ########################## Test 9a: Flag box; a=0 expected. An ultra-rare situation where 'self.front' is empty, but there are still non-mine cells inside the flag box ##############################
 
-    name = 'Test 9: Flag box; a=0 expected. An ultra-rare situation where "self.front" is empty, but there are still unclicked cells'
+    name = 'Test 9a: Flag box; a=0 expected. An ultra-rare situation where "self.front" is empty, but there are still non-mine cells inside the flag box'
     csp = CSP_solver()
     # NO EQUATIONS in this test. Yes, this can happen, when a 'flag box' is born in a rare game. If only one side of the box is seen by 'self.front', then the other side is inaccessible without guessing, AND there is no 'self.front' anymore, if everything else has been solved and/or guessed already.
     csp.handle_incoming_equations([]) # no equations, BUT in minesweeper, this function has been called (many many times) before arriving in this 'flag box' situation
     csp.absolut_brut(minecount=0, all_unclicked='a'.split(), number_of_unclicked_unseen_cells=1)
 
     expected_result = '0'
+    test_info_dict[name] = [csp, expected_result]
+
+    ########################## Test 9b: Flag box b; nothing expected. An ultra-rare situation where 'self.front' is empty, but there are still non-mine cells inside the flag box. Here, there's one non-mine cell, and one mine cell -> only a guess can be made. This test doesn't check, if the guess is made, however. ##############################
+
+    expected_result = 'NOTHING'
+
+    name = f'Test 9b: Flag box; "{expected_result}" expected. An ultra-rare situation where "self.front" is empty, but there are still non-mine cells inside the flag box'
+    csp = CSP_solver()
+    # NO EQUATIONS in this test. Yes, this can happen, when a 'flag box' is born in a rare game. If only one side of the box is seen by 'self.front', then the other side is inaccessible without guessing, AND there is no 'self.front' anymore, if everything else has been solved and/or guessed already.
+    csp.handle_incoming_equations([]) # no equations, BUT in minesweeper, this function has been called (many many times) before arriving in this 'flag box' situation
+    csp.absolut_brut(minecount=1, all_unclicked='a b'.split(), number_of_unclicked_unseen_cells=1)
+
+    
     test_info_dict[name] = [csp, expected_result]
 
     ########################## Test 8c: minecount helps, complex. ? expected. 0 unseen cells. ##############################
