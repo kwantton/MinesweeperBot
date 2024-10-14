@@ -21,6 +21,7 @@ class Minesweeper:
         self.clock = pygame.time.Clock()
         self.cell_size = 50-int(0.8*height)             # how many px in height and width should each cell be?
         self.initialize_debug_features()
+        self.game_result_counter = [0,0]                # [wins, losses]
         self.font = pygame.font.Font(None, 36-int(0.5*height))
         
         if mines >= width*height-9:
@@ -161,6 +162,7 @@ class Minesweeper:
         self.hit_a_mine = True
         self.timer_active = False
         self.draw_display()                                                     # for precise ending time, maybe something else too, I can't remember...
+        self.game_result_counter[1] += 1
 
     def handle_probing_of_already_opened_cell(self, x:int, y:int) -> None:      # this kind of a probing (when humans play) is either a chording, or a wasted click (it doesn't do anything)
         # print('\nhandle_probing_of_already_opened_cell()')
@@ -413,8 +415,10 @@ class Minesweeper:
     
     def is_map_cleared(self) -> None:
         if len(self.opened) == self.cells_to_open:
-            self.victory = True
-            self.timer_active = False
+            if not self.victory:
+                self.victory = True
+                self.game_result_counter[0] += 1
+                self.timer_active = False
 
     def draw_display(self) -> None:
         self.screen.fill((0,0,0))
@@ -507,6 +511,19 @@ class Minesweeper:
                 choice = 'safest cell from front'
             choice_surface = self.font.render(f'pick: {choice}', True, (255,255,255))
             self.screen.blit(choice_surface, (self.cell_size*self.width-500, 50))
+        
+        def write_wins_and_losses():
+            wins, losses = self.game_result_counter
+
+            wins_surface = self.font.render(f'won: {wins}', True, (255,255,255))
+            losses_surface = self.font.render(f'lost: {losses}', True, (255,255,255))
+
+            self.screen.blit(wins_surface, ((300, 30)))
+            self.screen.blit(losses_surface, ((300, 50)))
+            if wins or losses:
+                percent_won = round(100 * wins / (wins+losses), 1)
+                percent_won_surface = self.font.render(f'% won: {percent_won}', True, (255,255,255))
+                self.screen.blit(percent_won_surface, ((300, 70)))
 
         def draw_map() -> None:
             for x in range (self.width):
@@ -530,6 +547,7 @@ class Minesweeper:
         draw_map()
         draw_instructions_bar()
         write_unclicked_cell_count()
+        write_wins_and_losses()
         if self.highlight_front:
             highlight_front_cells_yellow()
         if self.show_mines:

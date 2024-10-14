@@ -17,6 +17,7 @@ class CSP_solver:
         self.solved_variables = set()                                   # ((x,y), value); the name of the variable is (x,y) where x and y are its location in the minesweeper map (if applicable), and the value of the variable is either 0 or 1, if everything is ok (each variable is one cell in the minesweeper map, and its value is the number of mines in the cell; 0 or 1, that is)
         self.mines_total = mines_total
         self.minecount_successful = False                               # used in 'botGame.py' for printing 'minecount successful' when it's used. Convenient for debugging!
+        self.variable_to_equations = dict()                             # it's good to initialize this here too for rare cases. Dict: { variable 1 : all equations that contain variable 1, variable 2 : all equations that contain variable 2, .... }
         self.solved_new_vars_during_this_round = False
         self.impossible_combinations = set()
         
@@ -499,6 +500,19 @@ class CSP_solver:
             sum_up_and_check_minecount(nMinesToAltSolutions_minmines_maxmines_for_each_set,               # get all possible minecount sums; one for each combination of set alt solutions (one alt per separate eq set). Then inspect each corresponding solution using the machinery below, as it works (it's been tested meticulously before already)
                 smallest_n_mines_in_front_alt_solutions, largest_n_mines_in_front_alt_solutions)
 
+        def handle_flag_box() -> None:
+            if len(all_unclicked) > 0:
+                if minecount == 0:
+                    for cell in all_unclicked:
+                        self.solved_variables.add((cell, 0))
+                else:
+                    # Both of these below work. The non-commented one is a lot more straightforward, though, and saves work.
+                    self.guess = all_unclicked[0]                                                   # in this situation, you have to guess, as the contents of the 'flag box' are a mystery
+                    # self.unique_equations = { (tuple(var for var in all_unclicked), minecount)}   # There's a chance for 'self.front' not existing in a case where the game is not finished, i.e. there are non-mine cells in that flag box
+                return
+            else:
+                return                                                                              # btw in minesweeper, this means the game is finished. Actually: the code will NEVER go here, but it's good to put this here just in case this class is used for something else than minesweeper.
+        
         def perform_solving() -> None:
             ''' 
             returns nothing: saves solved variables to 'self.solved_variables', etc, as attributes, which can then be used by 'botGame.py' conveniently 
@@ -508,7 +522,10 @@ class CSP_solver:
             
             # (0) reset variables
             self.reset_variables_before_csp_solving()
-            if not self.unique_equations:
+
+            # (0.1) check for an ultra-rare situation
+            if not self.unique_equations:                                                               # if there is no 'self.front' at all, there are no 'self.unique_equations' fed into this 'CSP_solver.py' from 'botGame.py'; this can happen when a 'flag box' / 'flag shield' is born in the game, in very rare situations (I just came up with that word, btw) but everything around it has been solved, so that the inner, unseen contents of the flag box are a complete mystery. If that mystery has at least one unclicked cell without a mine, we have to guess somewhere in the box. If the box had only mines, the game would be complete, and nothing would need to be done!
+                handle_flag_box()
                 return
 
             # (1.1) (1.2) find separate equation sets; this reduces time complexity in all solution-finding steps later, including in minecount and in guessing, if the sets are NOT assembled together again later!
@@ -883,6 +900,17 @@ FAILED tests:''')
     csp.absolut_brut(minecount=6, all_unclicked='a b c d e f g h i j k l m n o p q r s t'.split(), number_of_unclicked_unseen_cells=2)
 
     expected_result = '01100000'
+    test_info_dict[name] = [csp, expected_result]
+
+    ########################## Test 9: Flag box; a=0 expected. An ultra-rare situation where 'self.front' is empty, but there are still unclicked cells ##############################
+
+    name = 'Test 9: Flag box; a=0 expected. An ultra-rare situation where "self.front" is empty, but there are still unclicked cells'
+    csp = CSP_solver()
+    # NO EQUATIONS in this test. Yes, this can happen, when a 'flag box' is born in a rare game. If only one side of the box is seen by 'self.front', then the other side is inaccessible without guessing, AND there is no 'self.front' anymore, if everything else has been solved and/or guessed already.
+    csp.handle_incoming_equations([]) # no equations, BUT in minesweeper, this function has been called (many many times) before arriving in this 'flag box' situation
+    csp.absolut_brut(minecount=0, all_unclicked='a'.split(), number_of_unclicked_unseen_cells=1)
+
+    expected_result = '0'
     test_info_dict[name] = [csp, expected_result]
 
     ########################## Test 8c: minecount helps, complex. ? expected. 0 unseen cells. ##############################
