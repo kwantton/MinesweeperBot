@@ -33,7 +33,7 @@ class CSP_solver:
 
     # SOLVER ↓
     def absolut_brut(self, minecount=-1, all_unclicked = [], 
-        number_of_unclicked_unseen_cells = -1) -> None:   # minecounting logic is used ONLY if the minecount is not changing, i.e., if CSP_solver is currently incapable of solving any more of the map without minecount (not enough information -> 'normal' logic is not enough). In this situation, use information that unclicked_cell_1 + unclicked_cell_2 + unclicked_cell_3 + .... = total number of mines remaining in the entire map (HOWEVER! that equation is not used; it would be too slow, extremely slow at large numbers of unclicked cells remaining). In some cases, that helps solve the remaining situation, sometimes not.
+        number_of_unclicked_unseen_cells = -1, unclicked_unseen_cells = []) -> None:   # minecounting logic is used ONLY if the minecount is not changing, i.e., if CSP_solver is currently incapable of solving any more of the map without minecount (not enough information -> 'normal' logic is not enough). In this situation, use information that unclicked_cell_1 + unclicked_cell_2 + unclicked_cell_3 + .... = total number of mines remaining in the entire map (HOWEVER! that equation is not used; it would be too slow, extremely slow at large numbers of unclicked cells remaining). In some cases, that helps solve the remaining situation, sometimes not.
 
         ''' (1-5) definitive solutions for variables using logic, and if that doesn't help, then (6) guess: 
         (1) group equations to sets (1.1 and 1.2); all the members of one such equation set share variables directly or indirectly with each other (indirectly means, via other equations in that set) 
@@ -395,17 +395,16 @@ class CSP_solver:
             if number_of_unclicked_unseen_cells > 0:
                 if smallest_n_mines_in_front_alt_solutions == minecount:                # if none of the alt solutions have less mines than the currently remaining minecount, then all the unclicked unseen cells, which are NOT a part of any of these alt solutions, must NOT have a mine, otherwise the total minecount would exceed the REAL total minecount!
                     only_min_sum_is_ok = True
-                    for cell in all_unclicked:
-                        if cell not in self.variables:                                  # NB! All cells in 'self.variables' have come through 'handle_incoming_equations', so they are seen by 'self.front'. All other 'unclicked' cells are NOT in 'self.front'.
-                            self.solved_variables.add((cell, 0))
-                            self.solved_new_vars_during_this_round = True
+                    for cell in unclicked_unseen_cells:
+                        self.minecount_successful = True
+                        self.solved_variables.add((cell, 0))
+                        self.solved_new_vars_during_this_round = True
                 elif largest_n_mines_in_front_alt_solutions + number_of_unclicked_unseen_cells == minecount:    # -> every unseen cell must be a mine, see below comment
                     only_max_sum_is_ok = True
-                    for cell in all_unclicked:
-                        if cell not in self.variables:                                  # NB! All cells in 'self.variables' have come through 'handle_incoming_equations', so they are seen by 'self.front'. All other 'unclicked' cells are NOT in 'self.front'.
-                            self.minecount_successful = True
-                            self.solved_variables.add((cell, 1))                        # if the number of unclicked unseen + max number of mines encountered in any alt solution == currently remaining minecount, then every single cell in unclicked unseen cells must have a mine. I met one such situation in a random game.
-                            self.solved_new_vars_during_this_round = True
+                    for cell in unclicked_unseen_cells:
+                        self.minecount_successful = True
+                        self.solved_variables.add((cell, 1))                        # if the number of unclicked unseen + max number of mines encountered in any alt solution == currently remaining minecount, then every single cell in unclicked unseen cells must have a mine. I met one such situation in a random game.
+                        self.solved_new_vars_during_this_round = True
             if self.solved_new_vars_during_this_round:
                 self.minecount_successful = True                                        # used in 'botGame.py' for printing 'minecount successful' when it's used. Convenient for debugging!
 
@@ -825,7 +824,8 @@ FAILED tests:''')
     name = 'test 6a, letters, MINECOUNT=1. c=0 expected.'
     csp = CSP_solver()
     csp.handle_incoming_equations([eq1])
-    csp.absolut_brut(minecount=1, all_unclicked=['a','b','c'], number_of_unclicked_unseen_cells=1)                 # So, here 'a' and 'b' are seen by number cell that says '1'. So, a+b=1. But also, there's an isolated cell c in the corner, surrounded by three flags, hence not seen by any number cell. The wanted result here is that c=0, because the remaining minecount is 1, and a+b=1, so c=0.
+    csp.absolut_brut(minecount=1, all_unclicked=['a','b','c'], number_of_unclicked_unseen_cells=1,
+        unclicked_unseen_cells=['c'])                 # So, here 'a' and 'b' are seen by number cell that says '1'. So, a+b=1. But also, there's an isolated cell c in the corner, surrounded by three flags, hence not seen by any number cell. The wanted result here is that c=0, because the remaining minecount is 1, and a+b=1, so c=0.
 
     expected_result = '0'                                                                               # c=0
     test_info_dict[name] = [csp, expected_result]
@@ -864,7 +864,7 @@ FAILED tests:''')
     expected_result = 'NOTHING'
     test_info_dict[name] = [csp, expected_result]
 
-    ########################## Test 8a: Expert_minecount-solvable_1. c0, d1, e1, f0, g0, i0, j0, t0 expected ##############################
+    ########################## Test 8a: Expert_minecount-solvable_1. c0, d1, e1, f0, g0, i0, j0, t0 expected. [j,i,t] = unclicked unseen ##############################
 
     eq1     = [-1, -1, ('a', 'b'), 1]
     eq2     = [-1, -1, ('c', 'd'), 1]
@@ -881,7 +881,8 @@ FAILED tests:''')
     name = 'Test 8a: Expert_minecount-solvable_1. c0, d1, e1, f0, g0, i0, j0, t0 expected'
     csp = CSP_solver()
     csp.handle_incoming_equations([eq1, eq2, eq3, eq4, eq5, eq6, eq7, eq8, eq9, eq10, eq11])
-    csp.absolut_brut(minecount=6, all_unclicked='a b c d e f g h i j k l m n o p q r s t'.split(), number_of_unclicked_unseen_cells=2)
+    csp.absolut_brut(minecount=6, all_unclicked='a b c d e f g h i j k l m n o p q r s t'.split(), 
+        number_of_unclicked_unseen_cells=3, unclicked_unseen_cells=['j', 'i', 't'])
 
     expected_result = '01100000'
     test_info_dict[name] = [csp, expected_result]
@@ -905,7 +906,8 @@ FAILED tests:''')
     csp = CSP_solver()
     # NO EQUATIONS in this test. Yes, this can happen, when a 'flag box' is born in a rare game. If only one side of the box is seen by 'self.front', then the other side is inaccessible without guessing, AND there is no 'self.front' anymore, if everything else has been solved and/or guessed already.
     csp.handle_incoming_equations([]) # no equations, BUT in minesweeper, this function has been called (many many times) before arriving in this 'flag box' situation
-    csp.absolut_brut(minecount=1, all_unclicked='a b'.split(), number_of_unclicked_unseen_cells=1)
+    csp.absolut_brut(minecount=1, all_unclicked='a b'.split(), number_of_unclicked_unseen_cells=2, 
+        unclicked_unseen_cells='a b'.split())
     
     test_info_dict[name] = [csp, expected_result]
 

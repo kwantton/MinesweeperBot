@@ -71,10 +71,11 @@ class Minesweeper:
         self.mouse_pos = (0,0)
         self.start_time = None
         self.hit_a_mine = False
-        self.timer_active = False
+        self.timer_active = False        
         self.guessed_cells = set()
         self.obsolete_front = set()         # all those members of 'self.front' that no longer have any unclicked unflagged neighbours
         self.solved_variables = set()                                               # needed for bookkeeping of what variables not to rehandle as solved_variables also come from CSP_solver
+        self.solved_new_using_simple_solver = False
         self.new_front_members = set()                                              # this set is needed in 'add_new_front_cells_to_self_front()' for bookkeeping so that after iteration through 'self.front', the members of this set can be added to self.front. 'self.front' cannot be modified DURING iteration over itself, so that's why.
         self.n_unclicked = self.width * self.height
         self.solver = CSP_solver(mines_total = self.mines)                          # minecount is needed in 'CSP_solver' in those rarish cases where information about the remaining minecount near the end of the game is needed to be able to solve the last few cases that would otherwise require guessing.
@@ -269,7 +270,7 @@ class Minesweeper:
                             self.obsolete_front.add((x,y))
                 remove_obsolete_front()
             
-            def get_unclicked_cells() -> set:                                               # needed below in two functions
+            def get_all_unclicked_cells() -> set:                                               # needed below in two functions
                 not_clicked = set()
                 for x in range (width):
                     for y in range (height):
@@ -279,20 +280,18 @@ class Minesweeper:
             
             def check_minecount_zero() -> None:
                 if self.minecount == 0:
-                    for x,y in get_unclicked_cells():
+                    for x,y in get_all_unclicked_cells():
                         self.probe(x,y,True)
             
             def get_unclicked_unseen_cells() -> set:
-                unclicked_unseen_cells = set()
-                all_unclicked_cells = get_unclicked_cells()
                 adjacent_to_front = set()
+                unclicked_unseen_cells = get_all_unclicked_cells()                      # this is filtered below! So at this point, this name is misleading.
                 for x,y in self.front:
                     unclicked_front_cell_neighbours = self.get_cells_of_type(unclicked, self.get_neighbours_of(x,y))
                     for neighbour in unclicked_front_cell_neighbours:
                         adjacent_to_front.add(neighbour)
-                for cell in all_unclicked_cells:
-                    if cell not in adjacent_to_front:
-                        unclicked_unseen_cells.add(cell)
+                for cell in adjacent_to_front:
+                    unclicked_unseen_cells.remove(cell)
                 return unclicked_unseen_cells
             
             def simple_solver() -> None:    
@@ -304,25 +303,29 @@ class Minesweeper:
                 Then, I remove unnecessary cells from the front to cut unnecessary computing work for the linear 
                 equation CSP solver.
                 '''
+                self.solved_new_using_simple_solver = False                                                                  # do not go to csp_solver if csp_solver has solved new variables during this round; instead return (so that you can repeat, by pressing 'b' or 'p' again c:)
                 for x,y in self.front:
                     label = self.map[y][x]    
                     neighbours = self.get_neighbours_of(x,y)                                                    # self.bot_x and self.bot_y had been initially set in self.handle_first_left_click as the x (column number) and y (row number) of the first click
                     n_surrounding_flags = self.count_cells_of_type(flag, neighbours)
                     unflagged_unclicked_neighbours = self.get_cells_of_type(unclicked, neighbours)              # this is indeed 'unclicked unflagged neighbours', since label 'unclicked' means exactly that; the picture for 'unclicked' is an unprobed cell. A big confusing perhaps, I know.
 
-                    if label == labellize(len(unflagged_unclicked_neighbours) + n_surrounding_flags):   # If the number of surrounding ('unclicked' + 'flag') cells equals to the label of this (x,y) front cell in question (for example, 1 flagged + 2 unclicked = 3 = the label of the cell),
-                        flag_these(unflagged_unclicked_neighbours)                          # then flag the remaining unflagged cells around the front cell in question (flag the remaining 2 unclicked cells in this example case).
-
-                    # At this point, I could, technically speaking, update the 'number_of_surrounding_flags' again, since I just (potentially) placed new flags above. Positives: if I updated the number of surrounding flags here, the benefit would be a chance for the 'if' clause below to enable performing a chord already during this round instead of during the next round of simple_solver(). However, it's visually and clearer to proceed one step at a time, instead of chording below right away; it helps in debugging, and looks a lot nicer when looking at the bot doing its job one small step at a time.
-
-                    if label == labellize(n_surrounding_flags):                             # NB! 'if', not 'elif'. If the number of flagged neighbours equals to the label of the current front cell,
-                        if len(unflagged_unclicked_neighbours) >= 1:                        # then if there also are unclicked cells around the current front cell,
-                            self.handle_chord(x,y)                                          # then open all of them (i.e. 'chord' at this current front cell (x,y)).
+                    if len(unflagged_unclicked_neighbours) > 0:
+                        if label == labellize(len(unflagged_unclicked_neighbours) + n_surrounding_flags):   # If the number of surrounding ('unclicked' + 'flag') cells equals to the label of this (x,y) front cell in question (for example, 1 flagged + 2 unclicked = 3 = the label of the cell),
+                            flag_these(unflagged_unclicked_neighbours)                          # then flag the remaining unflagged cells around the front cell in question (flag the remaining 2 unclicked cells in this example case).
+                            self.solved_new_using_simple_solver = True
+                        if label == labellize(n_surrounding_flags):                             # NB! 'if', not 'elif'. If the number of flagged neighbours equals to the label of the current front cell,
+                            if len(unflagged_unclicked_neighbours) >= 1:                        # then if there also are unclicked cells around the current front cell,
+                                self.solved_new_using_simple_solver = True
+                                self.handle_chord(x,y)                                          # then open all of them (i.e. 'chord' at this current front cell (x,y)).
                 
-                check_minecount_zero()                                                      # if minecount is zero, then probe all 'unclicked' cells, since they cannot be mines -> map completed! Of course, this requires, that all the flags were placed correctly by the bot (they always are). This situation needs separate handling because the last 'unclicked' cells can be inside completely flagged boxes, isolating them from 'self.front'. It took me 5 weeks to even arrive in that kind of a situation! It's extremely rare, as it needs at least 3 already-flagged cells in a cordner, or 5 in a center edge, or 8 or more in the middle! Awesomesauce.
+                check_minecount_zero()                                                          # if minecount is zero, then probe all 'unclicked' cells, since they cannot be mines -> map completed! Of course, this requires, that all the flags were placed correctly by the bot (they always are). This situation needs separate handling because the last 'unclicked' cells can be inside completely flagged boxes, isolating them from 'self.front'. It took me 5 weeks to even arrive in that kind of a situation! It's extremely rare, as it needs at least 3 already-flagged cells in a cordner, or 5 in a center edge, or 8 or more in the middle! Awesomesauce.
                 filter_front_cells()
 
             simple_solver()
+
+            if self.solved_new_using_simple_solver:
+                return
 
             # if I don't 'draw_display()' here, when using debugger, I wouldn't be able to see the map before csp-section code is executed c:
             if self.debug_csp:
@@ -347,10 +350,14 @@ class Minesweeper:
 
             def csp_solve():
                 print('\ncsp_solve():')
-                all_unclicked_cells = get_unclicked_cells()
-                n_unclicked_unseen_cells = len(get_unclicked_unseen_cells())
+                all_unclicked_cells = get_all_unclicked_cells()
+                unclicked_unseen_cells = get_unclicked_unseen_cells()
+                n_unclicked_unseen_cells = len(unclicked_unseen_cells)
                 
-                self.solver.absolut_brut(minecount=self.minecount, all_unclicked=all_unclicked_cells, number_of_unclicked_unseen_cells=n_unclicked_unseen_cells)                      # all the minecount info is not needed, if there's no minecount solving done in CSP_solver. Default 'need_for_minecount' is False.
+                self.solver.absolut_brut(minecount = self.minecount, 
+                    all_unclicked = all_unclicked_cells, 
+                    unclicked_unseen_cells = unclicked_unseen_cells,                      # all the minecount info is not needed, if there's no minecount solving done in CSP_solver. Default 'need_for_minecount' is False.
+                    number_of_unclicked_unseen_cells = n_unclicked_unseen_cells)
                 solved_vars = self.solver.solved_variables          # set of tuples: each is a tuple ((x,y), value)
                 for (x,y), value in solved_vars:
                     if ((x,y), value) not in self.solved_variables: # let's not do redundant work
@@ -588,9 +595,11 @@ if __name__ == '__main__':
     less_dense_beg = 9,9,15
     too_many_mines = 5,5,16
     small_weirdo = 4,4,6
+    big_ez = 50,24,200
+    big_expert = 50,24,248
     minecount_demonstration_sometimes = 5,5,15
 
     ''' ↓↓↓ STARTS A NEW MINESWEEPER with the ability to play the bot by pressing b ↓↓↓ (instructions in the game) '''
     # Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=False) # IF YOU WANT ONLY simple_solver(), which WORKS at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
-    Minesweeper(expert[0], expert[1], expert[2], csp_on=True) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
+    Minesweeper(big_expert[0], big_expert[1], big_expert[2], csp_on=True) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
     #           width       height      mines
