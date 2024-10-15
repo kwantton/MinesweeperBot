@@ -437,7 +437,7 @@ class Minesweeper:
             else:
                 shown_time = f'{self.elapsed_time:.3f}'                                                 # after clearing the map, show exact time
             timer_surface = self.font.render(f'Time: {shown_time}', True, (255,255,255))                # 'self.elapsed_time' is 0 by default
-            self.screen.blit(timer_surface, (10, 50)) 
+            self.screen.blit(timer_surface, (10, 65)) 
         
         def draw_victory() -> None:
             if not self.hit_a_mine:
@@ -503,7 +503,7 @@ class Minesweeper:
 
         def write_unclicked_cell_count():
             p_success_surface = self.font.render(f'unclicked cells: {self.n_unclicked}', True, (255,255,255))
-            self.screen.blit(p_success_surface, (300, 10))
+            self.screen.blit(p_success_surface, (10, 30))
         
         def write_choice():
             choice = 'other'
@@ -514,14 +514,18 @@ class Minesweeper:
         
         def write_wins_and_losses():
             wins, losses = self.game_result_counter
+            total = wins + losses
 
             wins_surface = self.font.render(f'won: {wins}', True, (255,255,255))
-            losses_surface = self.font.render(f'lost: {losses}', True, (255,255,255))
+            losses_surface = self.font.render(f'lost:  {losses}', True, (255,255,255))
+            total_surface = self.font.render(f'games: {total}', True, (255,255,255))
 
+            self.screen.blit(total_surface, ((300, 10)))
             self.screen.blit(wins_surface, ((300, 30)))
             self.screen.blit(losses_surface, ((300, 50)))
+            
             if wins or losses:
-                percent_won = round(100 * wins / (wins+losses), 1)
+                percent_won = round(100 * wins / total, 1)
                 percent_won_surface = self.font.render(f'% won: {percent_won}', True, (255,255,255))
                 self.screen.blit(percent_won_surface, ((300, 70)))
 

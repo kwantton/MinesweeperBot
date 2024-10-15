@@ -1,5 +1,5 @@
 '''to-do:
-- smart minecount: separate separated equation sets instead of combining them for minecount, as is done currently. This improves time complexity crucially in worst cases
+- smarten the solution checking by using 'value_counts_for_each_var' in 'join_comp_groups_into_solutions()'. So, use the same strategy as in minecount situations.
 - more tests, also on 'botGame.py' side
 '''
 from itertools import combinations
@@ -41,7 +41,8 @@ class CSP_solver:
         (3) chain link equations: find compatible alt solutions in a chain of equations, filtering out those alts that are not compatible to adjacent equations, for each equation (called a 'group' of alt solutions): from all of the alternative combinations of 1s and 0s that DO satisfy the CURRENT equation (group), filter out those alternatives that are incompatible with all alt answers from ONE OTHER (random) equation that is in the same equation set (shares variables directly or indirectly with other members of that equation set), pairing one group's all possible alts with compatible alts of ONE other group (i.e. "groups", i.e. incompatible with ALL the alternative solutions of at least one other group)
         (4) from the remaining alt equations per group (i.e. PER original equation), find columns where a variable is always 0 or 1 -> it HAS to be 0 or 1 ALWAYS. Then see these new solutions, inspect the remaining equations for untrue alternatives now that we've solved a new variable (or many new variables), and keep repeating the whole loop (1),(2),(3) as long as new solutions keep coming. Stop iteration when there are no longer new solutions produced by the whole loop. 
         (5) if no var solutions found, use minecount 
-        (6) guess if nothing else helps. Happens if 'self.solved_new_vars_during_this_round' = False '''
+        (6) guess if nothing else helps, if 'self.solved_new_vars_during_this_round' = False
+        '''
 
         # used in 'restrict_solution_space_as_equation_pairs_with_common_variables()' below; are there common variables between two equations (i.e. groups)?
         def common_vars(vars1, vars2) -> bool:
@@ -54,7 +55,7 @@ class CSP_solver:
             return common
         
         # (1.1) find separate sets of vars; this is for significantly reducing the max number of combinations of alt solutions per set later. If they are NOT separated whenever possible, the number of alt solution candidates (which are combinations) increases ~exponentially (why ~; because one separate set can have 2 alt solutions, the other 3, the third only 1, ect, so it's ON AVERAGE exponentially)
-        def divide_vars_to_disconnected_sets() -> dict:                              # FINDS SEPARATE VARS; finds sets that do not share a single variable between the equation groups. For example a+b = 1 and b+c=1 would be one group, separate from e+f+g=2, if there was only those three equations in total in self.unique_equations.
+        def divide_vars_to_disconnected_sets() -> dict:                             # finds sets that do not share a single variable between the var sets. For example a+b=1 and b+c=1 would be one equation set, separate from e+f+g=2, if there was only those three equations in total in self.unique_equations.
 
             called_vars = set()
             grouped_vars = set()
@@ -105,14 +106,14 @@ class CSP_solver:
             return separate_sets_of_eqs
         
         # (2) for each separate set (set=joukko) of eqs, for each equation (i.e. each number cell on the minesweeper map), given that each variable (= each unopened cell) is 0 or 1 (no mine or a mine), find all possible combinations of 1s and 0s that can satisfy that SINGLE equation GIVEN THAT it has sum = k (some integer number = the number of mines in those unopened surrounding cells in total!)
-        def find_and_group_possible_answers_per_single_equation(groups_of_eqs:list) -> list:
+        def find_and_group_possible_answers_per_single_equation(sets_of_eqs:list) -> list:
             '''
             returns: for each separated set of equations, for each equation in that set, get possible combinations of mines [[]] where each inner list has tuples of tuples of tuples, where each innermost tuple is ('x':0) or ('x':1) or such; possible values for the variable given the constraints of that specific equation. Each tuple surrounding this innermost tuple consists of all variables and their values in that equation. And the outermost tuple (3rd) has all the variations (alt solutions) for that equation, as tuples of tuples of values for variables. Much easier to see using debugger!
             '''
             alt_answers_for_groups = list()
-            for group_of_eqs in groups_of_eqs:
+            for set_of_eqs in sets_of_eqs:
                 alt_answers_per_equation = []
-                for variables, summa in group_of_eqs:
+                for variables, summa in set_of_eqs:                                     # so (variables, summa) is one equation, in a 'set of eqs'
                     mine_location_combinations = combinations(variables, summa)         # all possible combinations of mines for this equation. Since all incoming equations are of form a+b+c=1, and each variable is 0 or 1, I'm here just picking the MINE cells; combinations of mine cells.
                     this_eq_group = []                                                  # NB! All the possible solutions for THIS equation ('variables', 'summa' constitutes an equation in 'self.unique_equations') are gathered here; in the end, I have to solve each of these 'individual' equations, AND find a solution that satisfies all the other equations as well.
                     for mine_location_combination in mine_location_combinations:
@@ -129,7 +130,7 @@ class CSP_solver:
                     alt_answers_per_equation.append(tuple(this_eq_group))               # each list in this list is a list of alternative answers for that equation in question
                 alt_answers_for_groups.append(alt_answers_per_equation)
             return alt_answers_for_groups
-     
+
 
         # (3) for each separated set (set=joukko) of equations, do the following: for each group (group=alternative solutions for ONE equation like a+b=1 ('a' is a cell on the minesweeper map, 'b' is another cell)), find at least one solution that's compatible with AT LEAST ONE alternative solution from EXACTLY ONE other group (reminder: group = group of alt solutions for an equation). So, connect the first equation (group) to ONE another equation (second 'group'), and that also to another group, and so on (=build a chain of groups = a chain of compatible alt answers). So, for all compatible alt solutions in the 2nd group, couple all of those to the 3rd group (i.e. to the next equation); this builds a chain of equations, where all neighbouring alt solutions are compatible, where the first equation is linked to one equation, the next one to the previous and to the next, etc, and the last one is linked only to the previous one. AFTER 'chain_link_equations', continue to build all possible alternative answers from those, so that there's bookkeeping for every variable for every possible unique alt whole-solution, so that if a conflict is found, building of that alt solution tree is terminated on the spot -> less computation wasted. I think this was called backtracking, as I later found out.
         def chain_link_equations(alternative_answers_per_equation_per_set_of_eqs:list) -> list:
@@ -163,8 +164,8 @@ class CSP_solver:
                         for altB in groupB:                                     # NB! ONE at least needs to be compatible with altA, OR altA is not 'viable_and_connected'. e.g. (('a', 0), ('b', 1)); alt = alternative = one alternative solution for a single equation, that might or might not be possible (i.e. might or might not be compatible with A)
                             altA_altB_compatible = True                         # default
                             if common_variables:                                                                  
-                                for var1, val1 in altA:                         # e.g. 'a', 0. Each var1, val1 has to be compatible with at least ONE alt2 from every other group, so that 'altA_is_viable'!
-                                    opposite_value = (var1, int(not val1))      # val1 = 1 or 0; if 1, opposite = (var1, 0). This is so I can avoid if-clause below, making it shorter.
+                                for var, val in altA:                         # e.g. 'a', 0. Each var1, val1 has to be compatible with at least ONE alt2 from every other group, so that 'altA_is_viable'!
+                                    opposite_value = (var, int(not val))      # val = 1 or val = 0; if 1, opposite = (var, 0). This is so I can avoid if-clause below, making it shorter.
                                     if opposite_value in altB:
                                         altA_altB_compatible = False
                                         break
@@ -184,51 +185,43 @@ class CSP_solver:
 
                 comp_groups_and_starting_groups.append((compatibility_groups, starting_group))
             return comp_groups_and_starting_groups
-
-        def choose_best_guess(naive_safest_guess, min_n_mines_in_front, best_front_chance):
-            print('GUESSING IS NEEDED:')
-            
-            self.choice = 'FRONT'                                       # default
-            self.guess = naive_safest_guess                             # default. The below might be false -> the default stays.
-            self.front_guess = naive_safest_guess                       # as a backup to 'botGame.py' in case there are no unseen cells at all
-            if number_of_unclicked_unseen_cells > 0:                    # Can't guess unseen cell if there are no unseen unclicked cells.
-                unclicked_unseen_cell_safety_in_worst_scenario = 100 - (100 *(minecount - min_n_mines_in_front) / number_of_unclicked_unseen_cells)  # 100 - percent mine density in unclicked unseen cells in the case that there's the minimum possible number of mines remaining in self.front. It's arbitrary that I chose to inspect the worst case scenario, but generally speaking it's better to opt for guessing cells of partially-known situations than random whatever-tiles in many situations, since often guessing near the front has a higher chance of uncovering more logically solvable situations. However, as that depends on pretty much everything, I repeat that this is NOT the optimal solution in many cases!
-                if best_front_chance < unclicked_unseen_cell_safety_in_worst_scenario:
-                    self.guess = "pick unclicked"                           # 12.10.24: for guessing. If 'unclicked' cells have the lowest mine density, then guess there. 
-                    self.choice = 'UNSEEN'
-                self.p_success_unseen = round(unclicked_unseen_cell_safety_in_worst_scenario, 1)
-                print("- p_success(unseen) ≥", self.p_success_unseen, '%')  # TO-DO: negative values c:
-            self.p_success_front = round(best_front_chance, 1)
-            print('- p_success(front)  ≤', self.p_success_front, '%')
-            print('- guess:', self.choice)
         
-        def handle_possible_whole_solutions(possible_whole_solutions : list, min_n_mines_in_front = 0):
+        def handle_possible_whole_solutions(possible_whole_solutions : list, value_counts_for_each_var : dict):
             '''
             parameters: 
                 possible_whole_solutions    : list of dictionaries, each dict is {var1 : value1, ...}
                 min_n_mines_in_front        : int. The minimum number of mines in 'self.front' in 'botGame.py'
             '''
-            final_answers = dict()
-            n_alts = len(possible_whole_solutions)                              # number of alternative total answers. I need this for probability calculation
-            if n_alts == 0:                                                     # since I'm dividing by 'n_alts' below, I'm making sure no division by 0 is happening ever.
-                return
-            new_answer_count = 0
-            naive_safest_guess = None
-            for dictionary in possible_whole_solutions:
-                for var, val in dictionary.items():
-                    if var not in final_answers:
-                        final_answers[var] = val
-                        new_answer_count += 1
-                    elif final_answers[var] == 'either or':
-                        pass                                                    # I need this for accurate 'new_answer_count'
-                    elif final_answers[var] != val:
-                        final_answers[var] = 'either or'                        # either this was 'either or' was here or not, the result is the same - 'either or'  
-                        new_answer_count -= 1
-            if new_answer_count != 0:                                            # micro-optimization, skipping the below loop when no solutions were found
-                for var, val in final_answers.items():
-                    if val != 'either or':
-                        self.solved_variables.add((var, val))
-                        self.solved_new_vars_during_this_round = True
+            for var, [zeros, ones] in value_counts_for_each_var.items():
+                if zeros == 0:
+                    self.minecount_successful = True                # used for printing 'minecount successful' in 'botGame.py'
+                    self.solved_new_vars_during_this_round = True
+                    self.solved_variables.add((var, 1))
+                elif ones == 0:
+                    self.minecount_successful = True
+                    self.solved_new_vars_during_this_round = True
+                    self.solved_variables.add((var, 0))
+            # OLD:
+            # final_answers = dict()
+            # n_alts = len(possible_whole_solutions)                              # number of alternative total answers. I need this for probability calculation
+            # if n_alts == 0:                                                     # since I'm dividing by 'n_alts' below, I'm making sure no division by 0 is happening ever.
+            #     return
+            # new_answer_count = 0
+            # for dictionary in possible_whole_solutions:
+            #     for var, val in dictionary.items():
+            #         if var not in final_answers:
+            #             final_answers[var] = val
+            #             new_answer_count += 1
+            #         elif final_answers[var] == 'either or':
+            #             pass                                                    # I need this for accurate 'new_answer_count'
+            #         elif final_answers[var] != val:
+            #             final_answers[var] = 'either or'                        # either this was 'either or' was here or not, the result is the same - 'either or'  
+            #             new_answer_count -= 1
+            # if new_answer_count != 0:                                           # micro-optimization, skipping the below loop when no solutions were found
+            #     for var, val in final_answers.items():
+            #         if val != 'either or':
+            #             self.solved_variables.add((var, val))
+            #             self.solved_new_vars_during_this_round = True
         
         # every key in 'compatibility_groups' is an alt solution for one equation that must be solved one way or another. The same goes for all equation groups in each of those keys' values, BUT here I'm just looking at the keys before looking at their values.
         def keyVars_to_keys_builder(compatibility_groups:dict) -> dict:
@@ -255,9 +248,11 @@ class CSP_solver:
                         break                                                       # it's possible that one or more variable values from an alt answer (the current one) disagree with one or more alt answers that are INDIRECTLY connected to the current alt answer. Hence, they are in this case 'incompatible' (they directly disagree with each other), and the handling of this current alt solution should be prevented altogether
             return incompatible_pma
         
+        # (4) TO-DO: smarter solution inspection directly via var values instead of via going through every alt solution again
         def join_comp_groups_into_solutions(compatibility_groups:dict, starting_group) -> list:     # also return the whole list of 'possible_whole_solutions'; it's needed IF minecount is needed. If minecount is needed
             keyVars_to_keys = keyVars_to_keys_builder(compatibility_groups)
             n_groups = len(keyVars_to_keys.keys())
+            value_counts_for_each_var = dict()  # TO-DO: COUNT HERE, FOR EACH VAR, HOW MANY TIMES 0 AND HOW MANY TIMES 1 it is in minecount-OK alt solutions. SOLVES ALSO PROBLEMS REGARDING GUESSING! If the var has only 1s, then it's solved as 1. If only 0s, then it's solved as 0. Otherwise, the probability is extremely straightforward to calculate!
             possible_whole_solutions = []
             
             def traverse(this_alt, entered_alts_for_this_build, 
@@ -283,6 +278,13 @@ class CSP_solver:
                         already_handled_groups_local.append(group_of_this_alt)          # Since the alt solution was picked, mark the respective group as handled. ATM this is unnecessary, since I'm traversing through the equations in the same chain order as they were linked earlier, but If I were to change that, then this check is needed (previously, I DID need this, but this is a good check also for debugging anyways!)
 
                         if n_groups == len(already_handled_groups_local):
+                            for var, value in possible_solution_build_local.items():
+                                if var not in value_counts_for_each_var:
+                                    value_counts_for_each_var[var] = [0,0]              # [0s, 1s] seen so far
+                                if value == 0:
+                                    value_counts_for_each_var[var][0] += 1
+                                else:
+                                    value_counts_for_each_var[var][1] += 1
                             possible_whole_solutions.append(possible_solution_build_local)
                             return                                                      # if it's done, it's done. The possible next matches would be to a completely different group, AND it's not possible to gain more solutions from this one, as new groups and their alts are only ADDED in this 'traverse()', not removed, and we've already been to all groups -> return, don't continue!
                         
@@ -293,8 +295,8 @@ class CSP_solver:
                         if new_matches:
                             for new_match in new_matches:
                                 if new_match not in entered_alts_for_this_build_local:    # technically redundant, probably almost no effect regarding computing efficiency, BUT it's nice for clarity, and showing the logic still (even if double check)
-                                    traverse(new_match, 
-                                        entered_alts_for_this_build_local, possible_solution_build_local, already_handled_groups_local)
+                                    traverse(new_match, entered_alts_for_this_build_local, 
+                                        possible_solution_build_local, already_handled_groups_local)
                         
             # 'starting_group' is the group from where all arrows leave, and back to which no arrows return; an alt origin for an alt rooted tree, essentially!
             for alt_origin in starting_group:                                       # E.g.: ('d', 'e'), [(('d',1),('e',0)), (('d',0),('e',1))]. This quarantees that they build unidentical solution trees that together encompass all possible whole solutions.
@@ -304,44 +306,26 @@ class CSP_solver:
                     alt_solution_build = {}
                     traverse(alt_origin, seen_proposed_vectors, 
                         alt_solution_build, handled_groups)                         # 'traverse' builds alternative 'possible_whole_solutions' and saves all viable ones to 'possible_whole_solutions'
-            handle_possible_whole_solutions(possible_whole_solutions)
+            handle_possible_whole_solutions(possible_whole_solutions, value_counts_for_each_var)
             return possible_whole_solutions
-
-        # NEW! This function is PER ONE eq_set instead of the old one, which built solutions and their sums for ALL sets
-        def count_mines_of_set_alt_solutions_for_minecount_check(eq_set_alt_solutions:list) -> tuple:   # separated sets = erilliset joukot; here it means that the solution sets do not share a single variable. These separated sets consist of all eligible alt answers per each set. If the sum of a given combination whole-front-alt-answer that's joined together here and which has one alt from each set per combo disagrees with remaining minecount later, it is impossible; discard all such whole-front alt answers. Whether that disagreement happens is found out only by summing the thus-far separated alt answer sets together - that's why I'm combining them here!
-            '''
-            returns: tuple (nMines_to_setAltSolutions, min_minecount, max_minecount). 
-            The 1. one is a ditionary with 
-            { number of mines in the alt solution to this set : [alt solution to this set #1, alt solution to this set #2, ...], .... }. This contains ALL the alt solutions to this set! It's just divided by number of mines. That will come in handy later, when inspecting the whole-front alt answers regarding minecount; this makes it a lot faster to discard bad answers before the actual 'construction' even begins.
-            The 2. one is the min number of mines that was found in any of the alt solutions to this set. This is needed for minecount.
-            The 3. one is the max number of mines that was found in any of the alt solutions to this set. Likewise, for minecount.
-            '''
-            # needed; for each alt build, I need the sum of the build. I have one or more alt_solutions per each equation, and one or more equations per this set-in-question.
-            def count_mines(alt_solution):
-                mines = 0
-                for var, value in alt_solution.items():
-                    mines += value
-                return mines
-
-            # needed: (1) build the solution by choosing all alt combinations PER this set-in-question, (2) count the sum for each build
-            def handle_alt_solution(set_alt_solution:list, n_mines:int, min_minecount, max_minecount) -> None:
-                if n_mines < min_minecount:
-                    min_minecount = n_mines
-                if n_mines > max_minecount:
-                    max_minecount = n_mines
-                if n_mines not in nMines_to_setAltSolutions:
-                    nMines_to_setAltSolutions[n_mines] = []
-                nMines_to_setAltSolutions[n_mines].append(set_alt_solution)
-                return min_minecount, max_minecount
-
-            # I also need this. I could just return: (nMines_to_setAltSolutions, min_minecount, max_minecount). That would do it!
-            max_minecount = 0
-            min_minecount = float('inf')
-            nMines_to_setAltSolutions = dict()                      # {number of mines : alt entire-front combined solutions with that number of mines}. Every alt solution from every separate equation set is coupled with every alt solution from every other set, to be able to construct all the possible entire-front alt solutions, the mines of which are counted - this is for being able to use remaining mine count for deducing which of these alt whole-front solutions are impossible. For each of these entire-front alt solutions, discard the impossible ones, then see if the remaining ones all agree regarding one or more variable just like previously, once again using 'handle_possible_whole_solutions()' since it's awesome c:
-            for set_alt_solution in eq_set_alt_solutions:           # for in the FIRST equation; this is the starting point for building the entire-front alt solutions (one set alt solution from every set must be chosen)
-                min_minecount, max_minecount = handle_alt_solution(set_alt_solution, 
-                    count_mines(set_alt_solution), min_minecount, max_minecount)
-            return nMines_to_setAltSolutions, min_minecount, max_minecount
+        
+        # (6) guess if needed
+        def choose_best_guess(naive_safest_guess, min_n_mines_in_front, best_front_chance):
+            print('GUESSING IS NEEDED:')
+            
+            self.choice = 'FRONT'                                               # default
+            self.guess = naive_safest_guess                                     # default. The below might be false -> the default stays.
+            self.front_guess = naive_safest_guess                               # as a backup to 'botGame.py' in case there are no unseen cells at all
+            if number_of_unclicked_unseen_cells > 0:                            # Can't guess unseen cell if there are no unseen unclicked cells.
+                unclicked_unseen_cell_safety_in_worst_scenario = 100 - (100 *(minecount - min_n_mines_in_front) / number_of_unclicked_unseen_cells)  # 100 - percent mine density in unclicked unseen cells in the case that there's the minimum possible number of mines remaining in self.front. It's arbitrary that I chose to inspect the worst case scenario, but generally speaking it's better to opt for guessing cells of partially-known situations than random whatever-tiles in many situations, since often guessing near the front has a higher chance of uncovering more logically solvable situations. However, as that depends on pretty much everything, I repeat that this is NOT the optimal solution in many cases!
+                if best_front_chance < unclicked_unseen_cell_safety_in_worst_scenario:
+                    self.guess = "pick unclicked"                               # for guessing. If 'unclicked' cells have the lowest mine density, then guess there. 
+                    self.choice = 'UNSEEN'
+                self.p_success_unseen = round(unclicked_unseen_cell_safety_in_worst_scenario, 1)
+                print("- p_success(unseen) ≥", self.p_success_unseen, '%')
+            self.p_success_front = round(best_front_chance, 1)
+            print('- p_success(front)  ≤', self.p_success_front, '%')
+            print('- guess:', self.choice)
         
         def handle_minecount_results(value_counts_for_each_var:dict, min_n_mines_in_front:int):
 
@@ -368,7 +352,7 @@ class CSP_solver:
                 choose_best_guess(naive_safest_guess = best_bet, min_n_mines_in_front = min_n_mines_in_front,
                     best_front_chance = highest_survival_rate_in_front_cells*100)
 
-        # NEW! For every eq set: 'sets_altSolutionsMinminesMaxmines', get possible sums of mines, and count the number of times every alt is seen in any combination with others - this will be used in guessing, if needed ((If possible, return 'nMines_to_frontAltSolutions' like it was before.))
+        # For every eq set: 'sets_altSolutionsMinminesMaxmines', get possible sums of mines, and count the number of times every alt is seen in any combination with others - this will be used in guessing, if needed ((If possible, return 'nMines_to_frontAltSolutions' like it was before.))
         def sum_up_and_check_minecount(sets_nMinesToAltsolutions_minmines_maxmines:list,
             smallest_n_mines_in_front_alt_solutions:int, largest_n_mines_in_front_alt_solutions:int) -> dict:
 
@@ -464,7 +448,43 @@ class CSP_solver:
                     nonempty_eq_set_possible_solutions.append(eq_set)
             return nonempty_eq_set_possible_solutions
         
-        # for each ENTIRELY COUPLED alt whole solution
+        # This function is PER ONE eq_set instead of the old one, which built solutions and their sums for ALL sets
+        def count_mines_of_set_alt_solutions_for_minecount_check(eq_set_alt_solutions:list) -> tuple:   # separated sets = erilliset joukot; here it means that the solution sets do not share a single variable. These separated sets consist of all eligible alt answers per each set. If the sum of a given combination whole-front-alt-answer that's joined together here and which has one alt from each set per combo disagrees with remaining minecount later, it is impossible; discard all such whole-front alt answers. Whether that disagreement happens is found out only by summing the thus-far separated alt answer sets together - that's why I'm combining them here!
+            '''
+            returns: tuple (nMines_to_setAltSolutions, min_minecount, max_minecount). 
+            The 1. one is a ditionary with 
+            { number of mines in the alt solution to this set : [alt solution to this set #1, alt solution to this set #2, ...], .... }. This contains ALL the alt solutions to this set! It's just divided by number of mines. That will come in handy later, when inspecting the whole-front alt answers regarding minecount; this makes it a lot faster to discard bad answers before the actual 'construction' even begins.
+            The 2. one is the min number of mines that was found in any of the alt solutions to this set. This is needed for minecount.
+            The 3. one is the max number of mines that was found in any of the alt solutions to this set. Likewise, for minecount.
+            '''
+            # needed; for each alt build, I need the sum of the build. I have one or more alt_solutions per each equation, and one or more equations per this set-in-question.
+            def count_mines(alt_solution):
+                mines = 0
+                for var, value in alt_solution.items():
+                    mines += value
+                return mines
+
+            # needed: (1) build the solution by choosing all alt combinations PER this set-in-question, (2) count the sum for each build
+            def handle_alt_solution(set_alt_solution:list, n_mines:int, min_minecount, max_minecount) -> None:
+                if n_mines < min_minecount:
+                    min_minecount = n_mines
+                if n_mines > max_minecount:
+                    max_minecount = n_mines
+                if n_mines not in nMines_to_setAltSolutions:
+                    nMines_to_setAltSolutions[n_mines] = []
+                nMines_to_setAltSolutions[n_mines].append(set_alt_solution)
+                return min_minecount, max_minecount
+
+            # I also need this. I could just return: (nMines_to_setAltSolutions, min_minecount, max_minecount). That would do it!
+            max_minecount = 0
+            min_minecount = float('inf')
+            nMines_to_setAltSolutions = dict()                      # {number of mines : alt entire-front combined solutions with that number of mines}. Every alt solution from every separate equation set is coupled with every alt solution from every other set, to be able to construct all the possible entire-front alt solutions, the mines of which are counted - this is for being able to use remaining mine count for deducing which of these alt whole-front solutions are impossible. For each of these entire-front alt solutions, discard the impossible ones, then see if the remaining ones all agree regarding one or more variable just like previously, once again using 'handle_possible_whole_solutions()' since it's awesome c:
+            for set_alt_solution in eq_set_alt_solutions:           # for in the FIRST equation; this is the starting point for building the entire-front alt solutions (one set alt solution from every set must be chosen)
+                min_minecount, max_minecount = handle_alt_solution(set_alt_solution, 
+                    count_mines(set_alt_solution), min_minecount, max_minecount)
+            return nMines_to_setAltSolutions, min_minecount, max_minecount
+        
+        # (5) minecount: for each ENTIRELY COUPLED alt whole solution
         def use_minecount(eq_set_possible_solutions : list) -> None:
             print('\nuse_minecount() since no solutions were found without it')
 
@@ -509,7 +529,7 @@ class CSP_solver:
             # (0) reset variables
             self.reset_variables_before_csp_solving()
 
-            # (0.1) check for an ultra-rare situation which I'm calling a 'flag box', where 'self.front' of 'botGame.py' has been emptied, hence there are no 'self.unique_equations' here, and there's a wall of flags preventing seeing to the other side at all. See more explanation in the function 'handle_flag_box()'. I ran into this flag box after around 650 expert games. Yes, I manually pushed 'b' and 'p' for 650 expert games c: yes, I need help c:
+            # (0.1) check for a rare situation which I'm calling a 'flag box', where 'self.front' of 'botGame.py' has been emptied, hence there are no 'self.unique_equations' here, and there's a wall of flags preventing seeing to the other side at all. See more explanation in the function 'handle_flag_box()'. I ran into this flag box after around 650 expert games. Yes, I manually pushed 'b' and 'p' for 650 expert games c: yes, I need help
             if not self.unique_equations:                                                               # if there is no 'self.front' at all, there are no 'self.unique_equations' fed into this 'CSP_solver.py' from 'botGame.py'; this can happen when a 'flag box' / 'flag shield' is born in the game, in very rare situations (I just came up with that word, btw) but everything around it has been solved, so that the inner, unseen contents of the flag box are a complete mystery. If that mystery has at least one unclicked cell without a mine, we have to guess somewhere in the box. If the box had only mines, the game would be complete, and nothing would need to be done!
                 handle_flag_box()
                 return
@@ -530,7 +550,7 @@ class CSP_solver:
                 possible_whole_solutions = join_comp_groups_into_solutions(compatibility_groups, starting_group)
                 eq_set_possible_solutions.append(possible_whole_solutions)
 
-            # (5) use minecount only if necessary. TO-DO: reduce time complexity by keeping the eq_sets separated in 'use_minecount' instead of combining them
+            # (5) use minecount only if necessary. I have reduced time complexity by keeping the eq_sets separated in 'use_minecount' instead of combining them first. That only required summing (and quite complex data structures and loops..).
             if not self.solved_new_vars_during_this_round:                                                                                  # 'self.solved_new_vars_during_this_round' is set to 'True' the very second that a new variable has been solved, each round of absolut_brut() in two possible situations: in (1) 'handle_possible_whole_solutions()' that was done previously, when any new variable is solved (using normal solving BEFORE minecount, and (2) If non-minecount logic wasn't enough, then I'm using 'use_minecount()' that's called here, and that also marks newly solved variables as True, so that guessing is NOT done. If not solved new, then 'handle_possible_whole_solutions()' is called again, there check for new solutions again, and if still not (3rd attempt, kind of), then guessing is done.
                 use_minecount(eq_set_possible_solutions) # (6) if minecount doesn't help, 'use_minecount()' will pick the safest choice for guessing
         
