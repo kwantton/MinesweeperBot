@@ -186,7 +186,7 @@ class CSP_solver:
                 comp_groups_and_starting_groups.append((compatibility_groups, starting_group))
             return comp_groups_and_starting_groups
         
-        def handle_possible_whole_solutions(possible_whole_solutions : list, value_counts_for_each_var : dict):
+        def handle_possible_whole_solutions(value_counts_for_each_var : dict):
             '''
             parameters: 
                 possible_whole_solutions    : list of dictionaries, each dict is {var1 : value1, ...}
@@ -194,34 +194,12 @@ class CSP_solver:
             '''
             for var, [zeros, ones] in value_counts_for_each_var.items():
                 if zeros == 0:
-                    self.minecount_successful = True                # used for printing 'minecount successful' in 'botGame.py'
-                    self.solved_new_vars_during_this_round = True
                     self.solved_variables.add((var, 1))
-                elif ones == 0:
-                    self.minecount_successful = True
                     self.solved_new_vars_during_this_round = True
+                elif ones == 0:
                     self.solved_variables.add((var, 0))
-            # OLD:
-            # final_answers = dict()
-            # n_alts = len(possible_whole_solutions)                              # number of alternative total answers. I need this for probability calculation
-            # if n_alts == 0:                                                     # since I'm dividing by 'n_alts' below, I'm making sure no division by 0 is happening ever.
-            #     return
-            # new_answer_count = 0
-            # for dictionary in possible_whole_solutions:
-            #     for var, val in dictionary.items():
-            #         if var not in final_answers:
-            #             final_answers[var] = val
-            #             new_answer_count += 1
-            #         elif final_answers[var] == 'either or':
-            #             pass                                                    # I need this for accurate 'new_answer_count'
-            #         elif final_answers[var] != val:
-            #             final_answers[var] = 'either or'                        # either this was 'either or' was here or not, the result is the same - 'either or'  
-            #             new_answer_count -= 1
-            # if new_answer_count != 0:                                           # micro-optimization, skipping the below loop when no solutions were found
-            #     for var, val in final_answers.items():
-            #         if val != 'either or':
-            #             self.solved_variables.add((var, val))
-            #             self.solved_new_vars_during_this_round = True
+                    self.solved_new_vars_during_this_round = True
+
         
         # every key in 'compatibility_groups' is an alt solution for one equation that must be solved one way or another. The same goes for all equation groups in each of those keys' values, BUT here I'm just looking at the keys before looking at their values.
         def keyVars_to_keys_builder(compatibility_groups:dict) -> dict:
@@ -306,7 +284,7 @@ class CSP_solver:
                     alt_solution_build = {}
                     traverse(alt_origin, seen_proposed_vectors, 
                         alt_solution_build, handled_groups)                         # 'traverse' builds alternative 'possible_whole_solutions' and saves all viable ones to 'possible_whole_solutions'
-            handle_possible_whole_solutions(possible_whole_solutions, value_counts_for_each_var)
+            handle_possible_whole_solutions(value_counts_for_each_var)
             return possible_whole_solutions
         
         # (6) guess if needed
@@ -928,7 +906,6 @@ FAILED tests:''')
     # NO EQUATIONS in this test. Yes, this can happen, when a 'flag box' is born in a rare game. If only one side of the box is seen by 'self.front', then the other side is inaccessible without guessing, AND there is no 'self.front' anymore, if everything else has been solved and/or guessed already.
     csp.handle_incoming_equations([]) # no equations, BUT in minesweeper, this function has been called (many many times) before arriving in this 'flag box' situation
     csp.absolut_brut(minecount=1, all_unclicked='a b'.split(), number_of_unclicked_unseen_cells=1)
-
     
     test_info_dict[name] = [csp, expected_result]
 
