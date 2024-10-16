@@ -15,16 +15,18 @@ class Minesweeper:
         # NB! Put here ONLY those that are not reset at every 'new_game()'
         self.mines = mines
         self.width = width
-        self.autobot = False                            # if set to true, then the bot will play as long as it hits a mine or wins; no need to smash p or b manually
+        self.auto_on = False                            # if set to true, then the bot will play as long as it hits a mine or wins; no need to smash p or b manually
         self.csp_on = csp_on
         self.height = height                            # map height measured in rows
         self.infobar_height = 100                       # pixels for the infobar above the minesweeper map
+        self.ms_bot_time_TOTAL = 0
         self.visual_autobot = True                      # when this is on, the 30 fps screen draw is ON. This limits the speed of the bot, but looks cool :D press v to activate, WHEN you have pressed a
         self.debug_csp = debug_csp
         self.clock = pygame.time.Clock()
         self.cell_size = 50-int(0.8*height)             # how many px in height and width should each cell be?
         self.initialize_debug_features()
         self.game_result_counter = [0,0]                # [wins, losses]
+        
         self.font = pygame.font.Font(None, 36-int(0.5*height))
         
         if mines >= width*height-9:
@@ -61,6 +63,16 @@ class Minesweeper:
         for image_name in image_names:
             self.images[image_name] = pygame.transform.scale(pygame.image.load(image_name), (self.cell_size,self.cell_size))
 
+    def reset_timer_vars(self):
+        self.start_time = 0
+        self.current_time = 0
+        self.elapsed_bot_ms = 0                                                     # used for BOT timer in screen drawing
+        self.finishing_time = 0
+        self.autobot_end_time = 0
+        self.elapsed_nonbot_s = 0                                                   # will be used for `self.finishing_time`
+        self.ms_time_summed = False                                                 # for summing the ms elapsed time in case using autobot, EXACTLY ONCE, and not more times, to self.ms_time_summed, each game
+        self.autobot_start_time = 0       
+    
     def new_game(self):                     # i.e. initialize all variables
         print('\n-----------------------------')
         print("NEW_GAME")
@@ -72,52 +84,50 @@ class Minesweeper:
         self.started = False                # the mines will be placed AFTER the first click, as in real minesweeper. Otherwise you could lose on the first click. For that, we need to keep track on if the first click has already commenced or not.
         self.victory = False
         
-        self.current_time = 0
-        self.elapsed_time = 0
         self.mouse_pos = (0,0)
-        self.start_time = 0
         
         self.hit_a_mine = False
         self.game_ended = False
         self.guessed_cells = set()
         self.obsolete_front = set()         # all those members of 'self.front' that no longer have any unclicked unflagged neighbours
-        self.autobot_end_time = None
+        
         self.solved_variables = set()                                               # needed for bookkeeping of what variables not to rehandle as solved_variables also come from CSP_solver
         self.new_front_members = set()                                              # this set is needed in 'add_new_front_cells_to_self_front()' for bookkeeping so that after iteration through 'self.front', the members of this set can be added to self.front. 'self.front' cannot be modified DURING iteration over itself, so that's why.
-        self.autobot_start_time = None       
-        self.ended_using_autobot = False                                            # needed for accurate choice between ms timer and standard timer in case autobot was used (=in case automatic bot playing was used)        
+        
+        self.finished_using_autobot = False                                            # needed for accurate choice between ms timer and standard timer in case autobot was used (=in case automatic bot playing was used)        
         self.n_unclicked = self.width * self.height
         self.solved_new_using_simple_solver = False                                 # if True, continue with simple_solver() (continue with that as long as possible, only go to CSP_solver if simple_solver() is no longer enough)
         self.solver = CSP_solver(mines_total = self.mines)                          # minecount is needed in 'CSP_solver' in those rarish cases where information about the remaining minecount near the end of the game is needed to be able to solve the last few cases that would otherwise require guessing.
         
         self.minecount = self.mines
-        self.previous_round_minecount = -1                                          # inspect: if current minecount == previous, then try minecount logic. Then if that doesn't work, try quessing (last resort)
-        self.previous_round_n_unclicked = -1
-
         self.map = [[unclicked for x in range(self.width)] for y in range(self.infobar_height, self.height + self.infobar_height)]   # map = all the mines. Since the infobar is on top, the '0' y for mines = infobar_height. This map records the names of the images of each cell on the map.
 
+        self.reset_timer_vars()
+
     def autobot_loop(self) -> None:
-        if not self.autobot_start_time:                                                  # otherwise this would be reset every time you press a
-            print("AUTOBOT LOOP")
-            self.autobot_start_time = time()
+        print("AUTOBOT LOOP")    
         while True:
-            if self.autobot:
-                self.check_victory()                                              
+            if self.auto_on:                                                        # this loop itself can set it off -> break the loop, go back to 'self.loop()' instead
+                self.check_victory()                                                # sets 'self.game_ended = True', etc
                 for event in pygame.event.get():
-                    self.inspect_event(event)                                       # if you press 'a' again, this loop will break (among all the other things that are inspected in this loop as well)
-                if not self.game_ended:                           # I want to enable smashing 'b' and 'p' repeatedly without risking of error; after hitting a mine, smashing 'p' or 'b' can result in error (and can cause (more) lag)
+                    self.inspect_event(event)                                       # if you press 'a' again, this loop will break (among all the other things that are inspected in this 'inspect_event()' as well)
+                if not self.game_ended:
                     if not self.started:
                         self.handle_first_left_click(self.start_x, self.start_y)    # this also starts the timer
                     else:
                         self.bot_act()  
                 else:
-                    self.autobot = False
-                    if not self.autobot_end_time:
+                    self.auto_on = False
+                    if not self.finished_using_autobot:
                         self.autobot_end_time = time()                                   # without checking, this would increase a bit after every press of a even if the game has for exampled finished already
-                    self.ended_using_autobot = True
-                    print("TIME (ms):", round((self.autobot_end_time-self.autobot_start_time)*1000,1))
-                    if not self.visual_autobot:
-                        self.draw_display()
+                        self.elapsed_bot_ms = (self.autobot_end_time - self.autobot_start_time) * 1000
+                        if not self.ms_time_summed:
+                            self.ms_time_summed = True
+                            self.ms_bot_time_TOTAL += self.elapsed_bot_ms
+                        self.finished_using_autobot = True
+                        print("TIME (ms):", round((self.autobot_end_time-self.autobot_start_time)*1000,1))
+                        if not self.visual_autobot:
+                            self.draw_display()
                     break
                 if self.visual_autobot:
                     self.draw_display()
@@ -127,7 +137,7 @@ class Minesweeper:
     def inspect_event(self, event) -> None:
         if event.type == pygame.KEYDOWN:                                            # I have to check this first to be able to escape from the autobot loop when I so want
             if event.key == pygame.K_a:
-                self.autobot = not self.autobot
+                self.auto_on = not self.auto_on
             if event.key == pygame.K_v:
                 self.visual_autobot = not self.visual_autobot
             if event.key == pygame.K_SPACE:                                         # event.key, not event.type, sigh. I was looking for this with cats and dogs
@@ -171,8 +181,9 @@ class Minesweeper:
         self.start_x = x                                                            # If you click the map in the beginning, the start coordinates are where you first click. If you don't click, but instead press b right away to let the bot make the first move, then by default 'self.start_x' = 'self.start_y' = 0 (top left corner of the map).
         self.start_y = y
         self.started = True
-        self.start_time = pygame.time.get_ticks()
         self.generate_map(x, y)
+        self.start_time = pygame.time.get_ticks()
+        self.autobot_start_time = time()
         self.probe(x, y, primary=True)
 
     # based on the coordinates of the first clicked cell (mouse_x, mouse_y), place the mines elsewhere
@@ -201,16 +212,22 @@ class Minesweeper:
 
     def handle_game_ended(self):
         self.game_ended = True
-        self.current_time = pygame.time.get_ticks()
-        self.elapsed_time = (self.current_time - self.start_time) / 1000
+        self.finishing_time = pygame.time.get_ticks()
+        self.elapsed_nonbot_s = (self.finishing_time - self.start_time) / 1000
+
+    def check_victory(self) -> None:
+        if len(self.opened) == self.cells_to_open:
+            if not self.victory:
+                self.victory = True
+                self.game_result_counter[0] += 1
+                self.handle_game_ended()
 
     def handle_game_lost(self, x:int, y:int) -> None:
         if not self.hit_a_mine:
             print('game_over(): HIT A MINE AT COORDINATES:', (x, y))
             self.hit_a_mine = True
-            self.handle_game_ended()
-            self.draw_display()                                                     # for precise ending time, maybe something else too, I can't remember...
             self.game_result_counter[1] += 1
+            self.handle_game_ended()
 
     def handle_probing_of_already_opened_cell(self, x:int, y:int) -> None:      # this kind of a probing (when humans play) is either a chording, or a wasted click (it doesn't do anything)
         # print('\nhandle_probing_of_already_opened_cell()')
@@ -467,13 +484,6 @@ class Minesweeper:
                 if self.map[y][x] == unclicked:                     # NB! this ensures that a flag is placed in all, only when appropriate
                     self.toggle_flag(x,y)
         brain()
-    
-    def check_victory(self) -> None:
-        if len(self.opened) == self.cells_to_open:
-            if not self.victory:
-                self.victory = True
-                self.game_result_counter[0] += 1
-                self.handle_game_ended()
 
     def draw_display(self) -> None:
         self.screen.fill((0,0,0))
@@ -490,18 +500,30 @@ class Minesweeper:
             elif not self.game_ended:
                 self.current_time = pygame.time.get_ticks()
                 shown_time = f'{((self.current_time - self.start_time) // 1000)}'
-            else:                                                                                       # hit a mine or won:
-                if self.ended_using_autobot and not self.visual_autobot:
-                    #round((self.autobot_end_time-self.autobot_start_time)*1000,1)
-                    shown_time = f'{round(1000*(self.autobot_end_time-self.autobot_start_time), 1)} ms'
+            else:                                                                                       # GAME END: hit a mine or won; GAME ENDED:
+                if self.finished_using_autobot and not self.visual_autobot:
+                    ms_time = self.elapsed_bot_ms                                                       # autobot timer; the goal is to be as precise as possible
+                    shown_time = f'{ms_time:.1f} ms'
+                    if ms_time > 1000:                                                                  # it usually is less than 1000 ms, so that's why it's the default
+                        shown_time = f'{(ms_time / 1000):.3f} s'
                 else:
-                    shown_time = f'{self.elapsed_time:.3f}'                                             #b after clearing the map, show exact time
+                    shown_time = f'{self.elapsed_nonbot_s:.3f} s'                                       # b after clearing the map, show exact time
             timer_surface = self.font.render(f'Time: {shown_time}', True, (255,255,255))                # 'self.elapsed_time' is 0 by default
-            self.screen.blit(timer_surface, (10, 65))
-            
-
-
+            self.screen.blit(timer_surface, (10, 55))
         
+        def write_ms_average():
+            n_games = sum(self.game_result_counter)
+            if n_games:
+                ms_time_average = self.ms_bot_time_TOTAL / n_games
+                if ms_time_average > 1000: # then show seconds, not milliseconds
+                    s_time_average = ms_time_average / 1000
+                    ms_average_surface = self.font.render(f'average time: {s_time_average:.3f} s', True, (255,255,255))                # 'self.elapsed_time' is 0 by default
+                    print(f'average time: {s_time_average:.3f} s')
+                else:
+                    ms_average_surface = self.font.render(f'average time: {ms_time_average:.0f} ms', True, (255,255,255))                # 'self.elapsed_time' is 0 by default
+                    print(f'average time: {ms_time_average:.3f} ms')
+                self.screen.blit(ms_average_surface, (10, 75))
+            
         def draw_victory() -> None:
             if not self.hit_a_mine:
                 text = 'MAP CLEARED!'
@@ -611,6 +633,7 @@ class Minesweeper:
         
         draw_minecount()
         draw_timer()
+        write_ms_average()
         draw_map()
         draw_instructions_bar()
         write_unclicked_cell_count()
@@ -639,8 +662,8 @@ class Minesweeper:
     def loop(self) -> None:
         print('LOOP')
         while True:                                                         # I'm enabling continuing after hitting a mine as well
-            self.check_victory()
-            if self.autobot:                                             # if autobot is on, then play as fast as possible. Otherwise, only inspect events if an event occurs
+            self.check_victory()                                            # here, 'self.finishing_time' is recorded, IF the game is won
+            if self.auto_on:                                             # if autobot is on, then play as fast as possible. Otherwise, only inspect events if an event occurs
                 self.autobot_loop()
                 self.draw_display()                                             # (2) then draw the screen after handling them
             else:
