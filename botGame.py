@@ -1,4 +1,5 @@
 import pygame
+from time import time
 from random import sample
 from constraint import Problem                          # this could be used (not done at the moment if grey) to solve groups of CSP-equations (CSP = constraint satisfaction problem)
 from CSP_solver import CSP_solver, format_equation_for_csp_solver
@@ -14,9 +15,11 @@ class Minesweeper:
         # NB! Put here ONLY those that are not reset at every 'new_game()'
         self.mines = mines
         self.width = width
+        self.autobot = False                            # if set to true, then the bot will play as long as it hits a mine or wins; no need to smash p or b manually
         self.csp_on = csp_on
         self.height = height                            # map height measured in rows
         self.infobar_height = 100                       # pixels for the infobar above the minesweeper map
+        self.visual_autobot = True                      # when this is on, the 30 fps screen draw is ON. This limits the speed of the bot, but looks cool :D press v to activate, WHEN you have pressed a
         self.debug_csp = debug_csp
         self.clock = pygame.time.Clock()
         self.cell_size = 50-int(0.8*height)             # how many px in height and width should each cell be?
@@ -41,6 +44,8 @@ class Minesweeper:
         self.highlight_guesses = False
         self.highlight_csp_solved = self.debug_csp
         self.instructions = '''
+        a : automatic bot play
+        v : toggle visual, 30 fps version of a
         b or p : bot move
         f : front highlighting
         c : highlight csp-solved cells
@@ -66,6 +71,7 @@ class Minesweeper:
 
         self.started = False                # the mines will be placed AFTER the first click, as in real minesweeper. Otherwise you could lose on the first click. For that, we need to keep track on if the first click has already commenced or not.
         self.victory = False
+        self.autobot_end = -1
         self.current_time = 0
         self.elapsed_time = 0
         self.mouse_pos = (0,0)
@@ -86,11 +92,40 @@ class Minesweeper:
 
         self.map = [[unclicked for x in range(self.width)] for y in range(self.infobar_height, self.height + self.infobar_height)]   # map = all the mines. Since the infobar is on top, the '0' y for mines = infobar_height. This map records the names of the images of each cell on the map.
 
+    def autobot_loop(self) -> None:
+        self.autobot_start = time()
+        while True:
+            if self.autobot:
+                self.is_map_cleared()                                               # if True, self.victory is set to True -> the loop will stop below
+                if self.autobot:
+                    for event in pygame.event.get():
+                        self.inspect_event(event)                                       # if you press 'a' again, this loop will break (among all the other things that are inspected in this loop as well)
+                if not (self.hit_a_mine or self.victory):                           # I want to enable smashing 'b' and 'p' repeatedly without risking of error; after hitting a mine, smashing 'p' or 'b' can result in error (and can cause (more) lag)
+                    if not self.started:
+                        self.handle_first_left_click(self.start_x, self.start_y)    # this also starts the timer
+                    else:
+                        self.bot_act()  
+                else:
+                    self.autobot = False
+                    self.autobot_end = time()
+                    print("TIME (ms):", round((self.autobot_end-self.autobot_start)*1000,1))
+                    if not self.visual_autobot:
+                        self.draw_display()
+                    break
+                if self.visual_autobot:
+                    self.draw_display()
+            else:
+                break
+
     def inspect_event(self, event) -> None:
-        if event.type == pygame.KEYDOWN:
+        if event.type == pygame.KEYDOWN:                                            # I have to check this first to be able to escape from the autobot loop when I so want
+            if event.key == pygame.K_a:
+                self.autobot = not self.autobot
+            if event.key == pygame.K_v:
+                self.visual_autobot = not self.visual_autobot
             if event.key == pygame.K_SPACE:                                         # event.key, not event.type, sigh. I was looking for this with cats and dogs
                 self.new_game()
-            elif event.key == pygame.K_b or event.key == pygame.K_p:   
+            elif event.key in [pygame.K_b, pygame.K_p]:
                 if not (self.hit_a_mine or self.victory):                           # I want to enable smashing 'b' and 'p' repeatedly without risking of error; after hitting a mine, smashing 'p' or 'b' can result in error (and can cause (more) lag)
                     if not self.started:
                         self.handle_first_left_click(self.start_x, self.start_y)
@@ -277,12 +312,12 @@ class Minesweeper:
                         if self.map[y][x] == unclicked:
                             not_clicked.add((x,y))
                 return not_clicked
-            
+
             def check_minecount_zero() -> None:
                 if self.minecount == 0:
                     for x,y in get_all_unclicked_cells():
                         self.probe(x,y,True)
-            
+
             def get_unclicked_unseen_cells() -> set:
                 adjacent_to_front = set()
                 unclicked_unseen_cells = get_all_unclicked_cells()                      # this is filtered below! So at this point, this name is misleading.
@@ -322,14 +357,8 @@ class Minesweeper:
                 check_minecount_zero()                                                          # if minecount is zero, then probe all 'unclicked' cells, since they cannot be mines -> map completed! Of course, this requires, that all the flags were placed correctly by the bot (they always are). This situation needs separate handling because the last 'unclicked' cells can be inside completely flagged boxes, isolating them from 'self.front'. It took me 5 weeks to even arrive in that kind of a situation! It's extremely rare, as it needs at least 3 already-flagged cells in a cordner, or 5 in a center edge, or 8 or more in the middle! Awesomesauce.
                 filter_front_cells()
 
-            simple_solver()
-
-            if self.solved_new_using_simple_solver:
-                return
-
-            # if I don't 'draw_display()' here, when using debugger, I wouldn't be able to see the map before csp-section code is executed c:
-            if self.debug_csp:
-                self.draw_display()
+            
+            
 
             # after removing thus far redundant cells from the 'self.front' (done in 'update_front'), I'm feeding equations into my CSP linear equation solver:
             def feed_csp_solver():
@@ -343,10 +372,7 @@ class Minesweeper:
                     csp_solver_input.append(csp_solver_input_addition)
                 self.solver.handle_incoming_equations(csp_solver_input)
 
-            if self.debug_csp:
-                self.draw_display()
-
-            feed_csp_solver()
+            
 
             def csp_solve():
                 print('\ncsp_solve():')
@@ -408,11 +434,26 @@ class Minesweeper:
                 self.guessed_cells.add(cell_to_open)
                 self.probe(x=cell_to_open[0], y=cell_to_open[1])
             
-            if self.csp_on:
-                csp_solve()
+            # ACTUAL EVENT CHAIN IS HERE: this performes the above functions in order
+            def bot_execute():
+                simple_solver()
+
+                if self.solved_new_using_simple_solver:                 # IF 'simple_solver()' IS ENOUGH, DO NOT PROCEED FURTHER! Only use the heavier machinery (csp_solve()) if necessary.
+                    return
+
+                # if I don't 'draw_display()' here, when using debugger, I wouldn't be able to see the map before csp-section code is executed c:
+                if self.debug_csp:
+                    self.draw_display()
+
+                feed_csp_solver()
+                
+                if self.csp_on:
+                    csp_solve()
+                
+                if self.solver.guess:                                   # if CSP_solver has not managed to solve any new variables with 100% certainty ('normal' logic OR minecounting logic), THEN guess. This info is directly obtained from 'self.solver', as you can see (`if self.solver.guess`)
+                    guess(self.solver.guess)                            # 'self.solver.guess' is the variable that had the highest probability of NOT being a mine (as of 12.10.2024 at least)
             
-            if self.solver.guess:                                   # if CSP_solver has not managed to solve any new variables with 100% certainty ('normal' logic OR minecounting logic), THEN guess
-                guess(self.solver.guess)                            # 'self.solver.guess' is the variable that had the highest probability of NOT being a mine (as of 12.10.2024 at least)
+            bot_execute()
 
         def flag_these(cells) -> None:                              # NB! this ensures that a flag is placed in all, only when appropriate
             for x,y in cells:
@@ -442,9 +483,15 @@ class Minesweeper:
             elif not self.started:
                 shown_time = 0
             else:
-                shown_time = f'{self.elapsed_time:.3f}'                                                 # after clearing the map, show exact time
+                if self.autobot_end == -1:
+                    shown_time = f'{self.elapsed_time:.3f}'                                                 # after clearing the map, show exact time
+                else:
+                    shown_time = f'{round(100*(self.autobot_end-self.autobot_start), 1)} ms'
             timer_surface = self.font.render(f'Time: {shown_time}', True, (255,255,255))                # 'self.elapsed_time' is 0 by default
-            self.screen.blit(timer_surface, (10, 65)) 
+            self.screen.blit(timer_surface, (10, 65))
+            
+
+
         
         def draw_victory() -> None:
             if not self.hit_a_mine:
@@ -490,16 +537,16 @@ class Minesweeper:
                     self.screen.blit(surface, (x*self.cell_size, y*self.cell_size + self.infobar_height))
             except:
                 pass
-        
+
         def highlight_guesses_blue() -> None:
             surface = transparent_highlight_surface(0,0,255,128)
             for x,y in self.guessed_cells:
                 self.screen.blit(surface, (x*self.cell_size, y*self.cell_size + self.infobar_height))
-        
+
         def write_minecount_success():
             minecount_success_surface = self.font.render(f'minecount success', True, (255,255,255))
             self.screen.blit(minecount_success_surface, (self.cell_size*self.width-500, 10))
-        
+
         def write_p_success_front():
             p_success_surface = self.font.render(f'Front ≤ {self.solver.p_success_front} % safe', True, (255,255,255))
             self.screen.blit(p_success_surface, (self.cell_size*self.width-500, 10))
@@ -511,14 +558,14 @@ class Minesweeper:
         def write_unclicked_cell_count():
             p_success_surface = self.font.render(f'unclicked cells: {self.n_unclicked}', True, (255,255,255))
             self.screen.blit(p_success_surface, (10, 30))
-        
+
         def write_choice():
             choice = 'other'
             if self.solver.choice == 'FRONT':
                 choice = 'safest cell from front'
             choice_surface = self.font.render(f'pick: {choice}', True, (255,255,255))
             self.screen.blit(choice_surface, (self.cell_size*self.width-500, 50))
-        
+
         def write_wins_and_losses():
             wins, losses = self.game_result_counter
             total = wins + losses
@@ -530,7 +577,7 @@ class Minesweeper:
             self.screen.blit(total_surface, ((300, 10)))
             self.screen.blit(wins_surface, ((300, 30)))
             self.screen.blit(losses_surface, ((300, 50)))
-            
+
             if wins or losses:
                 percent_won = round(100 * wins / total, 1)
                 percent_won_surface = self.font.render(f'% won: {percent_won}', True, (255,255,255))
@@ -541,13 +588,13 @@ class Minesweeper:
                 for y in range(self.height):
                     cell_status = self.map[y][x]                                                    # self.map is a list of lists; indices start from 0
                     self.screen.blit(source=self.images[cell_status], dest=(x*self.cell_size, y*self.cell_size+self.infobar_height))
-        
+
         def draw_instructions_bar() -> None:
             start_y = self.height * self.cell_size + self.infobar_height + 10
-            for i, instruction in enumerate(self.instructions):                                          # it isn't possible to use a multiline text, so each instruction has to be drawn separately. For this solution, I asked ChatGPT.
+            for i, instruction in enumerate(self.instructions):                                     # it isn't possible to use a multiline text, so each instruction has to be drawn separately. For this solution, I asked ChatGPT.
                 instruction_surface = self.font.render(instruction, True, (255,255,255))
                 self.screen.blit(instruction_surface, (10, start_y + i * 30))                       # draw all the instructions beneath each other
-        
+
         if self.victory:
             draw_victory()
         if self.hit_a_mine:                                                                         # I'm enabling both, in case someone wants to try to finish it still
@@ -579,27 +626,34 @@ class Minesweeper:
 
         pygame.display.flip()                                               # display.flip() will update the contents of the entire display. display.update() enables updating of just a part IF you specify which part
         self.clock.tick(30)
-    
+
     def loop(self) -> None:
         while True:                                                         # I'm enabling continuing after hitting a mine as well
             self.is_map_cleared()
-            for event in pygame.event.get():
-                self.inspect_event(event)
-            self.draw_display()                                             # (2) then draw the screen after handling them
+            if self.autobot:                                             # if autobot is on, then play as fast as possible. Otherwise, only inspect events if an event occurs
+                self.autobot_loop()
+                self.draw_display()                                             # (2) then draw the screen after handling them
+            else:
+                for event in pygame.event.get():
+                    self.inspect_event(event)
+                self.draw_display()                                             # (2) then draw the screen after handling them
 
 if __name__ == '__main__':
     beginner = 9,9,10
     intermediate = 16,16,40
     expert = 30,16,99
+    big_expert = 50,24,248
+    bigger_expert = 60,24,297
+
     dense_beg = 9,9,70
     less_dense_beg = 9,9,15
     too_many_mines = 5,5,16
     small_weirdo = 4,4,6
     big_ez = 50,24,200
-    big_expert = 50,24,248
+    
     minecount_demonstration_sometimes = 5,5,15
 
     ''' ↓↓↓ STARTS A NEW MINESWEEPER with the ability to play the bot by pressing b ↓↓↓ (instructions in the game) '''
     # Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=False) # IF YOU WANT ONLY simple_solver(), which WORKS at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
-    Minesweeper(big_expert[0], big_expert[1], big_expert[2], csp_on=True) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
+    Minesweeper(expert[0], expert[1], expert[2], csp_on=True) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
     #           width       height      mines

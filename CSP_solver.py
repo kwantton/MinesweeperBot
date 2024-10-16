@@ -86,7 +86,7 @@ class CSP_solver:
                     for var in variables:                                           # add all vars to current group
                         if var not in grouped_vars:                                 # if one of these is not present, then none should be! The 'add_eqs_to_current_group' below might have added these already. If it has, then DON'T make another group
                             add_eqs_containing_current_var_to_current_group(group_n, var)
-                group_n += 1       
+                group_n += 1
             return groupN_to_vars
         
         # (1.2) from disconnected variables above, build disconnected (separate) sets of equations
@@ -104,7 +104,7 @@ class CSP_solver:
                         eqs_of_this_set.add(eq)
                 separate_sets_of_eqs.append(eqs_of_this_set)
             return separate_sets_of_eqs
-        
+
         # (2) for each separate set (set=joukko) of eqs, for each equation (i.e. each number cell on the minesweeper map), given that each variable (= each unopened cell) is 0 or 1 (no mine or a mine), find all possible combinations of 1s and 0s that can satisfy that SINGLE equation GIVEN THAT it has sum = k (some integer number = the number of mines in those unopened surrounding cells in total!)
         def find_and_group_possible_answers_per_single_equation(sets_of_eqs:list) -> list:
             '''
@@ -123,14 +123,12 @@ class CSP_solver:
                                 combo.append((var, 1))                                  # I could add only the 1s as all the others are 0, BUT then I'd have to also gather a set of all the variables present. Instead, I like to keep it more visually clear here; also each 'combo' is short, so using a set vs. iterating through all (usually 2-4) items makes no big difference performance-wise
                             else:
                                 combo.append((var, 0))
-
                         combo = tuple(combo)                                            # (('a',1),('c',0),...) is the format of combo
                         this_eq_group.append(combo)
                             
                     alt_answers_per_equation.append(tuple(this_eq_group))               # each list in this list is a list of alternative answers for that equation in question
                 alt_answers_for_groups.append(alt_answers_per_equation)
             return alt_answers_for_groups
-
 
         # (3) for each separated set (set=joukko) of equations, do the following: for each group (group=alternative solutions for ONE equation like a+b=1 ('a' is a cell on the minesweeper map, 'b' is another cell)), find at least one solution that's compatible with AT LEAST ONE alternative solution from EXACTLY ONE other group (reminder: group = group of alt solutions for an equation). So, connect the first equation (group) to ONE another equation (second 'group'), and that also to another group, and so on (=build a chain of groups = a chain of compatible alt answers). So, for all compatible alt solutions in the 2nd group, couple all of those to the 3rd group (i.e. to the next equation); this builds a chain of equations, where all neighbouring alt solutions are compatible, where the first equation is linked to one equation, the next one to the previous and to the next, etc, and the last one is linked only to the previous one. AFTER 'chain_link_equations', continue to build all possible alternative answers from those, so that there's bookkeeping for every variable for every possible unique alt whole-solution, so that if a conflict is found, building of that alt solution tree is terminated on the spot -> less computation wasted. I think this was called backtracking, as I later found out.
         def chain_link_equations(alternative_answers_per_equation_per_set_of_eqs:list) -> list:
@@ -140,7 +138,7 @@ class CSP_solver:
             comp_groups_and_starting_groups = []
             for alternative_answers_per_eq in alternative_answers_per_equation_per_set_of_eqs:
                 compatibility_groups = dict()                                   # { possible solution : all related possible solutions (i.e. those which share variables and do not disagree for any variable value for those variables that are present in both the key and each of the values in this dictionary for that key!) }. There's no need for explicit bookkeeping regarding which of the value solutions belong to which original equation, because the variables included themselves are enough to identify the origin.
-                
+
                 for a in range(len(alternative_answers_per_eq)):                # e.g. ( (('a',0), ('b',1)), (('a',1),('b',0)) ) would constitute one 'group' (length 2) for the equation 'a+b=1' which is stored as ((a,b),1) in 'self.unique_variables'; that is, all the possible solutions for that equation constitute a 'group'
                     if a == 0:
                         groupA = alternative_answers_per_eq[a]
@@ -287,7 +285,7 @@ class CSP_solver:
             handle_possible_whole_solutions(value_counts_for_each_var)
             return possible_whole_solutions
         
-        # (6) guess if needed
+        # (6) guess if needed. NB! this 'best' guess considers this round only; it doesn't take into account what will happen later
         def choose_best_guess(naive_safest_guess, min_n_mines_in_front, best_front_chance):
             print('GUESSING IS NEEDED:')
             
@@ -489,8 +487,9 @@ class CSP_solver:
                         self.solved_variables.add((cell, 0))
                 else:
                     # Both of these below work. The non-commented one is a lot more straightforward, though, and saves work.
-                    print('- self.guess:', all_unclicked[0])
-                    self.guess = all_unclicked[0]                                                   # in this situation, you have to guess, as the contents of the 'flag box' are a mystery
+                    for uc in all_unclicked:
+                        self.guess = uc                                                             # 'all unclicked' is a set(); therefore, to pick the first element, you can't use index - instead do this. In this situation, you have to guess, as the contents of the 'flag box' are a mystery
+                    print('- self.guess:', uc)
                     # self.unique_equations = { (tuple(var for var in all_unclicked), minecount)}   # There's a chance for 'self.front' not existing in a case where the game is not finished, i.e. there are non-mine cells in that flag box
                 return
             else:
