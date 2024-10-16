@@ -18,10 +18,12 @@ class Minesweeper:
         self.auto_on = False                            # if set to true, then the bot will play as long as it hits a mine or wins; no need to smash p or b manually
         self.csp_on = csp_on
         self.height = height                            # map height measured in rows
+        self.perpetual = False
         self.infobar_height = 100                       # pixels for the infobar above the minesweeper map
         self.ms_bot_time_TOTAL = 0
         self.visual_autobot = True                      # when this is on, the 30 fps screen draw is ON. This limits the speed of the bot, but looks cool :D press v to activate, WHEN you have pressed a
         self.debug_csp = debug_csp
+        
         self.clock = pygame.time.Clock()
         self.cell_size = 50-int(0.8*height)             # how many px in height and width should each cell be?
         self.initialize_debug_features()
@@ -48,7 +50,8 @@ class Minesweeper:
         self.instructions = '''
         a : automatic bot play
         v : toggle visual, 30 fps version of "a"
-        b or p : bot move
+        i = toggle infinite mode of a; if the bot loses or wins, it will start another game
+        x or m : single bot move (you can mash them as fast as you want)
         f : front highlighting
         c : highlight csp-solved cells
         spacebar : new game
@@ -94,7 +97,7 @@ class Minesweeper:
         self.solved_variables = set()                                               # needed for bookkeeping of what variables not to rehandle as solved_variables also come from CSP_solver
         self.new_front_members = set()                                              # this set is needed in 'add_new_front_cells_to_self_front()' for bookkeeping so that after iteration through 'self.front', the members of this set can be added to self.front. 'self.front' cannot be modified DURING iteration over itself, so that's why.
         
-        self.finished_using_autobot = False                                            # needed for accurate choice between ms timer and standard timer in case autobot was used (=in case automatic bot playing was used)        
+        self.finished_using_autobot = False                                         # needed for accurate choice between ms timer and standard timer in case autobot was used (=in case automatic bot playing was used)        
         self.n_unclicked = self.width * self.height
         self.solved_new_using_simple_solver = False                                 # if True, continue with simple_solver() (continue with that as long as possible, only go to CSP_solver if simple_solver() is no longer enough)
         self.solver = CSP_solver(mines_total = self.mines)                          # minecount is needed in 'CSP_solver' in those rarish cases where information about the remaining minecount near the end of the game is needed to be able to solve the last few cases that would otherwise require guessing.
@@ -128,7 +131,11 @@ class Minesweeper:
                         print("TIME (ms):", round((self.autobot_end_time-self.autobot_start_time)*1000,1))
                         if not self.visual_autobot:
                             self.draw_display()
+                    if self.perpetual:
+                        self.auto_on = True
+                        self.new_game()
                     break
+
                 if self.visual_autobot:
                     self.draw_display()
             else:
@@ -136,13 +143,17 @@ class Minesweeper:
 
     def inspect_event(self, event) -> None:
         if event.type == pygame.KEYDOWN:                                            # I have to check this first to be able to escape from the autobot loop when I so want
-            if event.key == pygame.K_a:
+            if event.key == pygame.K_q:                                             # let's have a chance to escape asap, so that this doesn't go to the bottom of the to-do list
+                exit()
+            elif event.key == pygame.K_a:
                 self.auto_on = not self.auto_on
-            if event.key == pygame.K_v:
+            elif event.key == pygame.K_i:
+                self.perpetual = not self.perpetual
+            elif event.key == pygame.K_v:
                 self.visual_autobot = not self.visual_autobot
-            if event.key == pygame.K_SPACE:                                         # event.key, not event.type, sigh. I was looking for this with cats and dogs
+            elif event.key == pygame.K_SPACE:                                         # event.key, not event.type, sigh. I was looking for this with cats and dogs
                 self.new_game()
-            elif event.key in [pygame.K_b, pygame.K_p]:
+            elif event.key in [pygame.K_x, pygame.K_m]:
                 if not (self.hit_a_mine or self.victory):                           # I want to enable smashing 'b' and 'p' repeatedly without risking of error; after hitting a mine, smashing 'p' or 'b' can result in error (and can cause (more) lag)
                     if not self.started:
                         self.handle_first_left_click(self.start_x, self.start_y)
@@ -155,8 +166,7 @@ class Minesweeper:
                 self.highlight_csp_solved = not self.highlight_csp_solved
             elif event.key == pygame.K_g:
                 self.highlight_guesses = not self.highlight_guesses
-            elif event.key == pygame.K_q:
-                exit()
+            
         elif event.type == pygame.MOUSEBUTTONDOWN:
             print(f'MOUSEBUTTONDOWN;')
             mouse_x, mouse_y = pygame.mouse.get_pos()
@@ -518,10 +528,8 @@ class Minesweeper:
                 if ms_time_average > 1000: # then show seconds, not milliseconds
                     s_time_average = ms_time_average / 1000
                     ms_average_surface = self.font.render(f'average time: {s_time_average:.3f} s', True, (255,255,255))                # 'self.elapsed_time' is 0 by default
-                    print(f'average time: {s_time_average:.3f} s')
                 else:
                     ms_average_surface = self.font.render(f'average time: {ms_time_average:.0f} ms', True, (255,255,255))                # 'self.elapsed_time' is 0 by default
-                    print(f'average time: {ms_time_average:.3f} ms')
                 self.screen.blit(ms_average_surface, (10, 75))
             
         def draw_victory() -> None:
