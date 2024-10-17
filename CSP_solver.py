@@ -1,5 +1,4 @@
 '''to-do:
-- smarten the solution checking by using 'value_counts_for_each_var' in 'join_comp_groups_into_solutions()'. So, use the same strategy as in minecount situations.
 - more tests, also on 'botGame.py' side
 '''
 from itertools import combinations
@@ -135,7 +134,8 @@ class CSP_solver:
             '''
             returns: list of tuples [ (compatibility groups, starting group for the compatibility groups for alt tree solution builder), ...]
             '''
-            # TO-DO; try pairing equations with max overlap; essentially, keep them in coordinate-adjacent order, that's it
+            print('chain_link_equations()')
+            # done; using `sorted()`, try pairing equations with max overlap; essentially, keep them in coordinate-adjacent order, that's it
             comp_groups_and_starting_groups = []
             # alternative_answers_per_equation_per_set_of_eqs = pair_equations_via_shared_vars(alternative_answers_per_equation_per_set_of_eqs)
             for alternative_answers_per_eq in alternative_answers_per_equation_per_set_of_eqs:
@@ -226,15 +226,20 @@ class CSP_solver:
                         break                                                       # it's possible that one or more variable values from an alt answer (the current one) disagree with one or more alt answers that are INDIRECTLY connected to the current alt answer. Hence, they are in this case 'incompatible' (they directly disagree with each other), and the handling of this current alt solution should be prevented altogether
             return incompatible_pma
         
-        # (4) TO-DO: smarter solution inspection directly via var values instead of via going through every alt solution again
+        # (4) done: smarter solution inspection directly via var values instead of via going through every alt solution again
         def join_comp_groups_into_solutions(compatibility_groups:dict, starting_group) -> tuple:     # also return the whole list of 'possible_whole_solutions'; it's needed IF minecount is needed. If minecount is needed
+            print('join_comp_groups_into_solutions()')
             keyVars_to_keys = keyVars_to_keys_builder(compatibility_groups)
             n_groups = len(keyVars_to_keys.keys())
-            value_counts_for_each_var = dict()  # TO-DO: COUNT HERE, FOR EACH VAR, HOW MANY TIMES 0 AND HOW MANY TIMES 1 it is in minecount-OK alt solutions. SOLVES ALSO PROBLEMS REGARDING GUESSING! If the var has only 1s, then it's solved as 1. If only 0s, then it's solved as 0. Otherwise, the probability is extremely straightforward to calculate!
+            value_counts_for_each_var = dict()  # done: COUNT HERE, FOR EACH VAR, HOW MANY TIMES 0 AND HOW MANY TIMES 1 it is in minecount-OK alt solutions. SOLVES ALSO PROBLEMS REGARDING GUESSING! If the var has only 1s, then it's solved as 1. If only 0s, then it's solved as 0. Otherwise, the probability is extremely straightforward to calculate!
             possible_whole_solutions = []
+            n_times_traversed_for_debugging = 0
             
             def traverse(this_alt, entered_alts_for_this_build, 
-                possible_solution_build, already_handled_groups) -> None:
+                possible_solution_build, already_handled_groups,
+                n_times_traversed_for_debugging) -> int:                                # returns 'n_times_traversed...'
+
+                n_times_traversed_for_debugging += 1
 
                 already_handled_groups_local = already_handled_groups.copy()
                 possible_solution_build_local = possible_solution_build.copy()
@@ -247,7 +252,7 @@ class CSP_solver:
                         incompatible_alt_solution = check_for_disagreements(            # this cannot happen on the FIRST call of 'traverse()', but it CAN happen on subsequent later calls - the 'compatibility_groups' only ensure PAIR compatibility, not beyond than that!
                             this_alt, possible_solution_build_local)
                         if incompatible_alt_solution:                                   # if this alt solution disagrees i.e. is incompatible with already-recorded alt solutions (one from each met group so far), then move on to the next 'proposed_matching_alt' (which may be of the same OR of different group!) NB! Do NOT mark the group of the current alt solution as handled if it's incompatible; this means that we still need to wait for a compatible alt to come by from this group, so I must NOT mark it as handled yet!
-                            return
+                            return n_times_traversed_for_debugging
 
                         # this includes the current alt solution
                         for var, value in this_alt:                                     # (('a',0), ('b',1), ...) a 'proposed_matching_alt' has this format. It's one alt solution to an equation that's derived from the minesweeper map and which has to have ONE alt solution, the other ones being untrue.
@@ -264,7 +269,7 @@ class CSP_solver:
                                 else:
                                     value_counts_for_each_var[var][1] += 1
                             possible_whole_solutions.append(possible_solution_build_local)
-                            return                                                      # if it's done, it's done. The possible next matches would be to a completely different group, AND it's not possible to gain more solutions from this one, as new groups and their alts are only ADDED in this 'traverse()', not removed, and we've already been to all groups -> return, don't continue!
+                            return n_times_traversed_for_debugging                                                  # if it's done, it's done. The possible next matches would be to a completely different group, AND it's not possible to gain more solutions from this one, as new groups and their alts are only ADDED in this 'traverse()', not removed, and we've already been to all groups -> return, don't continue!
 
                         new_matches = compatibility_groups[this_alt]                    # continue to matches of this alt solution ONLY if none of the values of this alt solution disagree with values that have already been recorded in 'possible_solution_build' as values of the variables
                         entered_alts_for_this_build_local.add(this_alt)
@@ -273,8 +278,10 @@ class CSP_solver:
                         if new_matches:
                             for new_match in new_matches:
                                 if new_match not in entered_alts_for_this_build_local:    # technically redundant, probably almost no effect regarding computing efficiency, BUT it's nice for clarity, and showing the logic still (even if double check)
-                                    traverse(new_match, entered_alts_for_this_build_local, 
-                                        possible_solution_build_local, already_handled_groups_local)
+                                    n_times_traversed_for_debugging = traverse(new_match, entered_alts_for_this_build_local, 
+                                        possible_solution_build_local, already_handled_groups_local,
+                                        n_times_traversed_for_debugging)
+                return n_times_traversed_for_debugging
                         
             # 'starting_group' is the group from where all arrows leave, and back to which no arrows return; an alt origin for an alt rooted tree, essentially!
             for alt_origin in starting_group:                                       # E.g.: ('d', 'e'), [(('d',1),('e',0)), (('d',0),('e',1))]. This quarantees that they build unidentical solution trees that together encompass all possible whole solutions.
@@ -282,17 +289,18 @@ class CSP_solver:
                     seen_proposed_vectors = set()                                   # PER alt answer, of course - that's why it's initialized here and not at the top of this 'join_groups_into_solutions'
                     handled_groups = []
                     alt_solution_build = {}
-                    traverse(alt_origin, seen_proposed_vectors, 
-                        alt_solution_build, handled_groups)                         # 'traverse' builds alternative 'possible_whole_solutions' and saves all viable ones to 'possible_whole_solutions'
+                    n_times_traversed_for_debugging = traverse(alt_origin, seen_proposed_vectors, 
+                        alt_solution_build, handled_groups, n_times_traversed_for_debugging)                         # 'traverse' builds alternative 'possible_whole_solutions' and saves all viable ones to 'possible_whole_solutions'
             
-            # TO-DO! Count also at this point, use the ready function for that!; if max mines in front < minecount, there's NO NEED for minecount (this is checked in minecount situation checking functions later) -> use this instead!!!! That will significantly make the worst cases faster!!
+            # done: Count also at this point, use the ready function for that!; if max mines in front < minecount, there's NO NEED for minecount (this is checked in minecount situation checking functions later) -> use this instead!!!! That will significantly make the worst cases faster!!
+            print('- traverse()s finished,', n_times_traversed_for_debugging, 'times in total')
             best_bet, highest_survival_rate_in_front_cells = handle_minecount_results(
                 value_counts_for_each_var)
             return possible_whole_solutions, best_bet, highest_survival_rate_in_front_cells
 
         # (6) guess if needed. NB! this 'best' guess considers this round only; it doesn't take into account what will happen later
         def choose_best_guess(naive_safest_guess, min_n_mines_in_front, best_front_chance):
-            print('GUESSING IS NEEDED:')
+            print('choose_best_guess():')                                       # NB! This can happen both before it's known if a guess is actually needed (before minecount check, which checks if minecount would be useful, because performing this function is very quick and convenient), and AFTER minecount, if we know that guessing is ABSOLUTELY needed as minecount didn't help. That is; this function is called either 0, 1 or 2 times per round of 'absolut_brut()'. If it happens 2 times, it is KNOWN that these results will be used for guessing. If 1 time, then either they are used (if minecount isn't useful) or not (if minecount IS useful and provides answers)
 
             self.choice = 'FRONT'                                               # default
             self.guess = naive_safest_guess                                     # default. The below might be false -> the default stays.
@@ -337,7 +345,7 @@ class CSP_solver:
                 return best_bet, highest_survival_rate_in_front_cells * 100
 
         # For every eq set: 'sets_altSolutionsMinminesMaxmines', get possible sums of mines, and count the number of times every alt is seen in any combination with others - this will be used in guessing, if needed ((If possible, return 'nMines_to_frontAltSolutions' like it was before.))
-        def sum_up_and_check_minecount(sets_nMinesToAltsolutions_minmines_maxmines:list,
+        def check_minecount_need_and_guess_or_minecount(sets_nMinesToAltsolutions_minmines_maxmines:list,
             smallest_n_mines_in_front_alt_solutions:int, largest_n_mines_in_front_alt_solutions:int,
             best_guess, survival_chance:int) -> dict:   # 0 <= survival_chance <= 100. Best_guess is the variable that, from cells seen by self.front, has the lowest chance of being a mine.
 
@@ -413,9 +421,11 @@ class CSP_solver:
                         self.solved_variables.add((cell, 1))                            # if the number of unclicked unseen + max number of mines encountered in any alt solution == currently remaining minecount, then every single cell in unclicked unseen cells must have a mine. I met one such situation in a random game.
                         self.solved_new_vars_during_this_round = True
             if largest_n_mines_in_front_alt_solutions < minecount:                      # if self.front has at max less mines than remaining in the whole map, it cannot provide any more definitive solutions than part (4) tried - no variable is definitely 1 or 0 always. Have to guess.
+                print("GUESSING, no need for minecount")
                 choose_best_guess(naive_safest_guess = best_guess, 
                     min_n_mines_in_front = smallest_n_mines_in_front_alt_solutions, best_front_chance = survival_chance)
                 return
+            print("MINECOUNT needed")
             if self.solved_new_vars_during_this_round:
                 self.minecount_successful = True                                        # used in 'botGame.py' for printing 'minecount successful' when it's used. Convenient for debugging!
 
@@ -472,9 +482,9 @@ class CSP_solver:
                     count_mines(set_alt_solution), min_minecount, max_minecount)
             return nMines_to_setAltSolutions, min_minecount, max_minecount
 
-        # (5) minecount: for each ENTIRELY COUPLED alt whole solution
-        def check_minecount_need(eqSetPossibleSolutions_bestGuess_survivalChance : list) -> None: # list of tuples; each member of the list is for one separated eq set. Each of these tuples is therefore for one eq set: (possibleSolutions, bestGuess, survivalChance if that guess is taken). This is used, if minecount is NOT needed = if minecount canNOT reveal new logic! It's extremely important not to do minecount if not needed, as its machinery is very heavy if the remaining front is big, in worst scenarios.
-            print('\nuse_minecount() since no solutions were found without it')
+        # (5) minecount: for each ENTIRELY COUPLED alt whole solution, get the max and min n_mines. Then send the sets for minecount check and (1) guessing if minecount is not useful (2) minecount if minecount IS useful (3) if minecount still doesn't provide solutions, guess. So guessing can happen before or after the actual 'minecount'
+        def count_set_alt_mines_and_send_for_minecount_check(eqSetPossibleSolutions_bestGuess_survivalChance : list) -> None: # list of tuples; each member of the list is for one separated eq set. Each of these tuples is therefore for one eq set: (possibleSolutions, bestGuess, survivalChance if that guess is taken). This is used, if minecount is NOT needed = if minecount canNOT reveal new logic! It's extremely important not to do minecount if not needed, as its machinery is very heavy if the remaining front is big, in worst scenarios.
+            print('\ncheck_minecount_need() as no solutions were found yet')
 
             # all these three below are about THE WHOLE front solution; solutions for the WHOLE FRONT, everything seen by 'self.front' in 'botGame.py', everything in yellow when you highlight it in the minesweeper botGame by pressing 'f'. Please try it! c:
             smallest_n_mines_in_front_alt_solutions = largest_n_mines_in_front_alt_solutions = 0
@@ -488,7 +498,7 @@ class CSP_solver:
                 largest_n_mines_in_front_alt_solutions += max_minecount
                 smallest_n_mines_in_front_alt_solutions += min_minecount
                 nMinesToAltSolutions_minmines_maxmines_for_each_set.append(result)
-            sum_up_and_check_minecount(nMinesToAltSolutions_minmines_maxmines_for_each_set,               # get all possible minecount sums; one for each combination of set alt solutions (one alt per separate eq set). Then inspect each corresponding solution using the machinery below, as it works (it's been tested meticulously before already)
+            check_minecount_need_and_guess_or_minecount(nMinesToAltSolutions_minmines_maxmines_for_each_set,               # get all possible minecount sums; one for each combination of set alt solutions (one alt per separate eq set). Then inspect each corresponding solution using the machinery below, as it works (it's been tested meticulously before already)
                 smallest_n_mines_in_front_alt_solutions, largest_n_mines_in_front_alt_solutions,
                 bestGuess, survivalChance)  # these two are used in case minecount is NOT needed c: - if minecount is not needed, in English, it provides no useful information, then a GUESS is necessary.
 
@@ -534,7 +544,7 @@ class CSP_solver:
             # (3) chain link equations
             compGroups_and_startingGroup = chain_link_equations(alternative_answers_per_equation_per_set_of_eqs)
 
-            # (4) get possible solutions per equation set
+            # (4) get possible solutions per equation set, and for each, join the best guess in case solutions are not found using this, and in case minecount is not needed later -> guess needed.
             eq_set_possible_solutions_and_guessing_info_in_case_minecount_is_not_needed = []                                                                                                  # eg. this could be[{a:1,b:0}, {a:0,b:1}] for a situation where there's one fifty-fifty ending, AND in addition an x number of unclicked unseen cells. If the minecount is 1, then all the unclicked unseen cells must be zero.
             for compatibility_groups, starting_group in compGroups_and_startingGroup:
                 possible_whole_solutions, best_bet, highest_survival_rate_in_front_cells = join_comp_groups_into_solutions(compatibility_groups, starting_group)
@@ -543,7 +553,7 @@ class CSP_solver:
 
             # (5) use minecount only if necessary. I have reduced time complexity by keeping the eq_sets separated in 'use_minecount' instead of combining them first. That only required summing (and quite complex data structures and loops..).
             if not self.solved_new_vars_during_this_round:                                                                                  # 'self.solved_new_vars_during_this_round' is set to 'True' the very moment that a new variable has been solved, each round of absolut_brut() in two possible situations: in (1) 'handle_possible_whole_solutions()' that was done previously, when any new variable is solved (using normal solving BEFORE minecount, and (2) If non-minecount logic wasn't enough, then I'm using 'use_minecount()' that's called here, and that also marks newly solved variables as True, so that guessing is NOT done. If not solved new, then 'handle_possible_whole_solutions()' is called again, there check for new solutions again, and if still not (3rd attempt, kind of), then guessing is done.
-                check_minecount_need(eq_set_possible_solutions_and_guessing_info_in_case_minecount_is_not_needed) # (6) if minecount doesn't help, 'use_minecount()' will pick the safest choice for guessing
+                count_set_alt_mines_and_send_for_minecount_check(eq_set_possible_solutions_and_guessing_info_in_case_minecount_is_not_needed) # (6) if minecount doesn't help, 'use_minecount()' will pick the safest choice for guessing
         
         perform_solving()
 

@@ -51,7 +51,7 @@ class Minesweeper:
         a : automatic bot play
         v : toggle visual, 30 fps version of "a"
         i = toggle infinite mode of a; if the bot loses or wins, it will start another game
-        x or m : single bot move (you can mash them as fast as you want)
+        x or n : single bot move (you can mash them as fast as you want)
         f : front highlighting
         c : highlight csp-solved cells
         spacebar : new game
@@ -153,7 +153,7 @@ class Minesweeper:
                 self.visual_autobot = not self.visual_autobot
             elif event.key == pygame.K_SPACE:                                         # event.key, not event.type, sigh. I was looking for this with cats and dogs
                 self.new_game()
-            elif event.key in [pygame.K_x, pygame.K_m]:
+            elif event.key in [pygame.K_x, pygame.K_n]:
                 if not (self.hit_a_mine or self.victory):                           # I want to enable smashing 'b' and 'p' repeatedly without risking of error; after hitting a mine, smashing 'p' or 'b' can result in error (and can cause (more) lag)
                     if not self.started:
                         self.handle_first_left_click(self.start_x, self.start_y)
