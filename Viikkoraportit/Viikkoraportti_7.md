@@ -1,0 +1,32 @@
+## sanasto
+- 'minecount'-tilanne: tilanne, jossa ei pystytä ratkaisemaan uusia muuttujia (arvo 0 tai 1 muuttujalle) 100% varmuudella yhdellekään muuttujalle (AINAKAAN) ILMAN, että otetaan huomioon lisäksi se, kuinka monta miinaa kyseisellä hetkellä jäljellä olevassa mapissa vielä on. Tämän 'minecountin' avulla saadaan tapaustarkastelu, joka tehdään `use_minecount()`:issa
+- self.front (front=ratkaisemattomuuden rintama tässä kontekstissa): `botGame.py`:ssä etulinjan numeroruudut, sellaiset, jotka kertovat jotain hyödyllistä loppumapin ratkaisun kannalta.
+- käytännössä tarkoitan 'front':eilla tämän self.frontin (tai sen erillisten osien) näkemiä klikkaamattomia ruutuja
+- erilliset frontit: erilliset yhtälöjoukot. Kussakin erillisessä yhtälöjoukossa jokaisella yhtälöllä on keskenään vähintään yksi muuttuja suoraan tai epäsuorasti muiden kyseisen joukon yhtälöiden kanssa yhteistä. Eli 'eriytä frontit' tarkoittaa: jaa tällä hetkellä minecount-tilanteita varten yhdistetyt frontit taas erilleen, jotta aikavaativuus laskee
+
+## Tehty tällä viikolla
+
+Erittäin, erittäin merkittäviä parannuksia:
+1. MAJOR facilitation regarding calling for minecount; if `max front cells` < remaining mines in the map, then minecount cannot provide info -> do not perform alt solution minecount checks (all the other remaining minecounts cases stay, and are necessary, however) (2) ordered equations before feeding to equation chain builder -> maximum overlap regarding variables, minimum effort -> every step afterwards (chain equation csp, prob calculation 1, minecount, and prob calculation 2, are ALL more efficient)
+2. tähän liittyen; nyt todennäköisyydet lasketaan (erittäin halvalla) jo ennen kuin tarkistetaan, tarviiko minecountia. Jos osoittautuu, että minecount ei ole hyödyllinen, niin siirrytään suoraan arvaamaan aiemmin laskettujen (ja siis tässä tilanteessa muuttumattomien) todennäköisyyksien perusteella
+3. `simple_solver()` osoitteessa 'pyGame.py' on NYT KÄYTÖSSÄ NIIN KAUAN KUIN MAHDOLLISTA ennen `CSP_solver`:ia: niin kauan, ettei se enää kykene tuottamaan vastauksia ilman CSP-solveria. Tämän simple solverin tein jo 5 viikkoa sitten, koska siitä aloitin koko botin tekemisen (kuten `bot_brain()`-nimestä voi päätellä 'botGame.py':ssä), ja käy siis läpi kaikkein yksinkertaisimmat tapaukset: 1: jos numeroruudun numero = ympärillä olevat liputetut ja liputtamattomat ei-numeroruudut, niin liputa ne kaikki. 2: jos numeroruudun numero = ympärillä olevien lippujen määrä, niin chordaa. Tätä en laittanut CSP-solver-luokkaan koska se ei tuntunut kovin CSP:ltä, ja olisi ollut ylimääräistä työtä ja sekoittanut CSP-solveria lisää.
+4. Erittäin paljon parannuksia botGame.py -osastoon siinä mielessä, että nyt on mahdollista ajaa maailman tappiin asti (eli siihen, kunnes vastaan tulee peli, joka aiheuttaa 'process killed' viestin), painamalla ensin v, sitten i, sitten a (v: pois päältä 30 fps-rajoitus, piirretään ruutu ainoastaan loppuneiden pelien välissä; i; luuppaa 'auto_bot_loop()' ia ikuisesti, aloittaa uuden pelin aina kun edellinen loppunut; a: botti pelaa koko mapin loppuun automaattisesti itse. Näiden 3 yhdistelmänä voidaan pelata ikuisesti).
+5. Games, won, lost, average time (ms tai s) per peli lasketaan automaattisesti botGame.py:ssä, näkyy ruudulla. Sitä onkin mukava seurata c:
+6. jos näkee, että peli jää pitemmäksi aikaa laskemaan, painaa 'i' uudestaan -> kun peli loppu, se piirretään näytölle, ja näkee täsmälleen kuinka kauan meni. Kätevää!
+7. Tein 'flag box'-tilanteista manuaaliset testit, jotka menevät läpi. Tällainen tilanne tuli vastaan pelatessa! Aiemmin se ei ollut ongelma, koska aikoinaan tein minecount-tilanteet bruteforcella, jonka yksi yhtälö oli sum(joka-muuttuja-jäljelläolvassa-mapissa) = jäljellä olevien miinojen määrä, mutta tämä on tietty todella hidasta ilman miinustuksia sun muita, joten kun tein uudestaan, tämä unohtui tehdä uudestaan. Nyt se on olemassa ja toimii.
+8. ordered equations of each separated eq set before feeding to equation chain builder -> maximum overlap regarding variables, minimum effort (sorting of the equations regarding each other within each set does not take long at all in the case of minesweeper) -> every step afterwards (chain building, prob calc, minecount check, prob calc #2 if needed) are faster. Elikkäs aikas hyvä asia, sikäli kun toimii (kuinka paljon merkitystä tällä tässä tapauksessa on, en ole tarkistanut. Tiedän vain, että ne olivat aiemmin ties-missä järkässä, ennen kuin otin `sorted()`:in käyttöön, joten oli täysin mahdollista, ettei yhtälöiden välillä ollut juurikaan overlappia muuttujien suhteen -> aikainen karsinta saattoi aiemmin olla melkoisen olematonta!). Miksi sorttaus toimii: kussakin yhtälössä muuttujat OVAT järkässä -> koska muuttujien nimet ovat myös järkässä (x- ja y-koordinaatin mukaan), niin riveissä ne menevät järkässä, sen jälkeen sarakkeissa. Ainoastaan overlappaamatta jäävät siis rivinvaihdokset tapauksissa, joissa rivi on tarpeeksi pitkä (3 ruutua tai enemmän). Huom. rivi ei voi katketa keskeltä, koska tämä sorttaus tehdään PER EQUATION SET, eli on JO varmistettu, että yhteisiä muuttujia takuulla löytyy c:
+Muuta:
+9. https://www.dropbox.com/home/MSBot siellä on tilanteita, testituloksia kuvina ja videoina. Tänne on vinkki GitHubissa (oli jo viime viikolla)
+
+## Miten edistynyt
+Erittäin hyvin. Frontit eriytetty aina kun voi ('separated eq sets', 'separated fronts', ja muita nimiä rakkaalla lapsella)
+
+## Mitä opin:
+- minecountin rajaus, jonka olin unohtanut aiemmin (olin defaulttina aina mennyt minecountiin, vaikkakin minecount-tapaustarkastelun kautta (en tyhmästi) ilman että muistin koodata sinne, että on tilanteita, joissa se EI voi ratkaista yhtään mitään (se ylempänä mainittu frotin max mines < jäljelläolevien miinojen lukumäärä))
+- kuten olen aiemminkin tehnyt, mahd. simppeliä mahd. kauan, sitten raskaammat aseet käyttöön. Tällä kertaa se vain sattui olemaan hyvin merkittävä suorituskyvyn kannalta
+
+## Epäselvää
+Alan tehdä automaattitestejä (huom. olen jo testannut aivan hemmetin paljon, joten varsinaisesta logiikasta tuskin löytyy korjattavaa, eikä peli myöskään koskaan kaadu muuhun kuin pahimpiin mahdollisiin arvaustapauksiin -> 'process killed' koska rekursiossa voi olla pahimmillaan yli 100 miljoonaa kutsua `traverse()`a yhteensä), käyn vertaisarvioinnin ensin läpi jotta näen vähän miten poetry toimii (ei ole siitä kokemusta)
+
+## Seuraavaksi
+Testejä, vertaisarvio
