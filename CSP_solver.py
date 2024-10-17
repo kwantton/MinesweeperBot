@@ -541,7 +541,7 @@ class CSP_solver:
             # (2) get alternative solutions per equation
             alternative_answers_per_equation_per_set_of_eqs = find_and_group_possible_answers_per_single_equation(separate_sets_of_eqs)    # each group represents the answers for a single equation derived from a single number cell on the minesweeper map.
 
-            # (3) chain link equations
+            # (3) chain link equations; overlap of equations via common variables is ensured by (1) performing chain linking for each separated eq set, (2) sorting the equations within each equation set before linking, then linking in the sorting order -> usually max number of variables are shared
             compGroups_and_startingGroup = chain_link_equations(alternative_answers_per_equation_per_set_of_eqs)
 
             # (4) get possible solutions per equation set, and for each, join the best guess in case solutions are not found using this, and in case minecount is not needed later -> guess needed.
