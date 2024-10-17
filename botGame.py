@@ -203,7 +203,7 @@ class Minesweeper:
         danger_y = set(y for y in range(self.height) if y-1 <= mouse_y <= y+1)
         available_coordinates = [(x,y) for y in range(self.height) for x in range(self.width) if not x in danger_x or not y in danger_y]
         self.mine_locations = set(sample(available_coordinates, self.mines))   # NB! This line of code 'generates' the map by deciding mine locations! This samples a 'self.mines' number of mines (e.g. 99 in an expert game) from 'available_cordinates' which excludes the opening cell that was clicked.
-        print(f'- clicked coordinates {mouse_x, mouse_y} and placed the mines as follows:\n', self.mine_locations)
+        # print(f'- clicked coordinates {mouse_x, mouse_y} and placed the mines as follows:\n', self.mine_locations)
 
     def probe(self, x:int, y:int, primary=False) -> None:           # if primary = False, then don't go to 'handle_probing_of_already_opened_cell', otherwise it can loop and cause another chord! The chording is meant ONLY for actual chording
         # print(f'\nprobe({x,y}, from primary={primary});')
