@@ -7,7 +7,7 @@ see 'how_to_clone.md'
 
 ## results (as of 18.10.2024)
 Out of the 14403 expert games so far, 38.37 % have been solved.
-The algorithm only stalls in the worst situation (0.04% of all games after the improvements). This could be circumvented by a timer or alike - or replacing `chain_link_equations()` with something better.
+The algorithm only stalls in the worst situations (0.04% of all games after the improvements so far). This could be circumvented by a timer, utilizing last round's probabilities, random guessing or alike - or replacing `chain_link_equations()` with something better.
 After the latest improvements, the average time per game is 0.68 seconds (including the slowest finished games, excluding games that were killed automatically), n=6797.
 
 ## Current state (17.10.2024)
