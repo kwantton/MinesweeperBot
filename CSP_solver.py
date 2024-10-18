@@ -187,20 +187,6 @@ class CSP_solver:
                 comp_groups_and_starting_groups.append((compatibility_groups, starting_group))
             return comp_groups_and_starting_groups
         
-        def handle_possible_whole_solutions(value_counts_for_each_var : dict):
-            '''
-            to-do description
-            '''
-
-            for var, [zeros, ones] in value_counts_for_each_var.items():
-                if zeros == 0:
-                    self.solved_variables.add((var, 1))
-                    self.solved_new_vars_during_this_round = True
-                elif ones == 0:
-                    self.solved_variables.add((var, 0))
-                    self.solved_new_vars_during_this_round = True
-
-        
         # every key in 'compatibility_groups' is an alt solution for one equation that must be solved one way or another. The same goes for all equation groups in each of those keys' values, BUT here I'm just looking at the keys before looking at their values.
         def keyVars_to_keys_builder(compatibility_groups:dict) -> dict:
             keyVars_to_key = dict()                                             # let's say there are 2 alt versions (two possible ALTERNATIVE solution vectors, e.g. (a) a=1, b=0, c=1 and (b) a=1, b=1, c=0, that survived the previous handling in 'restrict_solution_space_as_equation_pairs_with_common_variables()') for an equation (a+b+c=2 in this example). These 2 alternative solution vectors share all the same keyVars (a,b,c). We know that ONE of these alt vectors has to be true. So, if in both alt versions, a variable has value 0, then that variable MUST be 0. If both have a variable value 1 (a=1 in both alt solutions in my example!), then that variable MUST be 1. This is because this equation, as well as every other equation originating from a cell in the minesweeper map, has to be satisfied (because all of them are true!), so exactly one of its alt vectors has to be true.

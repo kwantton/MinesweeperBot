@@ -21,7 +21,7 @@ class Minesweeper:
         self.perpetual = False
         self.infobar_height = 100                       # pixels for the infobar above the minesweeper map
         self.ms_bot_time_TOTAL = 0
-        self.visual_autobot = True                      # when this is on, the 30 fps screen draw is ON. This limits the speed of the bot, but looks cool :D press v to activate, WHEN you have pressed a
+        self.visual_autobot = False                     # when this is on, the 30 fps screen draw is ON. This limits the speed of the bot, but looks cool :D press v to activate, WHEN you have pressed a
         self.debug_csp = debug_csp
         
         self.clock = pygame.time.Clock()
