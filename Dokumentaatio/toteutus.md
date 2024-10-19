@@ -71,8 +71,8 @@ Becerran kandityössä (Becerra, David J. 2015. Algorithmic Approaches to Playin
 
 <h2>Työn mahdolliset puutteet ja parannusehdotukset</h2>
 Lukee 'README.md':ssä.
-- jos ratkaisulogiikkaa ei nopeuttaisi, tapa ratkaista pisimmät pelit olisi käyttää timeria, jonka umpeutuessa arvataan mahd. fiksusti sen sijaan että yritetään ratkaista puhtaasti/selvittää paras mahdollinen arvaus
 - automaattitestejä
+- `join_comp_groups_into_solutions()` on pullonkaula tällä hetkellä. Tämä saattaa johtua esim. yhtälöiden sorttaamisesta tapauksissa, joissa suuri yhdistetty frontti muistuttaa u-kirjainta; koska sorttaamisen kohteena ovat yhtälöt muuttujineen, jotka ovat muotoa (x,y), jos frontti on U:n muotoinen, tällöin sorttaus käytännössä katkoo koko ajan (ensin vasen haara U:sta, sitten oikea, sitten taas vasen, sitten oikea). Tämä vaatisi ehkä vähän visuaalisempaa selitystä, mutta siis sorttaaminen sorttaa x:n perusteella ensin, sitten vasta y:n, ja jos eka x on jossain vasemmalla kaukana oikeasta, niin näistä kahdesta yhtälöstä ei sitten löydy yhtäkään yhteistä muuttujaa, joten karsimista ei tapahdu chain_link:in kautta ollenkaan. Tämä kasvattaa työn määrää seuraavissa vaiheissa, koska ei karsi juuri mitään pois.
 - jne, 'README.md'
 
 <h2> Laajojen kielimallien (ChatGPT yms.) käyttö. </h2>
