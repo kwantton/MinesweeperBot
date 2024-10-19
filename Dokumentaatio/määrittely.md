@@ -1,5 +1,5 @@
 # Aihe: miinaharavabotti, joka pystyy ratkaisemaan kaikki mahdolliset logiikalla ratkaistavissa olevat miinaharavan tilanteet 
-Tekemättä (5.10.2024): nopeampi versio minecountista, mukaan lukien tilanteet joissa miinoja on jäljellä enemmän kuin 10 (nykyinen on hidas). Muuten kaikki tilanteet ratkeavat tällä hetkellä
+Tekemättä (19.10.2024): automaattitestejä
 - Tiedostossa `botGame.py` voi generoida kenttiä (eli "mappeja" eli yksittäisiä pelejä, joissa miinajakaumat ovat halutun laisia): mapissa rivejä on $r$, sarakkeita $s$, miinoja $m < rs-8^{(huom.1)}$ (esim. expertissä on 16 riviä, 30 saraketta ja 99 miinaa), ja mapit esitetään Pythonissa listana listoja (lista rivejä, joista jokaisen alkion arvo on 0 jos ruudussa ei ole miinaa, ja 1, jos on miina); arvotaan $m$ miinaa koordinaateilla $(x,y)$. . Mappien generoinnissa toistettavuutta varten testeissä voitaisiin käyttää seed-arvoa satunnaislukugeneraattorille, MUTTA on jo tehty kiinteitä (muuttumattomia) testejä `CSP_solver.py`-luokan `if __name__ == __main__`-osiossa.
 - Tiedostossa `CSP_solver.py` voidaan luoda luokan `CSP_solver` olio, jolle syötetään yhtälöitä, joissa jokaisen muuttujan tulee olla 0 tai 1. Tässä mielessä kyseessä on pikemminkin Boolen totuustaulukoija kuin "CSP-solver", eli kyseessä on ainoastaan sellaisten yhtälöiden ratkaisija, joissa jokainen muuttuja on edellämainitusti 0 tai 1. Tässä kontekstissa 0 tarkoittaa, että kyseisessä muuttujassa eli miinaharavamapin ruudussa ei ole miinaa, ja 1 tarkoittaa, että kyseisessä ruudussa on miina. Tätä luokkaa käytetään `botGame.py`:ssä ja se integroidaan `Minesweeper`-olioon niin, että pelin aloittaessa ajamalla `botGame.py`:n main-osion koodin voidaan pelata botilla painamalla b-näppäintä. Botti osaa ratkaista kaikki tilanteet paitsi ne, joissa tulisi ottaa huomioon koko mapissa jäljelläolevien miinojen lukumäärä eli 'minecount'.
 - Testausta varten voitaisiin generoida kahta luokkaa (toistaiseksi ei tehty, koska työn tekijä on harjaantunut tunnistamaan kummatkin tapaukset. Todistusaineisto : <a>https://minesweeper.online/player/2600486</a>). Tätä ei ole vielä tehty:
@@ -17,9 +17,21 @@ Samassa järjestyksessä kuin täällä https://algolabra-hy.github.io/dokumenta
   - kävin Data Analysis with Python -kurssin, 4/5, ja _Building AI_ -kurssit, MUTTA en ole käynyt _Lineaarialgebra ja matriisilaskenta_ -kursseja vielä
 
 ## Mitä algoritmeja käytän
-coupled subsets CSP (Becerran kandityö)
+Ratkaisu (arvaukset mukaanlukien) on kahdeksanvaiheinen (19.10.2024):
+1. `simple_solver()` (in 'botGame.py') solves the simplest of cases, solving all cases of number-cell-number-equals-to-surrounding-unclicked-cells and all cases of number-cell-number-equals-to-surrounding-flags before ever moving on to call `CSP_solver`, thus limiting work done later in `CSP_solver` (which practically always is needed many times per game in case of Expert maps)
+2. Moving to `CSP_solver`: grouping equations to separated equation sets where sets do not share variables with other sets. This significantly limits the size of the problems solved by the machinery below.
+3. finding solution combinations per one equation (equation is, for example, a+b=1, where a and b are cells (cell=ruutu)). So at this point, each equation set has all possible answers per every equation
+4. for each equation set, chain link equations. The order of the chain: the equations in each separated equation set are first sorted, ensuring that in almost all cases, linking between each equation pair is done so that some alternative answers per each equation can be discarded due to incompatibility with the equation before and/or after (a chain has 2 ends, that's why 'and/or' was written).
+5. after chain linking, in the same order as in the previous step, traverse through all possible chains, which always start from the same starting equation, called the 'starting group' per each equation set. There's bookkeeping for variables so conflicts are found, and if conflicts are found, backtracking happens, discarding the whole branch so far. Essentially, there are as many 'alt tree roots' per equation group as there are alternative answers to the first equation (i.e. the 'starting group'). Thanks to this and the previous step, all the impossible answers are quite effieciently backtracked, and thanks to keeping equation sets separate when possible, the size of the trees is severely limited in most cases.
+6. for each equation set's possible whole answers received in the previous step, check if one or more variables were always 1 or always 0 in all possible alternative answers. If such variables were found, they are absolute answers for that variable (i.e. other answers are impossible). If not, the numbers of 1 vs 0 for each variable have now been recorded, and a guess can be taken, UNLESS the next step evaluates to true
+7. check for need for minecount: if the sum of max numbers of mines in all the combined (separated) fronts is less than the remaining minecount, this always evaluates to false. If the max sum equals to remaining minecount, then all unclicked unseen cells are 0 (no mine) and only the max mine count alt solutions can be viable, and if only the min sum equals to remaining minecount, then all unclicked unseen cells are 0 and only the min mine count solutions can be viable, and if something between max and min, another round of discarding minecount-invalid alt solutions must be done. There is no simpler way to describe this, I'm sorry. The alternative would be to add another equation to the mix, the one that has ALL remaining variables (all unclicked cells) and the total minecount, but you probably see the problem with this: it's far more inefficient, and with large variable numbers, the number of combinations from this can go to over $10^100$ possible answers in worst cases - not doable by backtracking and/or brute forcing alone! My solution is very good regarding this.
+8. if the previous step didn't produce answers, guess using the minecount situation -derived minecounts. Like the previous possibility for guessing (if minecount was not even needed), this chooses the cell with lowest chance of being a mine, comparing front cells to unseen unclicked cells. If unseen unclicked cells have the lowest chance of being a mine, a corner is opened (4 corners exist per map) if they are still available, and if all corners have already been used, then a front cell's neighbouring unclicked unseen cells is guessed.
 
-Päädyin tekemään ratkaisijan `CSP_solver` pitkälti uudestaan niin, että
+Toteutuksessani halusin väsätä kaiken 'itse'. Saatan käyttää coupled subsets CSP:tä (CSCSP:tä, kuten Becerra 2015), mutta en ole lukenut työtä kunnolla, ja esim. yhtälöiden ketjuttamisen keksin itse (se siis nimenomaan on ketju eikä verkko, ja vaati ymmärryksen siitä, että kaikkien settien kaikkien yhtälöiden globaalit ratkaisut koostuvat niistä alteista, jotka myös joka ikinen yhtälöpari jakaa keskenään, eli ketjuttamisjärjestyksellä ei ole väliä, kaikki globaalit ratkaisut löydetään järjestyksestä riippumatta). 
+
+Ainoa lähteeni on Becerra, 2015. Becerran työssä ei tietääkseni puhuta minecount-tilanteista, eikä CSCSP-solver pääse 32.90 % korkeampaan ratkaisuprosenttiin, kun taas oma toteutukseni ratkaisee 10 sekunnin aikarajoituksella per peli 38.20% (n=12292) Expert-mapeista keskimääräisessä ajassa 153 ms / peli (19.10.2024).
+
+Päädyin kolmannella viikolla tekemään ratkaisijan `CSP_solver` pitkälti uudestaan niin, että (voi olla osittain vanhentunutta)
 
 <ol>
   <li>
@@ -90,7 +102,12 @@ if __name__ == '__main__':
 ```
 
 ## to-do: O-aikavaativuusanalyysit
-## to-do: vertailu tunnettuihin miinaharava-algoritmeihin
+## vertailu tunnettuihin miinaharava-algoritmeihin
+
+Ainoa lähteeni on Becerra, 2015. Becerran työssä ei tietääkseni puhuta minecount-tilanteista, eikä CSCSP-solver pääse 32.90 % korkeampaan ratkaisuprosenttiin, kun taas oma toteutukseni ratkaisee 10 sekunnin aikarajoituksella per peli 38.20% (n=12292) Expert-mapeista keskimääräisessä ajassa 153 ms / peli (19.10.2024).
+
+Niin omassa työssäni kuin ei Becerran työssäkään tarkastella, mitä tapahtuu arvauksen jälkeen; siis arvaukset ovat 'naiiveja' sen suhteen, mitä arvauksen jälkeen tapahtuu - vaikka kussakin pelitilanteessa löydetäänkin kyseisellä hetkellä turvallisin arvaus, tämä ei takaa sitä, että tämä 'turvallisin' arvaus olisi oikeasti paras koko loppumapin ratkaisemisen kannalta. On esimerkiksi tilanteita, joissa arvaus, vaikka ei osuisikaan miinaan, ei kerro mitään loppujen miinojen sijainneista, eli voi tosiasiassa olla kaikkein huonoin arvaus, vaikka olisikin akuutisti 'turvallisin'.
+
 ## to-do: viitteet: 
 
 Becerra, David J. 2015. Algorithmic Approaches to Playing Minesweeper. Bachelor's thesis,
