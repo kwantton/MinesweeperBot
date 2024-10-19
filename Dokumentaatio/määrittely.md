@@ -31,7 +31,7 @@ Toteutuksessani halusin väsätä kaiken 'itse'. Saatan käyttää coupled subse
 
 Ainoa lähteeni on Becerra, 2015. Becerran työssä ei tietääkseni puhuta minecount-tilanteista, eikä CSCSP-solver pääse 32.90 % korkeampaan ratkaisuprosenttiin, kun taas oma toteutukseni ratkaisee 10 sekunnin aikarajoituksella per peli 38.20% (n=12292) Expert-mapeista keskimääräisessä ajassa 153 ms / peli (19.10.2024).
 
-Päädyin tekemään ratkaisijan `CSP_solver` pitkälti uudestaan niin, että
+Päädyin kolmannella viikolla tekemään ratkaisijan `CSP_solver` pitkälti uudestaan niin, että (voi olla osittain vanhentunutta)
 
 <ol>
   <li>
