@@ -293,7 +293,7 @@ class CSP_solver:
                         alt_solution_build, handled_groups, n_times_traversed_for_debugging)                         # 'traverse' builds alternative 'possible_whole_solutions' and saves all viable ones to 'possible_whole_solutions'
                 if self.timeout:
                     timeout_guess()
-                    print('TOOK LONGER THAN', self.time_limit, 'GUESSING')
+                    print('TOOK LONGER THAN', self.time_limit, '- therefor GUESSING NEXT')
                     return 'time', 'out', 'occurred'
             
             # done: Count also at this point, use the ready function for that!; if max mines in front < minecount, there's NO NEED for minecount (this is checked in minecount situation checking functions later) -> use this instead!!!! That will significantly make the worst cases faster!!
