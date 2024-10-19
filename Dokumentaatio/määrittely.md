@@ -1,5 +1,5 @@
 # Aihe: miinaharavabotti, joka pystyy ratkaisemaan kaikki mahdolliset logiikalla ratkaistavissa olevat miinaharavan tilanteet 
-Tekemättä (5.10.2024): nopeampi versio minecountista, mukaan lukien tilanteet joissa miinoja on jäljellä enemmän kuin 10 (nykyinen on hidas). Muuten kaikki tilanteet ratkeavat tällä hetkellä
+Tekemättä (19.10.2024): automaattitestejä
 - Tiedostossa `botGame.py` voi generoida kenttiä (eli "mappeja" eli yksittäisiä pelejä, joissa miinajakaumat ovat halutun laisia): mapissa rivejä on $r$, sarakkeita $s$, miinoja $m < rs-8^{(huom.1)}$ (esim. expertissä on 16 riviä, 30 saraketta ja 99 miinaa), ja mapit esitetään Pythonissa listana listoja (lista rivejä, joista jokaisen alkion arvo on 0 jos ruudussa ei ole miinaa, ja 1, jos on miina); arvotaan $m$ miinaa koordinaateilla $(x,y)$. . Mappien generoinnissa toistettavuutta varten testeissä voitaisiin käyttää seed-arvoa satunnaislukugeneraattorille, MUTTA on jo tehty kiinteitä (muuttumattomia) testejä `CSP_solver.py`-luokan `if __name__ == __main__`-osiossa.
 - Tiedostossa `CSP_solver.py` voidaan luoda luokan `CSP_solver` olio, jolle syötetään yhtälöitä, joissa jokaisen muuttujan tulee olla 0 tai 1. Tässä mielessä kyseessä on pikemminkin Boolen totuustaulukoija kuin "CSP-solver", eli kyseessä on ainoastaan sellaisten yhtälöiden ratkaisija, joissa jokainen muuttuja on edellämainitusti 0 tai 1. Tässä kontekstissa 0 tarkoittaa, että kyseisessä muuttujassa eli miinaharavamapin ruudussa ei ole miinaa, ja 1 tarkoittaa, että kyseisessä ruudussa on miina. Tätä luokkaa käytetään `botGame.py`:ssä ja se integroidaan `Minesweeper`-olioon niin, että pelin aloittaessa ajamalla `botGame.py`:n main-osion koodin voidaan pelata botilla painamalla b-näppäintä. Botti osaa ratkaista kaikki tilanteet paitsi ne, joissa tulisi ottaa huomioon koko mapissa jäljelläolevien miinojen lukumäärä eli 'minecount'.
 - Testausta varten voitaisiin generoida kahta luokkaa (toistaiseksi ei tehty, koska työn tekijä on harjaantunut tunnistamaan kummatkin tapaukset. Todistusaineisto : <a>https://minesweeper.online/player/2600486</a>). Tätä ei ole vielä tehty:
@@ -29,7 +29,7 @@ Ratkaisu (arvaukset mukaanlukien) on kahdeksanvaiheinen (19.10.2024):
 
 Toteutuksessani halusin väsätä kaiken 'itse'. Saatan käyttää coupled subsets CSP:tä (CSCSP:tä, kuten Becerra 2015), mutta en ole lukenut työtä kunnolla, ja esim. yhtälöiden ketjuttamisen keksin itse (se siis nimenomaan on ketju eikä verkko, ja vaati ymmärryksen siitä, että kaikkien settien kaikkien yhtälöiden globaalit ratkaisut koostuvat niistä alteista, jotka myös joka ikinen yhtälöpari jakaa keskenään, eli ketjuttamisjärjestyksellä ei ole väliä, kaikki globaalit ratkaisut löydetään järjestyksestä riippumatta). 
 
-Huomattavaa on, että Becerran työssä ei puhuta minecount-tilanteista, eikä CSCSP-solver pääse 32.90 % korkeampaan ratkaisuprosenttiin, kun taas oma toteutukseni ratkaisee 10 sekunnin aikarajoituksella per peli tällä hetkellä saa läpi 38.20% (n=12292) keskimääräisessä ajassa 153 ms / peli (19.10.2024).
+Ainoa lähteeni on Becerra, 2015. Becerran työssä ei tietääkseni puhuta minecount-tilanteista, eikä CSCSP-solver pääse 32.90 % korkeampaan ratkaisuprosenttiin, kun taas oma toteutukseni ratkaisee 10 sekunnin aikarajoituksella per peli 38.20% (n=12292) Expert-mapeista keskimääräisessä ajassa 153 ms / peli (19.10.2024).
 
 Päädyin tekemään ratkaisijan `CSP_solver` pitkälti uudestaan niin, että
 
@@ -102,7 +102,10 @@ if __name__ == '__main__':
 ```
 
 ## to-do: O-aikavaativuusanalyysit
-## to-do: vertailu tunnettuihin miinaharava-algoritmeihin
+## vertailu tunnettuihin miinaharava-algoritmeihin
+
+Ainoa lähteeni on Becerra, 2015. Becerran työssä ei tietääkseni puhuta minecount-tilanteista, eikä CSCSP-solver pääse 32.90 % korkeampaan ratkaisuprosenttiin, kun taas oma toteutukseni ratkaisee 10 sekunnin aikarajoituksella per peli 38.20% (n=12292) Expert-mapeista keskimääräisessä ajassa 153 ms / peli (19.10.2024).
+
 ## to-do: viitteet: 
 
 Becerra, David J. 2015. Algorithmic Approaches to Playing Minesweeper. Bachelor's thesis,
