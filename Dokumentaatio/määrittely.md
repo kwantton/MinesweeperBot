@@ -106,6 +106,8 @@ if __name__ == '__main__':
 
 Ainoa lähteeni on Becerra, 2015. Becerran työssä ei tietääkseni puhuta minecount-tilanteista, eikä CSCSP-solver pääse 32.90 % korkeampaan ratkaisuprosenttiin, kun taas oma toteutukseni ratkaisee 10 sekunnin aikarajoituksella per peli 38.20% (n=12292) Expert-mapeista keskimääräisessä ajassa 153 ms / peli (19.10.2024).
 
+Niin omassa työssäni kuin ei Becerran työssäkään tarkastella, mitä tapahtuu arvauksen jälkeen; siis arvaukset ovat 'naiiveja' sen suhteen, mitä arvauksen jälkeen tapahtuu - vaikka kussakin pelitilanteessa löydetäänkin kyseisellä hetkellä turvallisin arvaus, tämä ei takaa sitä, että tämä 'turvallisin' arvaus olisi oikeasti paras koko loppumapin ratkaisemisen kannalta. On esimerkiksi tilanteita, joissa arvaus, vaikka ei osuisikaan miinaan, ei kerro mitään loppujen miinojen sijainneista, eli voi tosiasiassa olla kaikkein huonoin arvaus, vaikka olisikin akuutisti 'turvallisin'.
+
 ## to-do: viitteet: 
 
 Becerra, David J. 2015. Algorithmic Approaches to Playing Minesweeper. Bachelor's thesis,
