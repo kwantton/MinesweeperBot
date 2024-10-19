@@ -10,7 +10,7 @@ class CSP_solver:
         self.guess = None                                               # 12.10.24: The safest cell to guess is saved here for use in botGame.py, if there is a need to guess. If (1) normal solving doesn't help AND (2) mine counting doesn't help either, THEN guess the safest cell. This info, 'self.guess', is passed on to 'botGame.py' where the guess is made. I made a separate variable for this to be able to recognize this guessing situation in 'botGame.py' to distinguish it from normal solving; this makes it possible to add visuals, etc...
         self.choice = None                                              # either 'FRONT' or 'UNSEEN'; this tells you if the next guess is located next to 'self.front' (botGame.py has 'self.front') or in the cells unseen by self.front ('unseen unclicked')? This is for choice of guessing, and for passing this info to 'botGame.py' after the choice has been made. This is to describe it for printing.
         self.variables = set()                                          # ALL variables, solved or not
-        self.time_limit = 100000                                            # NB! Here you can set max time limit for 'traverse()' in 'join_comp_groups_into_solutions()'. If no limit is set, the worst games will be killed automatically
+        self.time_limit = 10                                            # NB! Here you can set max time limit for 'traverse()' in 'join_comp_groups_into_solutions()'. If no limit is set, the worst games will be killed automatically
         self.timeout = False
         self.front_guess = None                                         # the safest front guess cell is saved here for use in botGame.py
         self.p_success_front = None                                     # initialize. Otherwise 'draw' section in 'pyGame.py' complains that there's no such attribute. This is the highest probability that the most safe unclicked cell next to self.front is safe (has no mine).
@@ -42,7 +42,7 @@ class CSP_solver:
         ''' (1-5) definitive solutions for variables using logic, and if that doesn't help, then (6) guess: 
         (1) group equations to sets (1.1 and 1.2); all the members of one such equation set share variables directly or indirectly with each other (indirectly means, via other equations in that set) 
         (2) 'find_and_group_possible_answers_per_single_equation()': find all alt combinations of 1s PER EACH EQUATION (in each set, which doesn't matter at this step) that MUST be satisfied (i.e. each number cell on the minesweeper map). There are not too many, since the max lenght of an equation is 8, and the max sum is 8. Almost always these equations are a+b=1, or a+b+c=2, or the like. 
-        (3) chain link equations: find compatible alt solutions in a chain of equations, filtering out those alts that are not compatible to adjacent equations, for each equation (called a 'group' of alt solutions): from all of the alternative combinations of 1s and 0s that DO satisfy the CURRENT equation (group), filter out those alternatives that are incompatible with all alt answers from ONE OTHER (random) equation that is in the same equation set (shares variables directly or indirectly with other members of that equation set), pairing one group's all possible alts with compatible alts of ONE other group (i.e. "groups", i.e. incompatible with ALL the alternative solutions of at least one other group)
+        (3) chain link equations: find compatible alt solutions in a chain of equations, filtering out those alts that are not compatible with adjacent equations, for each equation (called a 'group' of alt solutions): from all of the alternative combinations of 1s and 0s that DO satisfy the CURRENT equation (group), filter out those alternatives that are incompatible with all alt answers from ONE OTHER EQUATION (the next equation in the ordered equation chain) that is in the same equation set (shares variables directly or indirectly with other members of that equation set), pairing one group's all possible alts with compatible alts of ONE other group (i.e. "groups", i.e. incompatible with ALL the alternative solutions of at least one other group)
         (4) from the remaining alt equations per group (i.e. PER original equation), find columns where a variable is always 0 or 1 -> it HAS to be 0 or 1 ALWAYS. Then see these new solutions, inspect the remaining equations for untrue alternatives now that we've solved a new variable (or many new variables), and keep repeating the whole loop (1),(2),(3) as long as new solutions keep coming. Stop iteration when there are no longer new solutions produced by the whole loop. 
         (5) if no definitive variable solutions were found, check the need for minecount (it's quite simple at this point). If minecount can provide solutions (= if max number of mines in `self.front` ≥ remaining minecount), use alt solution mine number counting to check, if there are more restrictions posed by this. If there are, there might be more answers found at this point by this 'minecount logic'.
         (6) if nothing else above helps, if `self.solved_new_vars_during_this_round = False` at this point, then guess.
@@ -142,11 +142,10 @@ class CSP_solver:
             returns: list of tuples [ (compatibility groups, starting group for the compatibility groups for alt tree solution builder), ...]
             '''
             print('chain_link_equations()')
-            # done; using `sorted()`, try pairing equations with max overlap; essentially, keep them in coordinate-adjacent order, that's it
+            
             comp_groups_and_starting_groups = []
-            # alternative_answers_per_equation_per_set_of_eqs = pair_equations_via_shared_vars(alternative_answers_per_equation_per_set_of_eqs)
             for alternative_answers_per_eq in alternative_answers_per_equation_per_set_of_eqs:
-                alternative_answers_per_eq = sorted(alternative_answers_per_eq)
+                alternative_answers_per_eq = sorted(alternative_answers_per_eq) # using `sorted()`, try pairing equations with max overlap; essentially, keep them in coordinate-adjacent order, that's it
                 compatibility_groups = dict()                                   # { possible solution : all related possible solutions (i.e. those which share variables and do not disagree for any variable value for those variables that are present in both the key and each of the values in this dictionary for that key!) }. There's no need for explicit bookkeeping regarding which of the value solutions belong to which original equation, because the variables included themselves are enough to identify the origin.
 
                 for a in range(len(alternative_answers_per_eq)):                # e.g. ( (('a',0), ('b',1)), (('a',1),('b',0)) ) would constitute one 'group' (length 2) for the equation 'a+b=1' which is stored as ((a,b),1) in 'self.unique_variables'; that is, all the possible solutions for that equation constitute a 'group'
@@ -934,7 +933,7 @@ FAILED tests:''')
     csp.absolut_brut(minecount=6, all_unclicked='a b c d e f g h i j k l m n o p q r s t'.split(), 
         number_of_unclicked_unseen_cells=3, unclicked_unseen_cells=['j', 'i', 't'])
 
-    expected_result = '01100000'
+    expected_result = '000' # this was changed after I added an early return from minecount in cases, where the simplest minecount cases already provided answers. This most likely saves most often a lot of work, cancellign the rest of the minecount machinery (postponed to the next round, if still needed! c:). So now it can only solve three variables on the first round. It would take another round to solve the rest c:
     test_info_dict[name] = [csp, expected_result]
 
     ########################## Test 9a: Flag box; a=0 expected. An ultra-rare situation where 'self.front' is empty, but there are still non-mine cells inside the flag box ##############################
@@ -961,7 +960,7 @@ FAILED tests:''')
     
     test_info_dict[name] = [csp, expected_result]
 
-    ########################## Test 8c: minecount helps, complex. ? expected. 0 unseen cells. ##############################
+    # ######################### Test 8c: minecount helps, complex. ? expected. 0 unseen cells. ##############################
 
     # eq1     = [-1, -1, ('a', 'b' 'c', 'd', 'e'), 2]
     # eq2     = [-1, -1, ('d', 'e', 'f'), 1]
