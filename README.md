@@ -1,6 +1,8 @@
 # MinesweeperBot
 Course _Aineopintojen harjoitustyö - algoritmit ja tekoäly_, University of Helsinki
 
+# Nb! This is old, and doesn't represent optimal logic. The main branch is 'improved_time_complexity'
+
 ## git cloning
 see 'How_to_install.md'
 
