@@ -521,7 +521,7 @@ class Minesweeper:
                 unclicked_unseen_cells = get_unclicked_unseen_cells()
                 n_unclicked_unseen_cells = len(unclicked_unseen_cells)
                 
-                self.solver.absolut_brut(minecount = self.minecount,        # the right top of normal minesweeper shows this number
+                self.solver.absolut_brut(n_mines_remaining = self.minecount,        # the right top of normal minesweeper shows this number
                     all_unclicked = all_unclicked_cells,                    # all unclicked cells (excludes flagged ones)
                     unclicked_unseen_cells = unclicked_unseen_cells,        # unclicked cells that are not neighbours of 'self.front'
                     number_of_unclicked_unseen_cells = n_unclicked_unseen_cells)    # the number of the cells above

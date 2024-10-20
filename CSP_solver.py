@@ -50,7 +50,7 @@ class CSP_solver:
         self.solved_new_vars_during_this_round = False                  # the most straightforward way of checking if guessing is ACTUALLY needed, as long as you remember to set this to 'True' when appropriate!
 
     # SOLVER ↓
-    def absolut_brut(self, minecount=-1, all_unclicked = [], 
+    def absolut_brut(self, n_mines_remaining=-1, all_unclicked = [], 
         number_of_unclicked_unseen_cells = -1, unclicked_unseen_cells = []) -> None:   # minecounting logic is used ONLY if the minecount is not changing, i.e., if CSP_solver is currently incapable of solving any more of the map without minecount (not enough information -> 'normal' logic is not enough). In this situation, use information that unclicked_cell_1 + unclicked_cell_2 + unclicked_cell_3 + .... = total number of mines remaining in the entire map (HOWEVER! that equation is not used; it would be too slow, extremely slow at large numbers of unclicked cells remaining). In some cases, that helps solve the remaining situation, sometimes not.
 
         ''' 
@@ -356,15 +356,16 @@ class CSP_solver:
             self.guess = naive_safest_guess                                     # default. The below might be false -> the default stays.
             self.front_guess = naive_safest_guess                               # as a backup to 'botGame.py' in case there are no unseen cells at all
             if number_of_unclicked_unseen_cells > 0:                            # Can't guess unseen cell if there are no unseen unclicked cells.
-                unclicked_unseen_cell_safety_in_worst_scenario = 100 - (100 *(minecount - min_n_mines_in_front) / number_of_unclicked_unseen_cells)  # 100 - percent mine density in unclicked unseen cells in the case that there's the minimum possible number of mines remaining in self.front. It's arbitrary that I chose to inspect the worst case scenario, but generally speaking it's better to opt for guessing cells of partially-known situations than random whatever-tiles in many situations, since often guessing near the front has a higher chance of uncovering more logically solvable situations. However, as that depends on pretty much everything, I repeat that this is NOT the optimal solution in many cases!
+                unclicked_unseen_cell_safety_in_worst_scenario = 100 - (100 *(n_mines_remaining - min_n_mines_in_front) / number_of_unclicked_unseen_cells)  # 100 - percent mine density in unclicked unseen cells in the case that there's the minimum possible number of mines remaining in self.front. It's arbitrary that I chose to inspect the worst case scenario, but generally speaking it's better to opt for guessing cells of partially-known situations than random whatever-tiles in many situations, since often guessing near the front has a higher chance of uncovering more logically solvable situations. However, as that depends on pretty much everything, I repeat that this is NOT the optimal solution in many cases!
                 if best_front_chance < unclicked_unseen_cell_safety_in_worst_scenario:
                     self.guess = "pick unclicked"                               # for guessing. If 'unclicked' cells have the lowest mine density, then guess there. 
                     self.choice = 'UNSEEN'
                 self.p_success_unseen = round(unclicked_unseen_cell_safety_in_worst_scenario, 1)
                 if self.p_success_unseen < 0:
+                    # Note: this can be negative! Note the 'MIN' in 'min_n_mines_in_front'? In cases where minecount doesn't exactly tell how many mines are in uu cells, it's possible that the min n mines IS INDEED impossible, BUT still taking that into account doesn't lead to new absolute solutions for any variable -> this guessing is called -> a negative number can be printed here, because I'm using the WORST CASE SCENARIO. That's why "≥" is written in the game in showing the uu probability ('uu prob ≥ x', written as 'other ≥ x' in the game)! Yes, this is complicated, sorry.
                     print("p_success_unseen < 0:", self.p_success_unseen)
                     # raise ValueError("p_success_unseen < 0:", self.p_success_unseen)
-                    sleep(10)
+                    sleep(10) # I wanted to inspect these cases, they are ok. Read the comment above, 'Note: ...'
                 print("- p_success(unseen) ≥", self.p_success_unseen, '%')
             self.p_success_front = round(best_front_chance, 1)
             print('- p_success(front)  ≤', self.p_success_front, '%')
@@ -401,7 +402,7 @@ class CSP_solver:
                 if zeros == 0:
                     if from_minecount:
                         self.minecount_successful = True                # used for printing 'minecount successful' in 'botGame.py'
-                        self.minecount_solved_vars.add((var,1))    
+                        self.minecount_solved_vars.add((var,1))         # for highlighting in botGame (visuals), bookkeeping  
                     self.solved_new_vars_during_this_round = True
                     self.solved_variables.add((var, 1))
                 elif ones == 0:
@@ -440,10 +441,10 @@ class CSP_solver:
                 def alt_solution_minecount_build_and_check(current_build:list, 
                     current_sum:int, current_index:int) -> None:
 
-                    if current_sum > minecount:                                                     # if the current sum of mines in the current build so far exceeds the number of mines remaining in the map at the moment, the the current build is impossible - stop building it.
+                    if current_sum > n_mines_remaining:                                                     # if the current sum of mines in the current build so far exceeds the number of mines remaining in the map at the moment, the the current build is impossible - stop building it.
                         return
                     if current_index == n_sets:
-                        if current_sum + number_of_unclicked_unseen_cells < minecount:              # Example: 8a. Any alt for which this happens is impossible. The max number of mines in 'unclicked unseen cells' is the number of those cells. So if this alt solution + that is less than the actual remaining minecount, then it's impossible
+                        if current_sum + number_of_unclicked_unseen_cells < n_mines_remaining:              # Example: 8a. Any alt for which this happens is impossible. The max number of mines in 'unclicked unseen cells' is the number of those cells. So if this alt solution + that is less than the actual remaining minecount, then it's impossible
                             return # impossible whole-alt; too few mines
                         else:
                             # -> this front alt (whole-alt) is minecount-ok -> record the values of variables
@@ -490,7 +491,7 @@ class CSP_solver:
             # let's check the convenient cases first - it saves a lot of work with little cost, if one of these two is true
             only_min_sum_is_ok = only_max_sum_is_ok = False
             
-            if smallest_n_mines_in_front_alt_solutions == minecount:                # if none of the alt solutions have less mines than the currently remaining minecount, then all the unclicked unseen cells, which are NOT a part of any of these alt solutions, must NOT have a mine, otherwise the total minecount would exceed the REAL total minecount!
+            if smallest_n_mines_in_front_alt_solutions == n_mines_remaining:                # if none of the alt solutions have less mines than the currently remaining minecount, then all the unclicked unseen cells, which are NOT a part of any of these alt solutions, must NOT have a mine, otherwise the total minecount would exceed the REAL total minecount!
                 only_min_sum_is_ok = True
                 if number_of_unclicked_unseen_cells > 0:
                     for cell in unclicked_unseen_cells:
@@ -498,7 +499,7 @@ class CSP_solver:
                         self.solved_variables.add((cell, 0))
                         self.minecount_solved_vars.add((cell, 0))
                         self.solved_new_vars_during_this_round = True
-            elif largest_n_mines_in_front_alt_solutions + number_of_unclicked_unseen_cells == minecount:    # -> every unseen cell must be a mine, see below comment. So: there can be 0 uu_cells. If that's the case, this is true. If there are more than 0 uu_cells, this is STILL true. Clever, huh?
+            elif largest_n_mines_in_front_alt_solutions + number_of_unclicked_unseen_cells == n_mines_remaining:    # -> every unseen cell must be a mine, see below comment. So: there can be 0 uu_cells. If that's the case, this is true. If there are more than 0 uu_cells, this is STILL true. This is because of the ' + n_uu_cells' here.
                 only_max_sum_is_ok = True
                 if number_of_unclicked_unseen_cells > 0:
                     for cell in unclicked_unseen_cells:
@@ -510,13 +511,12 @@ class CSP_solver:
                 self.minecount_successful = True    
                 print("✔ FOUND SOLUTIONS FROM EARLY MINECOUNT")                            # it's possibly much faster to return already at this point. During the next round, you can solve more possibly much faster thanks to the new solutions
                 return
-            if largest_n_mines_in_front_alt_solutions < minecount:                          # if self.front has at max less mines than remaining in the whole map, it cannot provide any more definitive solutions than part (4) tried - no variable is definitely 1 or 0 always. Have to guess.
-                print("GUESSING, no need for minecount")
+            if (largest_n_mines_in_front_alt_solutions < n_mines_remaining) and not only_max_sum_is_ok:
+                print("GUESSING, no help for minecount")
                 choose_best_guess(naive_safest_guess = best_guess, 
                     min_n_mines_in_front = smallest_n_mines_in_front_alt_solutions, best_front_chance = survival_chance)
                 return
-            print("Minecount is needed")
-                                                # used in 'botGame.py' for printing 'minecount successful' when it's used. Convenient for debugging!
+            print("Minecount filtering of alt solutions is needed")
 
             if only_min_sum_is_ok:
                 value_counts_for_each_var = count_front_sums_to_get_ok_set_alts(only_min_ok = True)
@@ -594,7 +594,7 @@ class CSP_solver:
         def handle_flag_box() -> None:
             print('handle_flag_box()')
             if len(all_unclicked) > 0:
-                if minecount == 0:
+                if n_mines_remaining == 0:
                     for cell in all_unclicked:
                         print('- marking var as 0')
                         self.solved_variables.add((cell, 0))
@@ -941,7 +941,7 @@ FAILED tests:''')
     name = 'test 6a, letters, MINECOUNT=1. c=0 expected.'
     csp = CSP_solver()
     csp.handle_incoming_equations([eq1])
-    csp.absolut_brut(minecount=1, all_unclicked=['a','b','c'], number_of_unclicked_unseen_cells=1,
+    csp.absolut_brut(n_mines_remaining=1, all_unclicked=['a','b','c'], number_of_unclicked_unseen_cells=1,
         unclicked_unseen_cells=['c'])                 # So, here 'a' and 'b' are seen by number cell that says '1'. So, a+b=1. But also, there's an isolated cell c in the corner, surrounded by three flags, hence not seen by any number cell. The wanted result here is that c=0, because the remaining minecount is 1, and a+b=1, so c=0.
 
     expected_result = '0'                                                                               # c=0
@@ -976,7 +976,7 @@ FAILED tests:''')
     name = "Test 7b: MINECOUNT DOESN'T HELP. unsolvable 2. NOTHING expected"
     csp = CSP_solver()
     csp.handle_incoming_equations([eq1, eq2, eq3, eq4, eq5])
-    csp.absolut_brut(minecount=3, all_unclicked='a b c d e f g h i j k'.split(), number_of_unclicked_unseen_cells=3) # NB! Yes, minecount (3) is the same, by coincidence, as 'number_of_unclicked_unseen_cells'.
+    csp.absolut_brut(n_mines_remaining=3, all_unclicked='a b c d e f g h i j k'.split(), number_of_unclicked_unseen_cells=3) # NB! Yes, minecount (3) is the same, by coincidence, as 'number_of_unclicked_unseen_cells'.
 
     expected_result = 'NOTHING'
     test_info_dict[name] = [csp, expected_result]
@@ -998,7 +998,7 @@ FAILED tests:''')
     name = 'Test 8a: Expert_minecount-solvable_1. c0, d1, e1, f0, g0, i0, j0, t0 expected'
     csp = CSP_solver()
     csp.handle_incoming_equations([eq1, eq2, eq3, eq4, eq5, eq6, eq7, eq8, eq9, eq10, eq11])
-    csp.absolut_brut(minecount=6, all_unclicked='a b c d e f g h i j k l m n o p q r s t'.split(), 
+    csp.absolut_brut(n_mines_remaining=6, all_unclicked='a b c d e f g h i j k l m n o p q r s t'.split(), 
         number_of_unclicked_unseen_cells=3, unclicked_unseen_cells=['j', 'i', 't'])
 
     expected_result = '000' # this was changed after I added an early return from minecount in situations, where the simplest minecount cases already provided answers. This most likely saves a lot of work, cancellign the rest of the minecount machinery which is the heaviest part of minecount (it's then postponed to the next round, if still needed then). So now it can now only solve three variables on the FIRST round. It would take another round to solve the rest, and most likely, could use faster logic for that!
@@ -1010,7 +1010,7 @@ FAILED tests:''')
     csp = CSP_solver()
     # NO EQUATIONS in this test. Yes, this can happen, when a 'flag box' is born in a rare game. If only one side of the box is seen by 'self.front', then the other side is inaccessible without guessing, AND there is no 'self.front' anymore, if everything else has been solved and/or guessed already.
     csp.handle_incoming_equations([]) # no equations, BUT in minesweeper, this function has been called (many many times) before arriving in this 'flag box' situation
-    csp.absolut_brut(minecount=0, all_unclicked='a'.split(), number_of_unclicked_unseen_cells=1)
+    csp.absolut_brut(n_mines_remaining=0, all_unclicked='a'.split(), number_of_unclicked_unseen_cells=1)
 
     expected_result = '0'
     test_info_dict[name] = [csp, expected_result]
@@ -1023,7 +1023,7 @@ FAILED tests:''')
     csp = CSP_solver()
     # NO EQUATIONS in this test. Yes, this can happen, when a 'flag box' is born in a rare game. If only one side of the box is seen by 'self.front', then the other side is inaccessible without guessing, AND there is no 'self.front' anymore, if everything else has been solved and/or guessed already.
     csp.handle_incoming_equations([]) # no equations, BUT in minesweeper, this function has been called (many many times) before arriving in this 'flag box' situation
-    csp.absolut_brut(minecount=1, all_unclicked='a b'.split(), number_of_unclicked_unseen_cells=2, 
+    csp.absolut_brut(n_mines_remaining=1, all_unclicked='a b'.split(), number_of_unclicked_unseen_cells=2, 
         unclicked_unseen_cells='a b'.split())
     
     test_info_dict[name] = [csp, expected_result]
