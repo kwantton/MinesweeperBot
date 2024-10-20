@@ -3,6 +3,7 @@ from time import time
 from random import sample
 from constraint import Problem                          # this could be used (not done at the moment if grey) to solve groups of CSP-equations (CSP = constraint satisfaction problem)
 from CSP_solver import CSP_solver, format_equation_for_csp_solver
+from CSP_solver_old import CSP_solver as CSP_solver_old, format_equation_for_csp_solver as format_equation_for_csp_solver_old
 from cell_id_names import flag, unclicked, mine, safe, labellize, read_number_from_label
 
 # cell = a clickable square of the minesweeper map, 'ruutu'. 'Label' = the id of a cell, like '0' or 'flag'.
@@ -113,6 +114,7 @@ class Minesweeper:
         self.n_unclicked = self.width * self.height
         self.solved_new_using_simple_solver = False                                 # if True, continue with simple_solver() (continue with that as long as possible, only go to CSP_solver if simple_solver() is no longer enough)
         self.solver = CSP_solver(mines_total = self.mines)                          # minecount is needed in 'CSP_solver' in those rarish cases where information about the remaining minecount near the end of the game is needed to be able to solve the last few cases that would otherwise require guessing.
+        self.solver_old = CSP_solver_old()
         
         self.minecount = self.mines
         self.map = [[unclicked for x in range(self.width)] for y in range(self.infobar_height, self.height + self.infobar_height)]   # map = all the mines. Since the infobar is on top, the '0' y for mines = infobar_height. This map records the names of the images of each cell on the map.
@@ -487,6 +489,8 @@ class Minesweeper:
                     csp_solver_input_addition = format_equation_for_csp_solver(x, y, unflagged_unclicked_neighbours, surrounding_mine_count - n_surrounding_flags)    # NB! 'surrounding_mine_count - n_surrounding_flags' was what I was missing for two days; it caused solving of WRONG equations in the CSP_solver(). I.e.; what if there are flags around, not just unflagged neighbours? That's why there's the '- n_unflagged_neighbours' subtraction. They have to be removed from the total minecount.
                     csp_solver_input.append(csp_solver_input_addition)
                 self.solver.handle_incoming_equations(csp_solver_input)
+                self.solver_old.reset_all()                                                             # reset all before new round
+                self.solver_old.add_equations_if_new(csp_solver_input)
 
             def csp_solve():
                 '''
@@ -496,6 +500,23 @@ class Minesweeper:
                 `self.solver.absolut_brut()` is called with the necessary parameters
                 '''
                 print('\ncsp_solve():')
+
+                self.solver_old.factor_one_binary_solve()
+                solved_vars = self.solver_old.solved_variables                  # set of tuples: each is a tuple ((x,y), value)
+                
+                for (x,y), value in solved_vars:
+                    if ((x,y), value) not in self.solved_variables:         # avoid repeating already-done work
+                        if value == 1:
+                            flag_these([(x,y)])
+                        elif value == 0:
+                            self.probe(x, y)
+                        self.solved_variables.add(((x,y), value))           # for avoiding repeating work in the future
+                if solved_vars:                                             # VERY often this finds solutions -> next round; do not use heavier machinery than needed!
+                    print('OLD SOLVER FOUND SOLUTIONS!')
+                    self.solver.guess = None
+                    filter_front_cells()
+                    return
+
                 all_unclicked_cells = get_all_unclicked_cells()
                 unclicked_unseen_cells = get_unclicked_unseen_cells()
                 n_unclicked_unseen_cells = len(unclicked_unseen_cells)

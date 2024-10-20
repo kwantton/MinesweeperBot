@@ -9,6 +9,9 @@
 class CSP_solver:
     def __init__(self):
 
+        self.reset_all()
+
+    def reset_all(self):
         self.unique_equations = set()                           # { ((var1, var2, ..), sum_of_mines_in_vars), (...) }. Each var (variable) has format (x,y) of that cell's location; cell with a number label 1...8 = var. Here, I want uniqe EQUATIONS, not unique LOCATIONS, and therefore origin-(x,y) is not stored here. It's possible to get the same equation for example from two different sides, and via multiple different calculation routes, and it's of course possible to mistakenly try to add the same equation multiple times; that's another reason to use a set() here, the main reason being fast search from this hashed set.        
         self.solved_variables = set()                           # ((x,y), value); the name of the variable is (x,y) where x and y are its location in the minesweeper map (if applicable), and the value of the variable is either 0 or 1, if everything is ok (each variable is one cell in the minesweeper map, and its value is the number of mines in the cell; 0 or 1, that is)
         self.reassigned_variables = dict()                      # { variable_a : variable_b }. This is for those ~solved cases, where b=c; so every b will no be c forever, etc.
@@ -18,7 +21,6 @@ class CSP_solver:
         }                                                       # { numberOfVariables : set(equation1, equation2, ...) }; all equations with numberOfVariables = x. I want to look at those equations with low number of variables, and see for each of those variables if they can be found in equations with more variables.
         self.var_to_equations_updated_equations_to_add = set()     # during iteration of these, these cannot be directly changed -> gather a list, modify after iteration is over
         self.var_to_equations_obsolete_equations_to_remove = set() # same as above comment
-
     # NB! This is called, when adding new equations for the first time, AND after finding new variables IF the related equations are (1) new and (2) do not become single solved variables as well (i.e. if the related equations are not reduced from equations like a+b=1 to just solved single variables like b=1). Hence, sometimes the 'self.update_equation(equation)' is necessary.
     def add_equations_if_new(self, equations:list) -> None:                             # equations = [(x, y, ((x1, y1), (x2, y2), ...), summa), ...]; so each equation is a tuple of of x, y, unflagged unclicked neighbours (coordinates; unique variables, that is!), and the label of the cell (1,2,...8)
         for equation in equations:                                                      # (x,y,(variables),sum_of_variables)

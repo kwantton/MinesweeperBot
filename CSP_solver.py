@@ -24,7 +24,7 @@ class CSP_solver:
 
         self.guess = None                                               # 12.10.24: The safest cell to guess is saved here for use in botGame.py, if there is a need to guess. If (1) normal solving doesn't help AND (2) mine counting doesn't help either, THEN guess the safest cell. This info, 'self.guess', is passed on to 'botGame.py' where the guess is made. I made a separate variable for this to be able to recognize this guessing situation in 'botGame.py' to distinguish it from normal solving; this makes it possible to add visuals, etc...
         self.choice = None                                              # either 'FRONT' or 'UNSEEN'; this tells you if the next guess is located next to 'self.front' (botGame.py has 'self.front') or in the cells unseen by self.front ('unseen unclicked')? This is for choice of guessing, and for passing this info to 'botGame.py' after the choice has been made. This is to describe it for printing.
-        self.time_limit = 30                                            # NB! Here you can set max time limit for 'traverse()' in 'join_comp_groups_into_solutions()'. If no limit is set, the worst games will be killed automatically
+        self.time_limit = 100                                           # NB! Here you can set max time limit for 'traverse()' in 'join_comp_groups_into_solutions()'. If no limit is set, the worst games will be killed automatically
         self.timeout = False
         self.variables = set()                                          # ALL variables, solved or not
         self.front_guess = None                                         # the safest front guess cell is saved here for use in botGame.py
@@ -283,6 +283,7 @@ class CSP_solver:
                 elapsed = time() - self.start
                 if elapsed > self.time_limit:
                     self.timeout = True
+                    return
                 n_times_traversed_for_debugging[0] += 1
 
                 already_handled_groups_local = already_handled_groups.copy()
@@ -336,10 +337,10 @@ class CSP_solver:
                     alt_solution_build = {}
                     traverse(alt_origin, seen_proposed_vectors, 
                         alt_solution_build, handled_groups, n_times_traversed_for_debugging)                         # 'traverse' builds alternative 'possible_whole_solutions' and saves all viable ones to 'possible_whole_solutions'
-                if self.timeout:
-                    timeout_guess()
-                    print('TOOK LONGER THAN', self.time_limit, 's - therefore GUESSING NEXT')
-                    return 'time', 'out', 'occurred'
+                    if self.timeout:
+                        timeout_guess()
+                        print('TOOK LONGER THAN', self.time_limit, 's - therefore GUESSING NEXT')
+                        return 'time', 'out', 'occurred'
             
             # done: Count also at this point, use the ready function for that!; if max mines in front < minecount, there's NO NEED for minecount (this is checked in minecount situation checking functions later) -> use this instead!!!! That will significantly make the worst cases faster!!
             print('- traverse()s finished,', n_times_traversed_for_debugging, 'times in total')
