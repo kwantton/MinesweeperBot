@@ -1,4 +1,7 @@
-'''to-do:
+'''
+- NB! This 'CSP_solver_old' is auxiliary; it's meant to produce additional answers quickly to see, if something 'easier' can be squeezed out before utilizing 'CSP_solver' (the not-old version). So this does NOT solve all problems, but the things it solves, it solves correctly.
+NB! The last test is flaky exactly because it sometimes produces ALL the answers, sometimes not; depends on the handling order (order of iterating through sets)
+to-do:
 - why is the last test flaky? most probable reason; iteration through sets varies in order, and through this, sometimes all variables are solved (yep) and sometimes NONE (YEP - I know! Amazing, right?)
 - in 'factor_one_solve', an easy way to check if subtracting the subset from the larger set is correct is as follows: if you end up with a+b+.... < 0, the subtraction was WRONG - something was wrong in the code itself. Why; because x ∈{0,1} for all cells x, and because I'm always subtracting a subset from a larger or equally sized set. Therefore, as every element of each set is 0 or 1, it is not possible to end up with a negative result for the resulting equation. For example: a+b+c = 1, a+b+c+d = 2 -> d = 1. The resulting equation can never have a negative value, if every element of the subset is found in the larger set, and every element x ∈{0,1} for all cells x. Therefore, it would be good the specifically add this at some point to facilitate debugging.
 
