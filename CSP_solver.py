@@ -2,7 +2,7 @@
 - more tests, also on 'botGame.py' side
 '''
 from itertools import combinations
-from time import time
+from time import time, sleep
 
 class CSP_solver:
     '''
@@ -24,7 +24,7 @@ class CSP_solver:
 
         self.guess = None                                               # 12.10.24: The safest cell to guess is saved here for use in botGame.py, if there is a need to guess. If (1) normal solving doesn't help AND (2) mine counting doesn't help either, THEN guess the safest cell. This info, 'self.guess', is passed on to 'botGame.py' where the guess is made. I made a separate variable for this to be able to recognize this guessing situation in 'botGame.py' to distinguish it from normal solving; this makes it possible to add visuals, etc...
         self.choice = None                                              # either 'FRONT' or 'UNSEEN'; this tells you if the next guess is located next to 'self.front' (botGame.py has 'self.front') or in the cells unseen by self.front ('unseen unclicked')? This is for choice of guessing, and for passing this info to 'botGame.py' after the choice has been made. This is to describe it for printing.
-        self.time_limit = 100                                           # NB! Here you can set max time limit for 'traverse()' in 'join_comp_groups_into_solutions()'. If no limit is set, the worst games will be killed automatically
+        self.time_limit = 20                                            # NB! Here you can set max time limit for 'traverse()' in 'join_comp_groups_into_solutions()'. If no limit is set, the worst games will be killed automatically
         self.timeout = False
         self.variables = set()                                          # ALL variables, solved or not
         self.front_guess = None                                         # the safest front guess cell is saved here for use in botGame.py
@@ -361,6 +361,10 @@ class CSP_solver:
                     self.guess = "pick unclicked"                               # for guessing. If 'unclicked' cells have the lowest mine density, then guess there. 
                     self.choice = 'UNSEEN'
                 self.p_success_unseen = round(unclicked_unseen_cell_safety_in_worst_scenario, 1)
+                if self.p_success_unseen < 0:
+                    print("p_success_unseen < 0:", self.p_success_unseen)
+                    # raise ValueError("p_success_unseen < 0:", self.p_success_unseen)
+                    sleep(10)
                 print("- p_success(unseen) ≥", self.p_success_unseen, '%')
             self.p_success_front = round(best_front_chance, 1)
             print('- p_success(front)  ≤', self.p_success_front, '%')
@@ -494,14 +498,14 @@ class CSP_solver:
                         self.solved_variables.add((cell, 0))
                         self.minecount_solved_vars.add((cell, 0))
                         self.solved_new_vars_during_this_round = True
-                elif largest_n_mines_in_front_alt_solutions + number_of_unclicked_unseen_cells == minecount:    # -> every unseen cell must be a mine, see below comment
-                    only_max_sum_is_ok = True
-                    if number_of_unclicked_unseen_cells > 0:
-                        for cell in unclicked_unseen_cells:
-                            self.minecount_successful = True
-                            self.solved_variables.add((cell, 1))                            # if the number of unclicked unseen + max number of mines encountered in any alt solution == currently remaining minecount, then every single cell in unclicked unseen cells must have a mine. I met one such situation in a random game.
-                            self.minecount_solved_vars.add((cell, 1))
-                            self.solved_new_vars_during_this_round = True
+            elif largest_n_mines_in_front_alt_solutions + number_of_unclicked_unseen_cells == minecount:    # -> every unseen cell must be a mine, see below comment. So: there can be 0 uu_cells. If that's the case, this is true. If there are more than 0 uu_cells, this is STILL true. Clever, huh?
+                only_max_sum_is_ok = True
+                if number_of_unclicked_unseen_cells > 0:
+                    for cell in unclicked_unseen_cells:
+                        self.minecount_successful = True
+                        self.solved_variables.add((cell, 1))                            # if the number of unclicked unseen + max number of mines encountered in any alt solution == currently remaining minecount, then every single cell in unclicked unseen cells must have a mine. I met one such situation in a random game.
+                        self.minecount_solved_vars.add((cell, 1))
+                        self.solved_new_vars_during_this_round = True
             if self.solved_new_vars_during_this_round:
                 self.minecount_successful = True    
                 print("✔ FOUND SOLUTIONS FROM EARLY MINECOUNT")                            # it's possibly much faster to return already at this point. During the next round, you can solve more possibly much faster thanks to the new solutions

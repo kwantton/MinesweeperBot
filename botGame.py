@@ -513,7 +513,7 @@ class Minesweeper:
                         self.solved_variables.add(((x,y), value))           # for avoiding repeating work in the future
                 if solved_vars:                                             # VERY often this finds solutions -> next round; do not use heavier machinery than needed!
                     print('OLD SOLVER FOUND SOLUTIONS!')
-                    self.solver.guess = None
+                    self.solver.guess = None                                # this is needed for chain of events logic; don't guess, if solutions were found: this is for loop checking in next phase of `bot_execute()`; only guess, `if self.solver.guess`
                     filter_front_cells()
                     return
 
@@ -625,7 +625,7 @@ class Minesweeper:
 
                 feed_csp_solver()
                 
-                if self.csp_on:
+                if self.csp_on:                                         # (1) it uses self.solver_old, and if that doesn't help (incomplete logic), then self.solver, which is capable of solving everything and calculating probabilities, but it's slower
                     csp_solve()
                 
                 if self.solver.guess:                                   # if CSP_solver has not managed to solve any new variables with 100% certainty ('normal' logic OR minecounting logic), THEN guess. This info is directly obtained from 'self.solver', as you can see (`if self.solver.guess`)
@@ -675,9 +675,9 @@ class Minesweeper:
                 ms_time_average = self.ms_bot_time_TOTAL / n_games
                 if ms_time_average > 1000: # then show seconds, not milliseconds
                     s_time_average = ms_time_average / 1000
-                    ms_average_surface = self.font.render(f'average time: {s_time_average:.3f} s', True, (255,255,255))                # 'self.elapsed_time' is 0 by default
+                    ms_average_surface = self.font.render(f'average: {s_time_average:.3f} s/game', True, (255,255,255))                # 'self.elapsed_time' is 0 by default
                 else:
-                    ms_average_surface = self.font.render(f'average time: {ms_time_average:.0f} ms', True, (255,255,255))                # 'self.elapsed_time' is 0 by default
+                    ms_average_surface = self.font.render(f'average: {ms_time_average:.0f} ms/game', True, (255,255,255))                # 'self.elapsed_time' is 0 by default
                 self.screen.blit(ms_average_surface, (10, 75))
             
         def draw_victory() -> None:
@@ -786,7 +786,7 @@ class Minesweeper:
                     self.screen.blit(source=self.images[cell_status], dest=(x*self.cell_size, y*self.cell_size+self.infobar_height))
 
         def draw_instructions_bar() -> None:
-            start_y = self.height * self.cell_size + self.infobar_height + 10
+            start_y = self.height * self.cell_size + self.infobar_height - 10
             for i, instruction in enumerate(self.instructions):                                     # it isn't possible to use a multiline text, so each instruction has to be drawn separately. For this solution, I asked ChatGPT.
                 instruction_surface = self.font.render(instruction, True, (255,255,255))
                 self.screen.blit(instruction_surface, (10, start_y + i * 30))                       # draw all the instructions beneath each other
