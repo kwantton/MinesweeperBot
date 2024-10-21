@@ -362,10 +362,10 @@ class CSP_solver:
                     self.choice = 'UNSEEN'
                 self.p_success_unseen = round(unclicked_unseen_cell_safety_in_worst_scenario, 1)
                 if self.p_success_unseen < 0:
-                    # Note: this CAN be negative! Why: notice the 'MIN' in 'min_n_mines_in_front'? This assumes there's MAX POSSIBLE mine density in uu cells -> in worst cases, negative probability because of my way of calculation. In cases where minecount doesn't exactly tell how many mines are in uu cells, it's possible that the min n mines IS INDEED impossible, BUT still taking that into account doesn't lead to new absolute solutions for any variable -> this guessing is called -> a negative number can be printed here, because I'm using the WORST CASE SCENARIO. That's why "≥" is written in the game in showing the uu probability ('uu prob ≥ x', written as 'other ≥ x' in the game)! Yes, this is complicated, sorry.
-                    print("p_success_unseen < 0:", self.p_success_unseen)
-                    # raise ValueError("p_success_unseen < 0:", self.p_success_unseen)
-                    # sleep(10) # I wanted to inspect these cases, they are ok. Read the comment above, 'Note: ...'
+                    # Note: this CAN be negative since it's the absolute worst-case scenario regarding uu_cell mine density (the -x then means that the worst case scenarios are impossible in that situation, naturally)! Reason: notice the 'MIN' in 'min_n_mines_in_front'? This assumes there's MAX POSSIBLE mine density in uu cells -> in worst cases, negative probability because of the way I count this probability: `unclicked_unseen_cell_safety_in_worst_scenario = 100 - (100 *(n_mines_remaining - min_n_mines_in_front) / number_of_unclicked_unseen_cells)  which is 100 - percent mine density in unclicked unseen cells in the case that there's the minimum possible number of mines remaining in self.front. In cases where minecount doesn't exactly tell how many mines are in uu cells, it's possible that the min n mines IS INDEED negative, BUT still taking that into account doesn't lead to new absolute solutions for any variable -> this guessing is called -> a negative number can be printed here, because I'm using the WORST CASE SCENARIO. That's why "≥" is written in the game in showing the uu probability ('uu prob ≥ x', written as 'other ≥ x' in the game)! Yes, this is complicated, sorry.
+                    print("worst case p_success_unseen < 0:", self.p_success_unseen)
+                    self.p_success_unseen = 0   # this is also true, as negative probs are not real. So this is not 'cheating' c:
+                    sleep(10) # I wanted to inspect these cases, they are ok. Read the comment above, 'Note: ...'
                 print("- p_success(unseen) ≥", self.p_success_unseen, '%')
             self.p_success_front = round(best_front_chance, 1)
             print('- p_success(front)  ≤', self.p_success_front, '%')
@@ -417,13 +417,14 @@ class CSP_solver:
                         best_bet = var
                         highest_survival_rate_in_front_cells = zeros / (zeros + ones)
 
-            if min_n_mines_in_front != -1: # NB! it's only -1 if 'handle_minecount_results()' was called NOT from minecount, but instead from after (4), which means I don't want to guess just yet, since the need for minecount hasn't been checked yet! If it's NOT needed (= if it doesn't benefit me), THEN I'll use this guessing c:
+            if from_minecount: # NB! it's only -1 if 'handle_minecount_results()' was called NOT from minecount, but instead from after (4), which means I don't want to guess just yet, since the need for minecount hasn't been checked yet! If it's NOT needed (= if it doesn't benefit me), THEN I'll use this guessing c:
                 if not self.minecount_successful:
                     print("Minecount done, didn't find solutions, NEED TO GUESS:")
                     choose_best_guess(naive_safest_guess = best_bet, min_n_mines_in_front = min_n_mines_in_front,
                         best_front_chance = highest_survival_rate_in_front_cells*100)
                 else:
-                    print("✔ Minecount was successful")
+                    print("✔ MINECOUNT FILTERING SUCCESSFUL")
+                    # sleep(10) # use when you wanna see examples; if happens, press i and a in the game (BOTH!!) to stop the progression of the game after the 10s has elapsed! Otherwise you won't SEE anything!!
             else:
                 return best_bet, highest_survival_rate_in_front_cells * 100
 
@@ -433,6 +434,15 @@ class CSP_solver:
             best_guess, survival_chance:int) -> dict:   # 0 <= survival_chance <= 100. Best_guess is the variable that, from cells seen by self.front, has the lowest chance of being a mine.
 
             def count_front_sums_to_get_ok_set_alts(only_min_ok = False, only_max_ok = False) -> dict:
+                '''
+                gets the possible sums of combos of alt solutions; if we came here, the situation is as follows:
+                - max number of mines in a whole-front alt solutions is greater than or equal to the number
+                of mines remaining in the map at the moment. This means, depending on the situation, that only
+                certain mine counts in whole-front solution candidates ('alts') are possible, some are impossible.
+                By eliminating the impossible answers, we're left with the possible answers, and can record 
+                the number of times each variable was 1 or 0 in all these possible alt answers. Doing this,
+                I get the probability [0-100%] for each var being a mine
+                '''
 
                 value_counts_for_each_var = dict()  # COUNT HERE, FOR EACH VAR, HOW MANY TIMES 0 AND HOW MANY TIMES 1 it is in minecount-OK alt solutions. SOLVES ALSO PROBLEMS REGARDING GUESSING! If the var has only 1s, then it's solved as 1. If only 0s, then it's solved as 0. Otherwise, the probability is extremely straightforward to calculate!
                 n_sets = len(sets_nMinesToAltsolutions_minmines_maxmines)                                     # for checking if 'index' has reached the end; for building entire solutions

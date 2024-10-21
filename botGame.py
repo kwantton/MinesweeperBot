@@ -60,9 +60,9 @@ class Minesweeper:
         self.highlight_minecount_solved = False
         self.highlight_csp_solved = self.debug_csp
         self.instructions = '''
-        a : automatic bot play
-        v : toggle visual, 30 fps version of "a"
-        i = toggle infinite mode of a; if the bot loses or wins, it will start another game
+        a : automatic bot play (pressing "a" mid-game will stop the game; you can see where the bot ended up)
+        v : toggle visual, 30 fps version of "a" (you also need to press a after this to use auto bot play)
+        i = toggle infinite mode of "a"; if the bot loses or wins, it will start another game. PRESS ALSO "a" after this to start!
         x or n : single bot move (you can mash them as fast as you want)
         f : front highlighting
         c : highlight csp-solved cells
@@ -512,7 +512,7 @@ class Minesweeper:
                             self.probe(x, y)
                         self.solved_variables.add(((x,y), value))           # for avoiding repeating work in the future
                 if solved_vars:                                             # VERY often this finds solutions -> next round; do not use heavier machinery than needed!
-                    print('OLD SOLVER FOUND SOLUTIONS!')
+                    print('✔ OLD CSP SOLVER FOUND SOLUTIONS')
                     self.solver.guess = None                                # this is needed for chain of events logic; don't guess, if solutions were found: this is for loop checking in next phase of `bot_execute()`; only guess, `if self.solver.guess`
                     filter_front_cells()
                     return
@@ -816,9 +816,9 @@ class Minesweeper:
         if self.solver.minecount_successful:                                 # if minecount() in CSP_solver solved variables succesfully, then write 'minecount' in the upper bar. Else, guessing, and write that info instead.
             write_minecount_success()
         else:
-            if self.solver.p_success_front:
+            if self.solver.p_success_front != None:                         # it can be zero!
                 write_p_success_front()
-            if self.solver.p_success_unseen:
+            if self.solver.p_success_unseen != None:                        # why? this too can be zero c:
                 write_p_success_unseen()
             if self.solver.choice:
                 write_choice()
