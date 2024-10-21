@@ -362,10 +362,10 @@ class CSP_solver:
                     self.choice = 'UNSEEN'
                 self.p_success_unseen = round(unclicked_unseen_cell_safety_in_worst_scenario, 1)
                 if self.p_success_unseen < 0:
-                    # Note: this can be negative! Note the 'MIN' in 'min_n_mines_in_front'? In cases where minecount doesn't exactly tell how many mines are in uu cells, it's possible that the min n mines IS INDEED impossible, BUT still taking that into account doesn't lead to new absolute solutions for any variable -> this guessing is called -> a negative number can be printed here, because I'm using the WORST CASE SCENARIO. That's why "≥" is written in the game in showing the uu probability ('uu prob ≥ x', written as 'other ≥ x' in the game)! Yes, this is complicated, sorry.
+                    # Note: this CAN be negative! Why: notice the 'MIN' in 'min_n_mines_in_front'? This assumes there's MAX POSSIBLE mine density in uu cells -> in worst cases, negative probability because of my way of calculation. In cases where minecount doesn't exactly tell how many mines are in uu cells, it's possible that the min n mines IS INDEED impossible, BUT still taking that into account doesn't lead to new absolute solutions for any variable -> this guessing is called -> a negative number can be printed here, because I'm using the WORST CASE SCENARIO. That's why "≥" is written in the game in showing the uu probability ('uu prob ≥ x', written as 'other ≥ x' in the game)! Yes, this is complicated, sorry.
                     print("p_success_unseen < 0:", self.p_success_unseen)
                     # raise ValueError("p_success_unseen < 0:", self.p_success_unseen)
-                    sleep(10) # I wanted to inspect these cases, they are ok. Read the comment above, 'Note: ...'
+                    # sleep(10) # I wanted to inspect these cases, they are ok. Read the comment above, 'Note: ...'
                 print("- p_success(unseen) ≥", self.p_success_unseen, '%')
             self.p_success_front = round(best_front_chance, 1)
             print('- p_success(front)  ≤', self.p_success_front, '%')
@@ -512,7 +512,7 @@ class CSP_solver:
                 print("✔ FOUND SOLUTIONS FROM EARLY MINECOUNT")                            # it's possibly much faster to return already at this point. During the next round, you can solve more possibly much faster thanks to the new solutions
                 return
             if (largest_n_mines_in_front_alt_solutions < n_mines_remaining) and not only_max_sum_is_ok:
-                print("GUESSING, no help for minecount")
+                print("GUESSING, minecount would not help here")
                 choose_best_guess(naive_safest_guess = best_guess, 
                     min_n_mines_in_front = smallest_n_mines_in_front_alt_solutions, best_front_chance = survival_chance)
                 return
