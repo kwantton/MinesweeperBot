@@ -33,18 +33,24 @@ class Minesweeper:
         self.debug_csp = debug_csp
         
         self.clock = pygame.time.Clock()
-        self.cell_size = 50-int(0.8*height)             # how many px in height and width should each cell be?
+
+        if (self.width, self.height, self.mines) == expert:
+            self.cell_size = 50-int(0.8*height)         # how many px in height and width should each cell be?
+        # Dynamic cell size calculation based on map dimensions
+        else:
+            self.cell_size = max(18, min(50, 800 // max(width, height)))
+        self.draw_width = max(self.cell_size*width, 1000)
         self.initialize_debug_features()
         self.game_result_counter = [0,0]                # [wins, losses]
         
-        self.font = pygame.font.Font(None, 36-int(0.5*height))
+        self.font = pygame.font.Font(None, max(36-int(0.5*height), 25)) # min size is 20 now for the font
         
         if mines >= width*height-9:
             raise ValueError(f'too many mines, max is {width*height-9} for this size')
         
         self.images = {}                                # {name : loaded image}
         self.load_images()
-        self.screen = pygame.display.set_mode((self.cell_size*width, self.cell_size*height + self.infobar_height + self.instructions_height), pygame.RESIZABLE) # each .png is 100 px, which is large. Extra height for info bar above the minesweeper map, and instructions bar below the minesweeper map
+        self.screen = pygame.display.set_mode((self.draw_width, self.cell_size*height + self.infobar_height + self.instructions_height), pygame.RESIZABLE) # each .png is 100 px, which is large. Extra height for info bar above the minesweeper map, and instructions bar below the minesweeper map
         
         self.new_game()
         self.loop()
@@ -684,17 +690,17 @@ class Minesweeper:
             if not self.hit_a_mine:
                 text = 'MAP CLEARED!'
                 y = 10
-                x = self.cell_size*self.width-200
+                x = self.draw_width-230
             else:
                 text = '.. and completed'                                                                   # if you hit a mine AFTER you've completed the game, acknowledge this c:
                 y = 50
-                x = self.cell_size*self.width-230
+                x = self.draw_width-230
             victory_surface = self.font.render(text, True, (0,255,0))
             self.screen.blit(victory_surface, (x, y))
         
         def draw_hit_a_mine() -> None:
             hit_a_mine_surface = self.font.render(f'HIT A MINE!', True, (255,0,0))
-            self.screen.blit(hit_a_mine_surface, (self.cell_size*self.width-200, 10))
+            self.screen.blit(hit_a_mine_surface, (self.draw_width-230, 10))
             draw_minecount()
             draw_timer()
 
@@ -740,16 +746,16 @@ class Minesweeper:
                 self.screen.blit(surface, (x*self.cell_size, y*self.cell_size + self.infobar_height))
 
         def write_minecount_success():
-            minecount_success_surface = self.font.render(f'minecount success', True, (255,255,255))
-            self.screen.blit(minecount_success_surface, (self.cell_size*self.width-500, 10))
+            minecount_success_surface = self.font.render(f'minecount success', True, (0,255,0))
+            self.screen.blit(minecount_success_surface, (self.draw_width-230, 40))
 
         def write_p_success_front():
             p_success_surface = self.font.render(f'Front ≤ {self.solver.p_success_front} % safe', True, (255,255,255))
-            self.screen.blit(p_success_surface, (self.cell_size*self.width-500, 10))
+            self.screen.blit(p_success_surface, (self.draw_width-230, 40))
 
         def write_p_success_unseen():
             p_success_surface = self.font.render(f'Other ≥ {self.solver.p_success_unseen} % safe', True, (255,255,255))
-            self.screen.blit(p_success_surface, (self.cell_size*self.width-500, 30))
+            self.screen.blit(p_success_surface, (self.draw_width-230, 70))
 
         def write_unclicked_cell_count():
             p_success_surface = self.font.render(f'unclicked cells: {self.n_unclicked}', True, (255,255,255))
@@ -759,8 +765,8 @@ class Minesweeper:
             choice = 'other'
             if self.solver.choice == 'FRONT':
                 choice = 'safest cell from front'
-            choice_surface = self.font.render(f'pick: {choice}', True, (255,255,255))
-            self.screen.blit(choice_surface, (self.cell_size*self.width-500, 50))
+            choice_surface = self.font.render(f'guess: {choice}', True, (255,255,255))
+            self.screen.blit(choice_surface, (self.draw_width-550, 50))
 
         def write_wins_and_losses():
             wins, losses = self.game_result_counter
@@ -842,11 +848,14 @@ class Minesweeper:
                 self.draw_display()                                             # (2) then draw the screen after handling them
 
 if __name__ == '__main__':
-    beginner = 9,9,10           # width, height, mines
+    beginner = 9,9,10                   # width, height, mines
     intermediate = 16,16,40
-    expert = 30,16,99
-    big_expert = 50,24,248
-    bigger_expert = 60,24,297
+    expert = 30,16,99                   # 480 cells. Expert mine density is 20.625 %. These all have that, just the size differs. Size: 480 cells
+    big_expert = 50,24,248              # 1200 cells, 20.666 %
+    bigger_expert = 60,24,297           # 1440 cells, 20.625 %
+    BIGGEST_expert = 60,42,520          # 2520 cells, 20.63 %
+    Humongous_expert = 100,42,866       # 4200 cells, 20.63 %
+    Sus_Amongus_Expert = 100,50,1031    # 5000 cells, 20.62 %
 
     dense_beg = 9,9,70
     less_dense_beg = 9,9,15
@@ -858,5 +867,5 @@ if __name__ == '__main__':
 
     ''' ↓↓↓ STARTS A NEW MINESWEEPER with the ability to play the bot by pressing b ↓↓↓ (instructions in the game) '''
     # Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=False) # IF YOU WANT ONLY simple_solver(), which WORKS at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
-    Minesweeper(expert[0], expert[1], expert[2], csp_on=True) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
+    Minesweeper(Sus_Amongus_Expert[0], Sus_Amongus_Expert[1], Sus_Amongus_Expert[2], csp_on=True) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
     #             width      height     mines
