@@ -15,8 +15,11 @@ class Minesweeper:
     Note! Also `simple_solver()` is here. It handles the very simplest cases - it was convenient to keep
     here as it required much less work than moving all the relevant info back and forth
     to `CSP_solver` class just for the simplest of cases.
+
+    Testing of lost games: 'constraing_problem_solver_for_testing.py' which finds if logic was missed in a lost game.
     '''
-    def __init__(self, width, height, mines, csp_on=True, debug_csp=False, minecount_demo_number = None, save_losses = False):
+    def __init__(self, width, height, mines, csp_on=True, debug_csp=False, minecount_demo_number = None, 
+                 logic_testing_on = False):
         pygame.init()
         pygame.display.set_caption('MINESWEEPER')
         self.cells_to_open = width*height - mines
@@ -32,7 +35,7 @@ class Minesweeper:
         self.ms_bot_time_TOTAL = 0
         self.debug_csp = debug_csp
         self.visual_autobot = False                     # when this is on, the 30 fps screen draw is ON. This limits the speed of the bot, but looks cool :D press v to activate, WHEN you have pressed a
-        self.record_losses = save_losses
+        self.record_losses = logic_testing_on           # when this is on, for every lost game, a check will commence in 'constraint_problem_solver_for_testing.py'
         self.minecount_demo = minecount_demo_number
         
         self.clock = pygame.time.Clock()
@@ -64,6 +67,7 @@ class Minesweeper:
         '''
         print('\ninitialize_debug_features()')
         if self.record_losses:
+            self.missed_logic_count = 0
             self.lost_game_eqs = []                                                 # [[eqA, eqB, eqC, ...], [eqX, eqY]] ; a list of eqs from every lost game after the loss has been recorded.
         self.show_mines = False
         self.highlight_front = False                                                # 'front' cells = number-labeled cells that neighbour unsolved cells, i.e. cells in x € {1,2,...8} that do not have x flags marked around them. When this is 'True', it draws a yellow rectangle around each such cell.
@@ -324,7 +328,8 @@ class Minesweeper:
         self.save_lost_game_equations_for_inspection()
         self.draw_display()
         # sleep(5)
-        check_if_solutions_were_missed_in_lost_game(self.last_lost_game, 
+        
+        self.missed_logic_count += check_if_solutions_were_missed_in_lost_game(self.last_lost_game, 
             remaining_mines_in_map=self.minecount, all_vars_in_remaining_map=self.get_all_unclicked_cells(), x=x, y=y)
     
     def save_lost_game_equations_for_inspection(self) -> None:
@@ -334,13 +339,10 @@ class Minesweeper:
         '''
         eq_list = []
         for eq in self.solver.unique_equations:
-            eq_list.append(eq)
-        # self.lost_game_eqs.append(eq_list)
+            eq_list.append(eq)        
         self.last_lost_game = eq_list
         print('GAME LOST')
-        self.draw_display()                             # I want to see what happened at this point, not a million years later after the checking is (perhaps) complete
-        # for i, eqs in enumerate(self.lost_game_eqs):
-        #     print(f'{i}: {eqs}')
+        self.draw_display()                                                     # I want to see what happened at this point, not a million years later after the checking is (perhaps) complete
 
 
     def handle_probing_of_already_opened_cell(self, x:int, y:int) -> None:
@@ -838,6 +840,15 @@ class Minesweeper:
                 percent_won = round(100 * wins / total, 1)
                 percent_won_surface = self.font.render(f'% won: {percent_won}', True, (255,255,255))
                 self.screen.blit(percent_won_surface, ((300, 70)))
+        
+        def write_missed_logic_count():
+            logic_inadequate_count = self.missed_logic_count
+            color = (0,255,0)
+            if logic_inadequate_count != 0:
+                color = (255,0,0)
+            logic_error_count = self.font.render(f'missing logic: {logic_inadequate_count}', True, color)
+            self.screen.blit(logic_error_count, ((self.draw_width-550, 70)))
+
 
         def draw_map() -> None:
             for x in range (self.width):
@@ -875,6 +886,8 @@ class Minesweeper:
             highlight_guesses_blue()
         if self.solver.minecount_successful:                                # if minecount() in CSP_solver solved variables succesfully, then write 'minecount' in the upper bar. Else, guessing, and write that info instead.
             write_minecount_success()
+        if self.record_losses:
+            write_missed_logic_count()
         else:
             if self.solver.p_success_front != None:                         # it can be zero!
                 write_p_success_front()
@@ -921,5 +934,11 @@ if __name__ == '__main__':
 
     ''' ↓↓↓ STARTS A NEW MINESWEEPER with the ability to play the bot by pressing b ↓↓↓ (instructions in the game) '''
     # Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=False) # IF YOU WANT ONLY simple_solver(), which WORKS at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
-    Minesweeper(expert[0], expert[1], expert[2], csp_on=True, minecount_demo_number=None, save_losses=True) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
+    Minesweeper(expert[0], expert[1], expert[2], csp_on=True, minecount_demo_number=None, logic_testing_on=True) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
     #             width      height     mines
+    '''
+    if 'logic_testing_on = True', then every lost game will be checked for missing logic 
+    in 'constraint_problem_solver_for_testing.py'.
+        For convenience, when using that, press 'i' and then 'a'; this will toggle on the infinite playing mode
+    (which can be toggled off by pressing 'i' again. Finishing current game can be toggled off by pressing 'a' again)
+    '''
