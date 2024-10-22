@@ -921,12 +921,13 @@ if __name__ == '__main__':
     '''
     Testing:
 
-    if 'logic_testing_on = True' below, then every lost game will be checked for missing logic 
+    if 'logic_testing_on = True' as a parameter below, then every lost game will be checked for missing logic 
     in 'constraint_problem_solver_for_testing.py'.
-        For convenience, when using that, press 'i' and then 'a'; this will toggle on the infinite playing mode
-    (which can be toggled off by pressing 'i' again. Finishing current game can be toggled off by pressing 'a' again).
-    Testing CAN stall forever in an EXPERT game, as the validity testing can be slow in big cases (it goes
-    through all possible solutions)!
+        For convenience, when using that, press 'i' and then 'a' in the game; this will toggle on the
+    infinite playing mode (which can be toggled off by pressing 'i' again.
+    Finishing current game can be toggled off by pressing 'a' again).
+        Testing CAN stall forever in an EXPERT game, as the validity testing is slow in cases of a
+        lot of variables (it lists all possible solutions)!
 
     -------------------------------------------------------
     HOW TO PROVE THAT THE LOST GAME CHECKING WORKS? Answer:
@@ -967,6 +968,6 @@ if __name__ == '__main__':
 
     ''' ↓↓↓ STARTS A NEW MINESWEEPER with the ability to play the bot by pressing b ↓↓↓ (instructions in the game) '''
     # Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=False) # IF YOU WANT ONLY simple_solver(), which WORKS at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
-    Minesweeper(expert[0], expert[1], expert[2], csp_on=True, minecount_demo_number=None, logic_testing_on=True,
-                unnecessary_guesses=True) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
+    Minesweeper(expert[0], expert[1], expert[2], csp_on=True, minecount_demo_number=None, logic_testing_on=False,
+                unnecessary_guesses=False) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
     #             width      height     mines
