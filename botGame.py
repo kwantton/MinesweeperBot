@@ -19,12 +19,12 @@ class Minesweeper:
     Testing of lost games: 'constraing_problem_solver_for_testing.py' which finds if logic was missed in a lost game.
     '''
     def __init__(self, width, height, mines, csp_on=True, debug_csp=False, minecount_demo_number = None, 
-                 logic_testing_on = False):
+                 logic_testing_on = False, unnecessary_guesses = False):
         pygame.init()
         pygame.display.set_caption('MINESWEEPER')
         self.cells_to_open = width*height - mines
         
-        # NB! Put here ONLY those that are not reset at every 'new_game()'
+        # Note! Put here ONLY those that are not reset at every 'new_game()'
         self.mines = mines
         self.width = width
         self.auto_on = False                            # if set to true, then the bot will play as long as it hits a mine or wins; no need to smash p or b manually
@@ -41,15 +41,14 @@ class Minesweeper:
         self.clock = pygame.time.Clock()
 
         if (self.width, self.height, self.mines) == expert:
-            self.cell_size = 50-int(0.8*height)         # how many px in height and width should each cell be?
-        # Dynamic cell size calculation based on map dimensions
+            self.cell_size = 50-int(0.8*height)                             # how many px in height and width should each cell be?
         else:
-            self.cell_size = max(18, min(50, 800 // max(width, height)))
+            self.cell_size = max(18, min(50, 800 // max(width, height)))    # dynamic cell size calculation based on map dimensions
         self.draw_width = max(self.cell_size*width, 1000)
-        self.initialize_debug_features()
+        self.initialize_debug_features(unnecessary_guesses)
         self.game_result_counter = [0,0]                # [wins, losses]
         
-        self.font = pygame.font.Font(None, max(36-int(0.5*height), 25)) # min size is 20 now for the font
+        self.font = pygame.font.Font(None, max(36-int(0.5*height), 25))     # min size is 25 now for the font
         
         if mines >= width*height-9:
             raise ValueError(f'too many mines, max is {width*height-9} for this size')
@@ -61,14 +60,13 @@ class Minesweeper:
         self.new_game()
         self.loop()
 
-    def initialize_debug_features(self) -> None:
+    def initialize_debug_features(self, unnecessary_guesses:bool) -> None:
         '''
         Initializes visual interface features, which are togglable by pressing buttons listed below.
         '''
         print('\ninitialize_debug_features()')
         if self.record_losses:
             self.missed_logic_count = 0
-            self.lost_game_eqs = []                                                 # [[eqA, eqB, eqC, ...], [eqX, eqY]] ; a list of eqs from every lost game after the loss has been recorded.
         self.show_mines = False
         self.highlight_front = False                                                # 'front' cells = number-labeled cells that neighbour unsolved cells, i.e. cells in x € {1,2,...8} that do not have x flags marked around them. When this is 'True', it draws a yellow rectangle around each such cell.
         self.highlight_guesses = False
@@ -86,6 +84,7 @@ class Minesweeper:
         g : highlight guessed cells
         m : show mine locations
         q: quit'''.split('\n        ')                                              # This way of writing lists is used a lot on the 'Data analysis with Python' course, it's very handy for writing longer lists quickly. This splits at each '\n        ' to form a list.
+        self.unnecessary_guesses = unnecessary_guesses
         self.instructions_height = 20 + len(self.instructions)*30                   # pixels for the instructions bar below the minesweeper map
 
     def load_images(self):
@@ -331,10 +330,13 @@ class Minesweeper:
         
         self.missed_logic_count += check_if_solutions_were_missed_in_lost_game(self.last_lost_game, 
             remaining_mines_in_map=self.minecount, all_vars_in_remaining_map=self.get_all_unclicked_cells(), x=x, y=y)
+        if self.missed_logic_count:
+            self.auto_on = False    # STOP so I could see what happened. Never happened so far (luckily c:) but this would be very handy in case logic was missed! I could look at the game and see what was missing, dang convenient.
+            self.perpetual = False
     
     def save_lost_game_equations_for_inspection(self) -> None:
         '''
-        saves the current lost game's equations to 'self.lost_game_eqs'. Then those eqs can be fed to a
+        saves the current lost game's equations to 'eq_list'. Then those eqs can be fed to a
         solver to see, if solutions were missed!
         '''
         eq_list = []
@@ -690,7 +692,7 @@ class Minesweeper:
                 if self.csp_on:                                         # (1) it uses self.solver_old, and if that doesn't help (incomplete logic), then self.solver, which is capable of solving everything and calculating probabilities, but it's slower
                     csp_solve()
                 
-                if self.solver.guess:                                   # if CSP_solver has not managed to solve any new variables with 100% certainty ('normal' logic OR minecounting logic), THEN guess. This info is directly obtained from 'self.solver', as you can see (`if self.solver.guess`)
+                if self.solver.guess or self.unnecessary_guesses:              # (1) NORMAL USAGE: if CSP_solver has not managed to solve any new variables with 100% certainty ('normal' logic OR minecounting logic), THEN guess. This info is directly obtained from 'self.solver', as you can see (`if self.solver.guess`) (2) TESTING TESTING USAGE: if `self.unnecessary_guesses`, then guesses are done -> the lost game missed logic tester in 'constraint_problem_solver_for_testing.py' will notice that missing logic was found, and the 'missing_logic' counter will increase and turn red, proving that it works. Awesome!
                     guess(self.solver.guess)                            # 'self.solver.guess' is the variable that had the highest probability of NOT being a mine (as of 12.10.2024 at least)
             
             bot_execute()
@@ -915,6 +917,37 @@ class Minesweeper:
                 self.draw_display()                                             # (2) then draw the screen after handling them
 
 if __name__ == '__main__':
+
+    '''
+    Testing:
+
+    if 'logic_testing_on = True' below, then every lost game will be checked for missing logic 
+    in 'constraint_problem_solver_for_testing.py'.
+        For convenience, when using that, press 'i' and then 'a'; this will toggle on the infinite playing mode
+    (which can be toggled off by pressing 'i' again. Finishing current game can be toggled off by pressing 'a' again).
+    Testing CAN stall forever in an EXPERT game, as the validity testing can be slow in big cases (it goes
+    through all possible solutions)!
+
+    -------------------------------------------------------
+    HOW TO PROVE THAT THE LOST GAME CHECKING WORKS? Answer:
+    -------------------------------------------------------
+
+    (1) ctrl-f (find) the following, here in botGame.py:
+
+    `if self.solver.guess or self.unnecessary_guesses:                 # (1) NORMAL USAGE: if CSP_solver has not managed to solve any new variables with 100% certainty ('normal' logic OR minecounting logic), THEN guess. This info is directly obtained from 'self.solver', as you can see (`if self.solver.guess`) (2) TESTING TESTING USAGE: if `self.unnecessary_guesses`, then guesses are done -> the lost game missed logic tester in 'constraint_problem_solver_for_testing.py' will notice that missing logic was found, and the 'missing_logic' counter will increase and turn red, proving that it works. Awesome!
+        guess(self.solver.guess)                                # you guessed it, it guesses. When 'self.solver.guess' is None, then it performs a not-terrible guess first into corners, then to edges of the map (they have highest chance of being 0, so highest chance of revealing a lot of new information)
+    
+    ^^ normally the above ensures that a guess is done only when necessary. 
+    When 'self.unnecessary_guesses = True', it guesses anyways, 
+    even if it already found answers in CSP_solver_old or CSP_solver
+    (sidenote: simple_solver will loop as long as it produces solutions, 
+    so if it DOES provide solutions, it will return and not go here ever)
+    
+    (2) run the Minesweeper() with parameter 'unnecessary_guesses = True'. This enables unnecessary guessing
+    -> validity testing in 'constraint_problem....py' will find that unnecessary guesses were done,
+    proving that validity testing works Perfect! c:
+    '''
+
     beginner = 9,9,10                   # width, height, mines
     intermediate = 16,16,40
     expert = 30,16,99                   # 480 cells. Expert mine density is 20.625 %. These all have that, just the size differs. Size: 480 cells
@@ -934,11 +967,6 @@ if __name__ == '__main__':
 
     ''' ↓↓↓ STARTS A NEW MINESWEEPER with the ability to play the bot by pressing b ↓↓↓ (instructions in the game) '''
     # Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=False) # IF YOU WANT ONLY simple_solver(), which WORKS at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
-    Minesweeper(expert[0], expert[1], expert[2], csp_on=True, minecount_demo_number=None, logic_testing_on=True) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
+    Minesweeper(expert[0], expert[1], expert[2], csp_on=True, minecount_demo_number=None, logic_testing_on=True,
+                unnecessary_guesses=True) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
     #             width      height     mines
-    '''
-    if 'logic_testing_on = True', then every lost game will be checked for missing logic 
-    in 'constraint_problem_solver_for_testing.py'.
-        For convenience, when using that, press 'i' and then 'a'; this will toggle on the infinite playing mode
-    (which can be toggled off by pressing 'i' again. Finishing current game can be toggled off by pressing 'a' again)
-    '''

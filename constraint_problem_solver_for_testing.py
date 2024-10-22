@@ -65,7 +65,7 @@ def check_if_solutions_were_missed_in_lost_game(equations:list,
 
         if len(always_one) > 0 or len(always_zero) > 0:
             print('MISSING LOGIC FOUND! sleep 60')
-            sleep(60)
+            # sleep(60)
             return 1
 
     print('check_if_solutions_were_missed_in_lost_game()')
