@@ -6,8 +6,19 @@ Course _Aineopintojen harjoitustyö - algoritmit ja tekoäly_, University of Hel
 see 'how_to_clone.md'
 
 ## results (as of 21.10.2024)
+[Win_percentages_and_average_time_per_game](./Testing/Win_percentages_and_average_time_per_game.pdf)
 Out of the 120 008 expert games so far (after latest changes), 38.80 % have been solved with average time 147 ms per game.
 The longest game was 30 minutes, despite the 20-s timer per round of CSP-solver after which a guess is done if no solutions come out before that. Replacing `chain_link_equations()` with something better would be the optimal solution; plug-and-play propositional logic solver or the like, for example, however that would require Massive rework.
+
+Expert games: 38.8% won, average 147 ms / game, n = 120 008
+
+Intermediate games: 83.6% won, average 11 ms / game, n=26 430
+
+Beginner games: 95.9% won, average 5 ms / game, n=25 038
+
+Validity testing: 
+[Logic validity testing](./Testing/Logic_validity_testing/Logic_validity_testing.pdf)
+no missing logic found so far (23.10.2024)
 
 ## Current state (21.10.2024)
 
