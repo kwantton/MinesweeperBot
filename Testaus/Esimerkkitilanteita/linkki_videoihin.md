@@ -1,2 +1,0 @@
-<a>https://www.dropbox.com/scl/fo/4dt7sda6htrzk6hp844tk/AOeWAB4MPLSlXZsdFEsb4tE?rlkey=e6065s75yqxx3f3ehtaypql4b&st=e7it1uzg&dl=0</a>
-$\Uparrow$ tuolta löytyy videot `CSP_solver`:in minecount-tilanteiden testeistä 8c, 8d ja yhdestä hyvin yksinkertaisesta tapauksesta

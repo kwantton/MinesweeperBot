@@ -970,4 +970,4 @@ if __name__ == '__main__':
     # Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=False) # IF YOU WANT ONLY simple_solver(), which WORKS at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
     #             width      height     mines
     Minesweeper(expert[0], expert[1], expert[2], csp_on=True, minecount_demo_number=None, logic_testing_on=True,
-                unnecessary_guesses=False)
+    unnecessary_guesses=False)
