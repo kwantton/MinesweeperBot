@@ -1,10 +1,11 @@
 import pygame
-from time import time
+from time import time, sleep
 from random import sample
-from constraint import Problem                          # this could be used (not done at the moment if grey) to solve groups of CSP-equations (CSP = constraint satisfaction problem)
+from CSP_solver_old import CSP_solver as CSP_solver_old
 from CSP_solver import CSP_solver, format_equation_for_csp_solver
-from CSP_solver_old import CSP_solver as CSP_solver_old, format_equation_for_csp_solver as format_equation_for_csp_solver_old
-from cell_id_names import flag, unclicked, mine, safe, labellize, read_number_from_label
+from constraint_problem_solver_for_testing import check_if_solutions_were_missed_in_lost_game
+from cell_id_names import flag, unclicked, mine, labellize, read_number_from_label
+
 
 # cell = a clickable square of the minesweeper map, 'ruutu'. 'Label' = the id of a cell, like '0' or 'flag'.
 class Minesweeper:
@@ -15,7 +16,7 @@ class Minesweeper:
     here as it required much less work than moving all the relevant info back and forth
     to `CSP_solver` class just for the simplest of cases.
     '''
-    def __init__(self, width, height, mines, csp_on=True, debug_csp=False):
+    def __init__(self, width, height, mines, csp_on=True, debug_csp=False, minecount_demo_number = None, save_losses = False):
         pygame.init()
         pygame.display.set_caption('MINESWEEPER')
         self.cells_to_open = width*height - mines
@@ -29,8 +30,10 @@ class Minesweeper:
         self.perpetual = False
         self.infobar_height = 100                       # pixels for the infobar above the minesweeper map
         self.ms_bot_time_TOTAL = 0
-        self.visual_autobot = False                     # when this is on, the 30 fps screen draw is ON. This limits the speed of the bot, but looks cool :D press v to activate, WHEN you have pressed a
         self.debug_csp = debug_csp
+        self.visual_autobot = False                     # when this is on, the 30 fps screen draw is ON. This limits the speed of the bot, but looks cool :D press v to activate, WHEN you have pressed a
+        self.record_losses = save_losses
+        self.minecount_demo = minecount_demo_number
         
         self.clock = pygame.time.Clock()
 
@@ -55,11 +58,13 @@ class Minesweeper:
         self.new_game()
         self.loop()
 
-    def initialize_debug_features(self):
+    def initialize_debug_features(self) -> None:
         '''
         Initializes visual interface features, which are togglable by pressing buttons listed below.
         '''
         print('\ninitialize_debug_features()')
+        if self.record_losses:
+            self.lost_game_eqs = []                                                 # [[eqA, eqB, eqC, ...], [eqX, eqY]] ; a list of eqs from every lost game after the loss has been recorded.
         self.show_mines = False
         self.highlight_front = False                                                # 'front' cells = number-labeled cells that neighbour unsolved cells, i.e. cells in x € {1,2,...8} that do not have x flags marked around them. When this is 'True', it draws a yellow rectangle around each such cell.
         self.highlight_guesses = False
@@ -167,7 +172,7 @@ class Minesweeper:
 
     def inspect_event(self, event) -> None:
         '''
-        inspect pygame events
+        inspect pygame events; this is only called if there ARE pygame events
         '''
         if event.type == pygame.KEYDOWN:                                            # I have to check this first to be able to escape from the autobot loop when I so want
             if event.key == pygame.K_q:                                             # let's have a chance to escape asap, so that this doesn't go to the bottom of the to-do list
@@ -237,11 +242,30 @@ class Minesweeper:
         Also, the first clicked cell is ensured to be 0 in classical minesweeper - that's how I'm doing it also.
         '''
         print('\ngenerate_map()')
-        danger_x = set(x for x in range(self.width) if x-1 <= mouse_x <= x+1)
-        danger_y = set(y for y in range(self.height) if y-1 <= mouse_y <= y+1)
-        available_coordinates = [(x,y) for y in range(self.height) for x in range(self.width) if not x in danger_x or not y in danger_y]
-        self.mine_locations = set(sample(available_coordinates, self.mines))   # NB! This line of code 'generates' the map by deciding mine locations! This samples a 'self.mines' number of mines (e.g. 99 in an expert game) from 'available_cordinates' which excludes the opening cell that was clicked.
+        if self.minecount_demo:
+            self.generate_simple_minecount_demo(self.minecount_demo)
+        else:
+            danger_x = set(x for x in range(self.width) if x-1 <= mouse_x <= x+1)
+            danger_y = set(y for y in range(self.height) if y-1 <= mouse_y <= y+1)
+            available_coordinates = [(x,y) for y in range(self.height) for x in range(self.width) if not x in danger_x or not y in danger_y]
+            self.mine_locations = set(sample(available_coordinates, self.mines))   # NB! This line of code 'generates' the map by deciding mine locations! This samples a 'self.mines' number of mines (e.g. 99 in an expert game) from 'available_cordinates' which excludes the opening cell that was clicked.
         # print(f'- clicked coordinates {mouse_x, mouse_y} and placed the mines as follows:\n', self.mine_locations)
+    
+    def generate_simple_minecount_demo(self, demo_number:int) -> None:
+        '''
+        for quickly showing what minecount is (it's an equation
+        whose sum is the number of remaining mines in the map at the moment, BUT
+        it must be used wisely, ONLY when needed; otherwise you could have an equation with
+        450 variables (expert map has 480 cells!) and {450 \choose 90} combinations. Yeah, would be bad.)
+        '''
+        self.minecount = self.mines = demo_number + 1
+        self.cells_to_open = self.width*self.height - self.minecount        # exact same formula as normally (normally would be width*height-mines, but here minecount is correct for this)
+        if demo_number == 1:
+            self.mine_locations = set([(1,7), (2,6)])                        # 1 mine after normal solving, minecountable solution
+        elif demo_number == 2:
+            self.mine_locations = set([(0,7), (1,8), (2,6)])               # 2 mines after normal solving, NO solution
+        elif demo_number == 3:
+            self.mine_locations = set([(0,7), (1,8), (0,8), (2,6)])        # 3 mines after normal solving, minecountable solution
 
     def probe(self, x:int, y:int, primary=False) -> None:           # if primary = False, then don't go to 'handle_probing_of_already_opened_cell', otherwise it can loop and cause another chord! The chording is meant ONLY for actual chording
         '''
@@ -264,6 +288,9 @@ class Minesweeper:
             self.handle_probing_of_already_opened_cell(x,y)         # it's possible that this is a chording, but you can't know that unless you check the number of marked flags around the cell first
 
     def handle_game_ended(self):
+        '''
+        after the game has ended in a victory or a loss
+        '''
         self.game_ended = True
         self.finishing_time = pygame.time.get_ticks()
         self.elapsed_nonbot_s = (self.finishing_time - self.start_time) / 1000
@@ -283,13 +310,38 @@ class Minesweeper:
 
     def handle_game_lost(self, x:int, y:int) -> None:
         '''
-        Note! This is only called AFTER a mine has been hit. This does not check if the game has been lost.
+        called AFTER a mine has been hit
         '''
         if not self.hit_a_mine:                                                 # my game counter increases after a lost game, so I'm making sure this happens only once
             print('game_over(): HIT A MINE AT COORDINATES:', (x, y))
             self.hit_a_mine = True
             self.game_result_counter[1] += 1
             self.handle_game_ended()
+        if self.record_losses:
+            self.check_logic_completeness(x, y)
+    
+    def check_logic_completeness(self, x, y):
+        self.save_lost_game_equations_for_inspection()
+        self.draw_display()
+        # sleep(5)
+        check_if_solutions_were_missed_in_lost_game(self.last_lost_game, 
+            remaining_mines_in_map=self.minecount, all_vars_in_remaining_map=self.get_all_unclicked_cells(), x=x, y=y)
+    
+    def save_lost_game_equations_for_inspection(self) -> None:
+        '''
+        saves the current lost game's equations to 'self.lost_game_eqs'. Then those eqs can be fed to a
+        solver to see, if solutions were missed!
+        '''
+        eq_list = []
+        for eq in self.solver.unique_equations:
+            eq_list.append(eq)
+        # self.lost_game_eqs.append(eq_list)
+        self.last_lost_game = eq_list
+        print('GAME LOST')
+        self.draw_display()                             # I want to see what happened at this point, not a million years later after the checking is (perhaps) complete
+        # for i, eqs in enumerate(self.lost_game_eqs):
+        #     print(f'{i}: {eqs}')
+
 
     def handle_probing_of_already_opened_cell(self, x:int, y:int) -> None:
         '''
@@ -376,6 +428,14 @@ class Minesweeper:
             self.n_unclicked -= 1
             self.minecount -= 1
 
+    def get_all_unclicked_cells(self) -> set:                                               # needed below in two functions
+        not_clicked = set()
+        for x in range (self.width):
+            for y in range (self.height):
+                if self.map[y][x] == unclicked:
+                    not_clicked.add((x,y))
+        return not_clicked
+    
     def bot_act(self) -> None:                                                              # before this, if started with 'b', there's been in order (1) 'self.handle_first_left_click()' (2) 'self.generate_map()' (3) 'self.probe()'
         # print('\nbot_act():')                                                             # the following prints will be '- something', '- something_else'. I like this way of console printing because it makes it faster to search for the useful stuff at a given moment in the console, and makes it clear which print originates from which function.
         
@@ -412,13 +472,7 @@ class Minesweeper:
                             self.obsolete_front.add((x,y))
                 remove_obsolete_front()
             
-            def get_all_unclicked_cells() -> set:                                               # needed below in two functions
-                not_clicked = set()
-                for x in range (width):
-                    for y in range (height):
-                        if self.map[y][x] == unclicked:
-                            not_clicked.add((x,y))
-                return not_clicked
+            
 
             def check_minecount_zero() -> None:
                 '''
@@ -429,7 +483,7 @@ class Minesweeper:
                 every remaining cell -> game won. Very simple.
                 '''
                 if self.minecount == 0:
-                    for x,y in get_all_unclicked_cells():
+                    for x,y in self.get_all_unclicked_cells():
                         self.probe(x,y,True)
 
             def get_unclicked_unseen_cells() -> set:
@@ -442,7 +496,7 @@ class Minesweeper:
                 'self.front' can have different probabilities (largely speaking of course).
                 '''
                 adjacent_to_front = set()
-                unclicked_unseen_cells = get_all_unclicked_cells()                      # this is filtered below! So at this point, this name is misleading.
+                unclicked_unseen_cells = self.get_all_unclicked_cells()                      # this is filtered below! So at this point, this name is misleading.
                 for x,y in self.front:
                     unclicked_front_cell_neighbours = self.get_cells_of_type(unclicked, self.get_neighbours_of(x,y))
                     for neighbour in unclicked_front_cell_neighbours:
@@ -523,7 +577,7 @@ class Minesweeper:
                     filter_front_cells()
                     return
 
-                all_unclicked_cells = get_all_unclicked_cells()
+                all_unclicked_cells = self.get_all_unclicked_cells()
                 unclicked_unseen_cells = get_unclicked_unseen_cells()
                 n_unclicked_unseen_cells = len(unclicked_unseen_cells)
                 
@@ -819,7 +873,7 @@ class Minesweeper:
             highlight_minecount_solved()
         if self.highlight_guesses:
             highlight_guesses_blue()
-        if self.solver.minecount_successful:                                 # if minecount() in CSP_solver solved variables succesfully, then write 'minecount' in the upper bar. Else, guessing, and write that info instead.
+        if self.solver.minecount_successful:                                # if minecount() in CSP_solver solved variables succesfully, then write 'minecount' in the upper bar. Else, guessing, and write that info instead.
             write_minecount_success()
         else:
             if self.solver.p_success_front != None:                         # it can be zero!
@@ -851,11 +905,11 @@ if __name__ == '__main__':
     beginner = 9,9,10                   # width, height, mines
     intermediate = 16,16,40
     expert = 30,16,99                   # 480 cells. Expert mine density is 20.625 %. These all have that, just the size differs. Size: 480 cells
-    big_expert = 50,24,248              # 1200 cells, 20.666 %
-    bigger_expert = 60,24,297           # 1440 cells, 20.625 %
-    BIGGEST_expert = 60,42,520          # 2520 cells, 20.63 %
-    Humongous_expert = 100,42,866       # 4200 cells, 20.63 %
-    Sus_Amongus_Expert = 100,50,1031    # 5000 cells, 20.62 %
+    big_expert = 50,24,248              # 1200 cells, 20.666 % mines
+    bigger_expert = 60,24,297           # 1440 cells, 20.625 % m.
+    BIGGEST_expert = 60,42,520          # 2520 cells, 20.63 % m.
+    Humongous_expert = 100,42,866       # 4200 cells, 20.63 % m.
+    Sus_Amongus_Expert = 100,50,1031    # 5000 cells, 20.62 % m.
 
     dense_beg = 9,9,70
     less_dense_beg = 9,9,15
@@ -867,5 +921,5 @@ if __name__ == '__main__':
 
     ''' ↓↓↓ STARTS A NEW MINESWEEPER with the ability to play the bot by pressing b ↓↓↓ (instructions in the game) '''
     # Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=False) # IF YOU WANT ONLY simple_solver(), which WORKS at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
-    Minesweeper(Sus_Amongus_Expert[0], Sus_Amongus_Expert[1], Sus_Amongus_Expert[2], csp_on=True) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
+    Minesweeper(expert[0], expert[1], expert[2], csp_on=True, minecount_demo_number=None, save_losses=True) # this one utilizes also csp-solver, which is partially broken at the moment, causing mislabeling of things
     #             width      height     mines
