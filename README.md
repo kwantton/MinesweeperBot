@@ -18,7 +18,8 @@ Beginner games: 95.9% won, average 5 ms / game, n=25 038
 
 Validity testing: 
 [Logic validity testing](./Testing/Logic_validity_testing/Logic_validity_testing.pdf)
-no missing logic found so far (23.10.2024)
+
+Results: no missing logic found so far (23.10.2024). I will run more games still.
 
 ## Current state (21.10.2024)
 
