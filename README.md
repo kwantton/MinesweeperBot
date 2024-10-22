@@ -38,3 +38,5 @@ The goal is to implement a bot that's capable of solving all solvable minesweepe
 - implemented: for each alt solution per equation, discard if it's incompatible with all possible alt solutions from the next equation in the max-overlap equation chain
 - implemented: chain link equations with (usually) maximum overlap regarding shared variables, discarding impossible alt solutions per equation based on this pairing. This builds a chain of equations, which eliminates the need to couple each equation directly to all other equations
 - implemented: a timer (20 seconds per `CSP_solver` call) is be used to opt for performance in the worst cases of expert rather than absolute solving and accurate probability calculations
+
+The second that all variables have recorded value as both 0 and 1 at least once (i.e. in at least one viable alt solution), then you know that no absolutely solved var exists. This would speed up the solving logic and the inspection logic a lot!
