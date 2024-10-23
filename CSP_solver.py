@@ -19,6 +19,7 @@ class CSP_solver:
     overlap between each neighbouring link in the equation chain, discarding incompatible solutions between
     equations in the set as the linking is done.
     '''
+    # DNR = Do not reset! (every round of CSP_solve or every round of equation adding)
     def __init__(self):
         # DNR = do not reset every round
         self.choice = None                                              # either 'FRONT' or 'UNSEEN'; this tells you if the next guess is located next to 'self.front' (botGame.py has 'self.front') or in the cells unseen by self.front ('unseen unclicked', please remember this term 'unseen unclicked cells', or 'uu_cells'). This is for choosing where to guessing, and for passing this info to 'botGame.py' after the choice has been made. This is also for printing in pygame.
@@ -31,11 +32,20 @@ class CSP_solver:
         self.solved_variables = set()                                   # ((x,y), value); the name of the variable is (x,y) where x and y are its location in the minesweeper map (if applicable), and the value of the variable is either 0 or 1, if everything is ok (each variable is one cell in the minesweeper map, and its value is the number of mines in the cell; 0 or 1, that is)
         self.minecount_successful = False                               # used in 'botGame.py' for printing 'minecount successful' when it's used. Convenient for debugging!
         self.minecount_solved_vars = set()                              # for highlighting in botGame.py. Do NOT reset every round
-        # self.variable_to_equations = dict()                           # RVBA
         self.impossible_combinations = set()
         self.solved_new_vars_during_this_round = False
 
-    def reset_variables_at_the_start_of_new_round_of_csp_solving(self): # NB! NOT ALL RESETTED VARS ARE HERE!!!! Some should ONLY be reset BEFORE ADDING NEW EQS! They are in 'reset_vars_before_adding_new_equations()'
+    def initialize_those_that_are_needed_in_botGame(self):
+        '''Vars that however need to exist from the very beginning
+        for botGame to work properly, BUT should not be reset
+        every round of CSP_solve or equation adding'''
+        # self.variables = set()
+        self.choice = None                                              # either 'FRONT' or 'UNSEEN'; this tells you if the next guess is located next to 'self.front' (botGame.py has 'self.front') or in the cells unseen by self.front ('unseen unclicked', please remember this term 'unseen unclicked cells', or 'uu_cells'). This is for choosing where to guess, and for passing this info to 'botGame.py' after the choice has been made. This is also for printing in pygame
+        self.p_success_front = None                                     # initialize. Otherwise 'draw' section in 'pyGame.py' complains that there's no such attribute. This is the highest probability that the most safe unclicked cell next to self.front is safe (has no mine).
+        self.p_success_unseen = None                                    # initialize. Equal probability for each of the unclicked unseen cells to NOT be a mine at the moment
+        self.minecount_successful = False                               # used in 'botGame.py' for printing 'minecount successful' when it's used. Convenient for debugging!
+    
+    def reset_variables_at_the_start_of_new_round_of_csp_solving(self): # NB! NOT ALL TO-BE-RESET VARS ARE HERE!!!! Some should ONLY be reset BEFORE ADDING NEW EQS. They are in 'reset_vars_before_adding_new_equations()', you guessed it.
         self.guess = None                                               # # The safest cell to guess is saved here for use in botGame.py, if there is a need to guess. If (1) normal solving doesn't help AND (2.1) no need for minecount or (2.2) mine counting didn't solve variables either, THEN guess the safest cell. This info, 'self.guess', is passed on to 'botGame.py' where the guess is made. I made a separate variable for this to be able to recognize this guessing situation in 'botGame.py' to distinguish it from normal solving; this makes it possible to add visuals, etc... what is the next guess, if needed? If this is not 'None', then guess is needed. Resetting this to 'None' at the start of every round of 'absolut_brut()', in case the previous round was a guess. (12.10.2024): this is the default value. If even mine counting doesn't help, then this is set to True in 'handle_possible_whole_solutions()'. That info is then read in 'botGame.py' to handle the guessing.
         self.choice = None                                              # the best possible front cell (lowest chance of mine in front) OR unseen unclicked cells? The guess is always one of these two
         self.start = time()                                             # can use this to stop if takes a ridicilous amount of time per round
@@ -44,7 +54,7 @@ class CSP_solver:
         self.p_success_front = None                                     # probability of surviving the safest front cell guess
         self.p_success_unseen = None                                    # prob of surviving any of the safest non-front cell (aka. unseen unclicked cell) guesses; they are equal, as they are unseen, so they all have the same (naive) probability
         self.minecount_successful = False                               # was a new solution found via minecount? This info is used in printing in 'botGame.py': write 'minecount successful' in the game, if minecount was used. For debugging, and most especially for showing off and looking smart.
-        self.solved_new_vars_during_this_round = False                  # the most straightforward way of checking if guessing is ACTUALLY needed, as long as you remember to set this to 'True' when appropriate!
+        self.solved_new_vars_during_this_round = False                  # the most straightforward way of checking if                # the most straightforward way of checking if guessing is ACTUALLY needed, as long as you remember to set this to 'True' when appropriate!
 
     def reset_vars_before_adding_new_equations(self):
         self.variables = set()                                          # ALL variables, solved or not. NB! If I uncomment, a test will not pass.
@@ -336,9 +346,9 @@ class CSP_solver:
             # 'starting_group' is the group from where all arrows leave, and back to which no arrows return; an alt origin for an alt rooted tree, essentially!
             for alt_origin in starting_group:                                       # E.g.: ('d', 'e'), [(('d',1),('e',0)), (('d',0),('e',1))]. This quarantees that they build unidentical solution trees that together encompass all possible whole solutions.
                 if self.timeout:
-                        timeout_guess()
-                        print('TOOK LONGER THAN', self.time_limit, 's - therefore GUESSING NEXT')
-                        return 'time', 'out', 'occurred'
+                    timeout_guess()
+                    print('TOOK LONGER THAN', self.time_limit, 's - therefore GUESSING NEXT')
+                    return 'time', 'out', 'occurred'
                 if alt_origin in compatibility_groups:                              # some might have been filtered out as they were no longer fitting ALL other groups; the whole key has been deleted from 'compatibility_groups' if it's not compatible with ANY alt solution from its paired group (paired equation)
                     seen_proposed_vectors = set()                                   # PER alt answer, of course - that's why it's initialized here and not at the top of this 'join_groups_into_solutions'
                     handled_groups = []
@@ -348,7 +358,7 @@ class CSP_solver:
                     
             
             # done: Count also at this point, use the ready function for that!; if max mines in front < minecount, there's NO NEED for minecount (this is checked in minecount situation checking functions later) -> use this instead!!!! That will significantly make the worst cases faster!!
-            print('- traverse()s finished,', n_times_traversed_for_debugging, 'times in total')
+            print(' → `traverse` called', n_times_traversed_for_debugging[0], 'times')
             best_bet, highest_survival_rate_in_front_cells = handle_minecount_results(
                 value_counts_for_each_var)
             return possible_whole_solutions, best_bet, highest_survival_rate_in_front_cells
@@ -396,22 +406,22 @@ class CSP_solver:
             but it slightly favours guessing in self.front, which could be a better strategy, as guessing in the 
             front safest spot often reveals solutions (no quarantee of that though!))
             '''
-            best_bet = None
-            from_minecount = True
+            called_from_minecount = True
             if min_n_mines_in_front == -1:
-                from_minecount = False
+                called_from_minecount = False
+            best_bet = None
             var_to_survivalChance = dict()
             highest_survival_rate_in_front_cells = 0
 
             for var, [zeros, ones] in value_counts_for_each_var.items():
-                if zeros == 0:
-                    if from_minecount:
+                if zeros == 0:                                          # then this var is solved as var = 0
+                    if called_from_minecount:
                         self.minecount_successful = True                # used for printing 'minecount successful' in 'botGame.py'
                         self.minecount_solved_vars.add((var,1))         # for highlighting in botGame (visuals), bookkeeping  
                     self.solved_new_vars_during_this_round = True
                     self.solved_variables.add((var, 1))
-                elif ones == 0:
-                    if from_minecount:
+                elif ones == 0:                                         # then solved as var = 1
+                    if called_from_minecount:
                         self.minecount_successful = True                # used for printing 'minecount successful' in 'botGame.py'
                         self.minecount_solved_vars.add((var,0))
                     self.solved_new_vars_during_this_round = True
@@ -422,11 +432,12 @@ class CSP_solver:
                         best_bet = var
                         highest_survival_rate_in_front_cells = zeros / (zeros + ones)
 
-            if from_minecount: # NB! it's only -1 if 'handle_minecount_results()' was called NOT from minecount, but instead from after (4), which means I don't want to guess just yet, since the need for minecount hasn't been checked yet! If it's NOT needed (= if it doesn't benefit me), THEN I'll use this guessing c:
+            if called_from_minecount: # NB! if false, this function was NOT called from minecount but earlier, from after `join_comp_groups...()`, which means I don't want to guess just yet, since the need for minecount hasn't been checked yet! If it's NOT needed (= if it doesn't benefit me), THEN I'll use this guessing c:
                 if not self.minecount_successful:
                     print("Minecount done, didn't find solutions, NEED TO GUESS:")
                     choose_best_guess(naive_safest_guess = best_bet, min_n_mines_in_front = min_n_mines_in_front,
                         best_front_chance = highest_survival_rate_in_front_cells*100)
+                    # no return values needed; this moves straight to guessing, minecount was unsuccessful
                 else:
                     print("✔ FOUND SOLUTIONS FROM MINECOUNT FILTERING")
                     # sleep(5) # UN-COMMENT THIS when you wanna see examples of these cases; if happens, press i and a in the game (BOTH!!) to stop the progression of the game after the 10s has elapsed! Otherwise you won't SEE anything!! My experience: roughly 80% of minecout situations are 'simple', and roughly 20% are these, complex 'minecount filtering' cases, so far.
@@ -479,7 +490,7 @@ class CSP_solver:
                                     seen_var_values.add((var, value))
                             if len(seen_var_values) == 2 * len(self.variables):
                                 no_vars_were_solved[0] = True
-                                print('NICE!!!!!!!!!!!!!!!!\n!!!!!!!!!!!!!!!!!!!!!!!!\!!!!!!!!!!!!!!!!!!!!!!!!!!\nEVERY VAR IS 1 or 0, no_solved_vars = True!') # this has not happened yet elsewhere than in the CSP_solver tests, which I'm sad bout :c would be cool
+                                print('⇒ EVERY VAR can be either 1 or 0 in at least one viable solution -> no absolutely solved vars') # this has not happened yet elsewhere than in the CSP_solver tests, which I'm sad bout :c would be cool
                                 # sleep(10) # I just wanna see this, haven't seen yet elsewhere than in a specific test for CSP_solver where no solutions are expected (so that works as expected, that's good). But Why haven't I seen this IRL? It's weird. Could imply an actual bug!
                                 
                     else:
@@ -627,13 +638,13 @@ class CSP_solver:
             if len(all_unclicked) > 0:
                 if n_mines_remaining == 0:
                     for cell in all_unclicked:
-                        print('- marking var as 0')
+                        print(f'⇒ marking cell {cell} as 0')
                         self.solved_variables.add((cell, 0))
                 else:
                     # Both of these below work. The non-commented one is a lot more straightforward, though, and saves work.
                     for uc in all_unclicked:
                         self.guess = uc                                                             # 'all unclicked' is a set(); therefore, to pick the first element, you can't use index - instead do this. In this situation, you have to guess, as the contents of the 'flag box' are a mystery
-                    print('- self.guess:', uc)
+                    print('⇒ self.guess:', uc)
                     # self.unique_equations = { (tuple(var for var in all_unclicked), minecount)}   # There's a chance for 'self.front' not existing in a case where the game is not finished, i.e. there are non-mine cells in that flag box
                 return
             else:
@@ -677,7 +688,7 @@ class CSP_solver:
             if not self.solved_new_vars_during_this_round:                                                                                  # 'self.solved_new_vars_during_this_round' is set to 'True' the very moment that a new variable has been solved, each round of absolut_brut() in two possible situations: in (1) 'handle_possible_whole_solutions()' that was done previously, when any new variable is solved (using normal solving BEFORE minecount, and (2) If non-minecount logic wasn't enough, then I'm using 'use_minecount()' that's called here, and that also marks newly solved variables as True, so that guessing is NOT done. If not solved new, then 'handle_possible_whole_solutions()' is called again, there check for new solutions again, and if still not (3rd attempt, kind of), then guessing is done.
                 count_set_alt_mines_and_send_for_minecount_check(eq_set_possible_solutions_and_guessing_info_in_case_minecount_is_not_needed) # (6) if minecount doesn't help, 'use_minecount()' will pick the safest choice for guessing
             else:
-                print('- ✔ FOUND SOLUTIONS FROM MAIN CSP_solver')
+                print('✔ FOUND SOLUTIONS FROM MAIN CSP_SOLVER')
         
         perform_solving()
 

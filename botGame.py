@@ -36,7 +36,7 @@ class Minesweeper:
         self.ms_bot_time_TOTAL = 0
         self.debug_csp = debug_csp
         self.visual_autobot = False                     # when this is on, the 30 fps screen draw is ON. This limits the speed of the bot, but looks cool :D press v to activate, WHEN you have pressed a
-        self.record_losses = logic_testing_on           # when this is on, for every lost game, a check will commence in 'constraint_problem_solver_for_testing.py'
+        self.logic_testing_on = logic_testing_on           # when this is on, for every lost game, a check will commence in 'constraint_problem_solver_for_testing.py'
         self.minecount_demo = minecount_demo_number
         
         self.clock = pygame.time.Clock()
@@ -67,7 +67,7 @@ class Minesweeper:
         '''
         print('\ninitialize_debug_features()')
         self.guesses = 0                                                            # keep a counter of how many guesses there were in total in all the games played so far
-        if self.record_losses:
+        if self.logic_testing_on:
             self.missed_logic_count = 0
         self.show_mines = False
         self.highlight_front = False                                                # 'front' cells = number-labeled cells that neighbour unsolved cells, i.e. cells in x € {1,2,...8} that do not have x flags marked around them. When this is 'True', it draws a yellow rectangle around each such cell.
@@ -325,7 +325,7 @@ class Minesweeper:
             self.hit_a_mine = True
             self.game_result_counter[1] += 1
             self.handle_game_ended()
-        if self.record_losses:
+        if self.logic_testing_on:
             self.check_logic_completeness(x, y)
     
     def check_logic_completeness(self, x, y):
@@ -817,15 +817,15 @@ class Minesweeper:
 
         def write_minecount_success():
             minecount_success_surface = self.font.render(f'minecount success', True, GREEN)
-            self.screen.blit(minecount_success_surface, (self.draw_width-230, 40))
+            self.screen.blit(minecount_success_surface, (self.draw_width-230, 35))
 
         def write_p_success_front():
             p_success_surface = self.font.render(f'Front ≤ {self.solver.p_success_front} % safe', True, WHITE)
-            self.screen.blit(p_success_surface, (self.draw_width-230, 40))
+            self.screen.blit(p_success_surface, (self.draw_width-230, 55))
 
         def write_p_success_unseen():
-            p_success_surface = self.font.render(f'Other ≥ {self.solver.p_success_unseen} % safe', True, WHITE)
-            self.screen.blit(p_success_surface, (self.draw_width-230, 70))
+            p_success_surface = self.font.render(f'other ≥ {self.solver.p_success_unseen} % safe', True, WHITE)
+            self.screen.blit(p_success_surface, (self.draw_width-230, 75))
 
         def write_unclicked_cell_count():
             p_success_surface = self.font.render(f'unclicked cells: {self.n_unclicked}', True, WHITE)
@@ -869,7 +869,7 @@ class Minesweeper:
             if logic_inadequate_count != 0:
                 color = RED
             logic_error_count = self.font.render(f'missing logic: {logic_inadequate_count}', True, color)
-            self.screen.blit(logic_error_count, ((self.draw_width-550, 70)))
+            self.screen.blit(logic_error_count, ((self.draw_width-550, 50)))
 
 
         def draw_map() -> None:
@@ -910,7 +910,7 @@ class Minesweeper:
             highlight_guesses_blue()
         if self.solver.minecount_successful:                                # if minecount() in CSP_solver solved variables succesfully, then write 'minecount' in the upper bar. Else, guessing, and write that info instead.
             write_minecount_success()
-        if self.record_losses:
+        if self.logic_testing_on:
             write_missed_logic_count()
         else:
             if self.solver.p_success_front != None:                         # it can be zero!
