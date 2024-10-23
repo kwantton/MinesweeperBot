@@ -41,7 +41,7 @@ class Minesweeper:
         
         self.clock = pygame.time.Clock()
 
-        if (self.width, self.height, self.mines) == expert:
+        if (self.width, self.height, self.mines) in [expert, intermediate]:
             self.cell_size = 50-int(0.8*height)                             # how many px in height and width should each cell be?
         else:
             self.cell_size = max(18, min(50, 800 // max(width, height)))    # dynamic cell size calculation based on map dimensions
@@ -145,10 +145,10 @@ class Minesweeper:
         '''
         print("AUTOBOT LOOP")    
         while True:
+            self.check_victory()                                                # sets 'self.game_ended = True', etc
+            for event in pygame.event.get():
+                self.inspect_event(event)                                       # if you press 'a' again, this loop will break (among all the other things that are inspected in this 'inspect_event()' as well)
             if self.auto_on:                                                        # this loop itself can set it off -> break the loop, go back to 'self.loop()' instead
-                self.check_victory()                                                # sets 'self.game_ended = True', etc
-                for event in pygame.event.get():
-                    self.inspect_event(event)                                       # if you press 'a' again, this loop will break (among all the other things that are inspected in this 'inspect_event()' as well)
                 if not self.game_ended:
                     if not self.started:
                         self.handle_first_left_click(self.start_x, self.start_y)    # this also starts the timer
@@ -579,7 +579,7 @@ class Minesweeper:
                             self.probe(x, y)
                         self.solved_variables.add(((x,y), value))           # for avoiding repeating work in the future
                 if solved_vars:                                             # VERY often this finds solutions -> next round; do not use heavier machinery than needed!
-                    print('✔ OLD CSP SOLVER FOUND SOLUTIONS')
+                    print('✔ FOUND SOLUTIONS FROM OLD CSP SOLVER')
                     self.solver.guess = None                                # this is needed for chain of events logic; don't guess, if solutions were found: this is for loop checking in next phase of `bot_execute()`; only guess, `if self.solver.guess`
                     filter_front_cells()
                     return
