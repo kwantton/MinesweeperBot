@@ -22,18 +22,10 @@ class CSP_solver:
     # DNR = Do not reset! (every round of CSP_solve or every round of equation adding)
     def __init__(self):
         # DNR = do not reset every round
-        self.choice = None                                              # either 'FRONT' or 'UNSEEN'; this tells you if the next guess is located next to 'self.front' (botGame.py has 'self.front') or in the cells unseen by self.front ('unseen unclicked', please remember this term 'unseen unclicked cells', or 'uu_cells'). This is for choosing where to guessing, and for passing this info to 'botGame.py' after the choice has been made. This is also for printing in pygame.
         self.time_limit = 20                                            # NB! Here you can set max time limit for 'traverse()' in 'join_comp_groups_into_solutions()'. If no limit is set, the worst games will be killed automatically
-        self.variables = set()                                          # ALL variables, solved or not
-        self.front_guess = None                                         # the safest front guess cell is saved here for use in botGame.py
-        self.unique_equations = []                                      # { ((var1, var2, ..), sum_of_mines_in_vars), (...) }. Each var (variable) has format (x,y) of that cell's location; cell with a number label 1...8 = var. Here, I want uniqe EQUATIONS, not unique LOCATIONS, and therefore origin-(x,y) is not stored here. It's possible to get the same equation for example from two different sides, and via multiple different calculation routes, and it's of course possible to mistakenly try to add the same equation multiple times; that's another reason to use a set() here, the main reason being fast search from this hashed set.        
-        self.p_success_front = None                                     # initialize. Otherwise 'draw' section in 'pyGame.py' complains that there's no such attribute. This is the highest probability that the most safe unclicked cell next to self.front is safe (has no mine).
-        self.p_success_unseen = None                                    # initialize. Equal probability for each of the unclicked unseen cells to NOT be a mine at the moment
-        self.solved_variables = set()                                   # ((x,y), value); the name of the variable is (x,y) where x and y are its location in the minesweeper map (if applicable), and the value of the variable is either 0 or 1, if everything is ok (each variable is one cell in the minesweeper map, and its value is the number of mines in the cell; 0 or 1, that is)
-        self.minecount_successful = False                               # used in 'botGame.py' for printing 'minecount successful' when it's used. Convenient for debugging!
-        self.minecount_solved_vars = set()                              # for highlighting in botGame.py. Do NOT reset every round
-        self.impossible_combinations = set()
-        self.solved_new_vars_during_this_round = False
+        self.solved_variables = set()                                   # DNR! Do not reset. ((x,y), value); the name of the variable is (x,y) where x and y are its location in the minesweeper map (if applicable), and the value of the variable is either 0 or 1, if everything is ok (each variable is one cell in the minesweeper map, and its value is the number of mines in the cell; 0 or 1, that is)
+        self.minecount_solved_vars = set()                              # DNR! for highlighting in botGame.py. Do NOT reset every round
+        self.initialize_those_that_are_needed_in_botGame()
 
     def initialize_those_that_are_needed_in_botGame(self):
         '''Vars that however need to exist from the very beginning
@@ -622,16 +614,21 @@ class CSP_solver:
             nMinesToAltSolutions_minmines_maxmines_for_each_set = []
             eqSetPossibleSolutions_bestGuess_survivalChance = remove_empty_sets(eqSetPossibleSolutions_bestGuess_survivalChance)
             # count entire-front min and max possible minecount, and count mines of alt solutions. This is for checking if minecount is needed by 'check_minecount...()', and if it is, getting minecount-viable alt solutions (=filtering out minecount-impossible whole-front alt solutions by using summing of minecounts of eq set alt solutions).
+            highest_chance = 0
+            best_cell_to_click = None
             for eq_set, bestGuess, survivalChance in eqSetPossibleSolutions_bestGuess_survivalChance:
-                result = count_mines_of_set_alt_solutions_for_minecount_check(eq_set)
-                nMines_to_setAltSolutions, min_minecount, max_minecount = result
+                if survivalChance > highest_chance:
+                    highest_chance = survivalChance
+                    best_cell_to_click = bestGuess
+                counting_result = count_mines_of_set_alt_solutions_for_minecount_check(eq_set)
+                nMines_to_setAltSolutions, min_minecount, max_minecount = counting_result
                 largest_n_mines_in_front_alt_solutions += max_minecount
                 smallest_n_mines_in_front_alt_solutions += min_minecount
-                nMinesToAltSolutions_minmines_maxmines_for_each_set.append(result)
-            # bestGuess = ??? # TO-DO! I had forgotten this, holy shit.
+                nMinesToAltSolutions_minmines_maxmines_for_each_set.append(counting_result)
+            # TO-DO:check
             check_minecount_need_and_guess_or_minecount(nMinesToAltSolutions_minmines_maxmines_for_each_set,               # get all possible minecount sums; one for each combination of set alt solutions (one alt per separate eq set). Then inspect each corresponding solution using the machinery below, as it works (it's been tested meticulously before already)
                 smallest_n_mines_in_front_alt_solutions, largest_n_mines_in_front_alt_solutions,
-                bestGuess, survivalChance)  # these two are used in case minecount is NOT needed c: - if minecount is not needed, in English, it provides no useful information, then a GUESS is necessary.
+                best_cell_to_click, highest_chance)  # these two are used in case minecount is NOT needed c: - if minecount is not needed, in English, it provides no useful information, then a GUESS is necessary.
 
         def handle_flag_box() -> None:
             print('handle_flag_box()')
