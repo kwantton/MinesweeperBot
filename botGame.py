@@ -121,17 +121,19 @@ class Minesweeper:
         
         self.hit_a_mine = False
         self.game_ended = False
+        self.solver = CSP_solver()          # the main, all-capable solver, which is used if easier methods don't work
         self.guessed_cells = set()
         self.obsolete_front = set()         # all those members of 'self.front' that no longer have any unclicked unflagged neighbours
         
         self.solved_variables = set()                                               # needed for bookkeeping of what variables not to rehandle as solved_variables also come from CSP_solver
         self.new_front_members = set()                                              # this set is needed in 'add_new_front_cells_to_self_front()' for bookkeeping so that after iteration through 'self.front', the members of this set can be added to self.front. 'self.front' cannot be modified DURING iteration over itself, so that's why.
         
+        self.solver_old = CSP_solver_old()                                          # the old, non-complete CSP_solver, which is very fast but can't solve everything. Used before CSP_solver (the new one)
         self.finished_using_autobot = False                                         # needed for accurate choice between ms timer and standard timer in case autobot was used (=in case automatic bot playing was used)        
         self.n_unclicked = self.width * self.height
         self.solved_new_using_simple_solver = False                                 # if True, continue with simple_solver() (continue with that as long as possible, only go to CSP_solver if simple_solver() is no longer enough)
-        self.solver = CSP_solver(mines_total = self.mines)                          # minecount is needed in 'CSP_solver' in those rarish cases where information about the remaining minecount near the end of the game is needed to be able to solve the last few cases that would otherwise require guessing.
-        self.solver_old = CSP_solver_old()
+        
+        
         
         self.minecount = self.mines
         self.map = [[unclicked for x in range(self.width)] for y in range(self.infobar_height, self.height + self.infobar_height)]   # map = all the mines. Since the infobar is on top, the '0' y for mines = infobar_height. This map records the names of the images of each cell on the map.
