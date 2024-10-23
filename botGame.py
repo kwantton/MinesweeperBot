@@ -18,6 +18,7 @@ class Minesweeper:
 
     Testing of lost games: 'constraing_problem_solver_for_testing.py' which finds if logic was missed in a lost game.
     '''
+    
     def __init__(self, width, height, mines, csp_on=True, debug_csp=False, minecount_demo_number = None, 
                  logic_testing_on = False, unnecessary_guesses = False):
         pygame.init()
@@ -65,10 +66,12 @@ class Minesweeper:
         Initializes visual interface features, which are togglable by pressing buttons listed below.
         '''
         print('\ninitialize_debug_features()')
+        self.guesses = 0                                                            # keep a counter of how many guesses there were in total in all the games played so far
         if self.record_losses:
             self.missed_logic_count = 0
         self.show_mines = False
         self.highlight_front = False                                                # 'front' cells = number-labeled cells that neighbour unsolved cells, i.e. cells in x € {1,2,...8} that do not have x flags marked around them. When this is 'True', it draws a yellow rectangle around each such cell.
+        self.solved_by_minecount = 0
         self.highlight_guesses = False
         self.highlight_minecount_solved = False
         self.highlight_csp_solved = self.debug_csp
@@ -178,7 +181,7 @@ class Minesweeper:
         inspect pygame events; this is only called if there ARE pygame events
         '''
         if event.type == pygame.KEYDOWN:                                            # I have to check this first to be able to escape from the autobot loop when I so want
-            if event.key == pygame.K_q:                                             # let's have a chance to escape asap, so that this doesn't go to the bottom of the to-do list
+            if event.key == pygame.K_q:                                             # let's have a chance to escape asap, so that this doesn't go to the bottom of the list of things to do
                 exit()
             elif event.key == pygame.K_a:
                 self.auto_on = not self.auto_on
@@ -597,6 +600,8 @@ class Minesweeper:
                         elif value == 0:
                             self.probe(x, y)
                         self.solved_variables.add(((x,y), value))           # for avoiding repeating work in the future
+                if self.solver.minecount_successful:
+                    self.solved_by_minecount += 1
                 filter_front_cells()                                        # 'self.front' has to be kept up-to-date. It's simple: if a self.front member is no longer surrounded by any unclicked unflagged cells, it is no longer in self.front.
             
             def guess_preferably_uu() -> tuple:
@@ -661,9 +666,10 @@ class Minesweeper:
                 parameters: cell_to_open; can be string or tuple
                 returns:    Nothing. Performs the guessing via `probe(cell_to_open)`
                 '''
+                self.guesses += 1
                 if cell_to_open in ['pick unclicked', 'timeout']:
                     cell_to_open = pick_optimal_unclicked_unseen_cell_for_guessing()
-                if cell_to_open == None:                            # TO-DO: given everything in 'botGame' and in 'CSP_solver', this actually should never happen at this point anymore, but in case it DOES happen, then pick the safest 'self.front' cell.
+                if cell_to_open == None:
                     cell_to_open = self.solver.front_guess
                 if cell_to_open == None:                            # ONLY if I set a timeout timer in `CSP_solver`, otherwise this was never needed (not in 18 000 expert games, at least c:)
                     cell_to_open = guess_preferably_uu()            # ONLY in case of timer timeout in `CSP_solver`
@@ -708,10 +714,14 @@ class Minesweeper:
         draw everything that's needed on the screen. If certain things are highlighted, highlight those
         (highlight_front, highlight_csp_solved, etc)
         '''
+        RED = (255,0,0)
+        GREEN = (0,255,0)
+        WHITE = (255,255,255)
+        
         self.screen.fill((0,0,0))
 
         def draw_minecount() -> None:
-            minecount_surface = self.font.render(f'Mines left: {self.minecount}', True, (255,255,255))      # True is for antialiasing. White is 255,255,255
+            minecount_surface = self.font.render(f'Mines left: {self.minecount}', True, WHITE)
             self.screen.blit(minecount_surface, (10,10))
         
         def draw_timer() -> None:
@@ -730,7 +740,7 @@ class Minesweeper:
                         shown_time = f'{(ms_time / 1000):.3f} s'
                 else:
                     shown_time = f'{self.elapsed_nonbot_s:.3f} s'                                       # b after clearing the map, show exact time
-            timer_surface = self.font.render(f'Time: {shown_time}', True, (255,255,255))                # 'self.elapsed_time' is 0 by default
+            timer_surface = self.font.render(f'Time: {shown_time}', True, WHITE)                # 'self.elapsed_time' is 0 by default
             self.screen.blit(timer_surface, (10, 55))
         
         def write_ms_average():
@@ -739,9 +749,9 @@ class Minesweeper:
                 ms_time_average = self.ms_bot_time_TOTAL / n_games
                 if ms_time_average > 1000: # then show seconds, not milliseconds
                     s_time_average = ms_time_average / 1000
-                    ms_average_surface = self.font.render(f'average: {s_time_average:.3f} s/game', True, (255,255,255))                # 'self.elapsed_time' is 0 by default
+                    ms_average_surface = self.font.render(f'average: {s_time_average:.3f} s/game', True, WHITE)                # 'self.elapsed_time' is 0 by default
                 else:
-                    ms_average_surface = self.font.render(f'average: {ms_time_average:.0f} ms/game', True, (255,255,255))                # 'self.elapsed_time' is 0 by default
+                    ms_average_surface = self.font.render(f'average: {ms_time_average:.0f} ms/game', True, WHITE)                # 'self.elapsed_time' is 0 by default
                 self.screen.blit(ms_average_surface, (10, 75))
             
         def draw_victory() -> None:
@@ -753,11 +763,11 @@ class Minesweeper:
                 text = '.. and completed'                                                                   # if you hit a mine AFTER you've completed the game, acknowledge this c:
                 y = 50
                 x = self.draw_width-230
-            victory_surface = self.font.render(text, True, (0,255,0))
+            victory_surface = self.font.render(text, True, GREEN)
             self.screen.blit(victory_surface, (x, y))
         
         def draw_hit_a_mine() -> None:
-            hit_a_mine_surface = self.font.render(f'HIT A MINE!', True, (255,0,0))
+            hit_a_mine_surface = self.font.render(f'HIT A MINE!', True, RED)
             self.screen.blit(hit_a_mine_surface, (self.draw_width-230, 10))
             draw_minecount()
             draw_timer()
@@ -804,50 +814,58 @@ class Minesweeper:
                 self.screen.blit(surface, (x*self.cell_size, y*self.cell_size + self.infobar_height))
 
         def write_minecount_success():
-            minecount_success_surface = self.font.render(f'minecount success', True, (0,255,0))
+            minecount_success_surface = self.font.render(f'minecount success', True, GREEN)
             self.screen.blit(minecount_success_surface, (self.draw_width-230, 40))
 
         def write_p_success_front():
-            p_success_surface = self.font.render(f'Front ≤ {self.solver.p_success_front} % safe', True, (255,255,255))
+            p_success_surface = self.font.render(f'Front ≤ {self.solver.p_success_front} % safe', True, WHITE)
             self.screen.blit(p_success_surface, (self.draw_width-230, 40))
 
         def write_p_success_unseen():
-            p_success_surface = self.font.render(f'Other ≥ {self.solver.p_success_unseen} % safe', True, (255,255,255))
+            p_success_surface = self.font.render(f'Other ≥ {self.solver.p_success_unseen} % safe', True, WHITE)
             self.screen.blit(p_success_surface, (self.draw_width-230, 70))
 
         def write_unclicked_cell_count():
-            p_success_surface = self.font.render(f'unclicked cells: {self.n_unclicked}', True, (255,255,255))
+            p_success_surface = self.font.render(f'unclicked cells: {self.n_unclicked}', True, WHITE)
             self.screen.blit(p_success_surface, (10, 30))
 
+        def write_number_of_games_solved_by_minecount():
+            count_surface = self.font.render(f'minecount solutions: {self.solved_by_minecount}', True, WHITE)
+            self.screen.blit(count_surface, (self.draw_width-550, 10))
+        
+        def write_number_of_guesses_so_far():
+            count_surface = self.font.render(f'total guesses: {self.guesses}', True, WHITE)
+            self.screen.blit(count_surface, (self.draw_width-550, 30))
+        
         def write_choice():
             choice = 'other'
             if self.solver.choice == 'FRONT':
-                choice = 'safest cell from front'
-            choice_surface = self.font.render(f'guess: {choice}', True, (255,255,255))
+                choice = 'safest front cell'
+            choice_surface = self.font.render(f'guess: {choice}', True, WHITE)
             self.screen.blit(choice_surface, (self.draw_width-550, 50))
 
         def write_wins_and_losses():
             wins, losses = self.game_result_counter
             total = wins + losses
 
-            wins_surface = self.font.render(f'won: {wins}', True, (255,255,255))
-            losses_surface = self.font.render(f'lost:  {losses}', True, (255,255,255))
-            total_surface = self.font.render(f'games: {total}', True, (255,255,255))
+            wins_surface = self.font.render(f'won: {wins}', True, WHITE)
+            total_surface = self.font.render(f'games: {total}', True, WHITE)
+            losses_surface = self.font.render(f'lost:  {losses}', True, WHITE)
 
-            self.screen.blit(total_surface, ((300, 10)))
             self.screen.blit(wins_surface, ((300, 30)))
+            self.screen.blit(total_surface, ((300, 10)))
             self.screen.blit(losses_surface, ((300, 50)))
 
             if wins or losses:
                 percent_won = round(100 * wins / total, 1)
-                percent_won_surface = self.font.render(f'% won: {percent_won}', True, (255,255,255))
+                percent_won_surface = self.font.render(f'% won: {percent_won}', True, WHITE)
                 self.screen.blit(percent_won_surface, ((300, 70)))
         
         def write_missed_logic_count():
             logic_inadequate_count = self.missed_logic_count
-            color = (0,255,0)
+            color = GREEN
             if logic_inadequate_count != 0:
-                color = (255,0,0)
+                color = RED
             logic_error_count = self.font.render(f'missing logic: {logic_inadequate_count}', True, color)
             self.screen.blit(logic_error_count, ((self.draw_width-550, 70)))
 
@@ -861,7 +879,7 @@ class Minesweeper:
         def draw_instructions_bar() -> None:
             start_y = self.height * self.cell_size + self.infobar_height - 10
             for i, instruction in enumerate(self.instructions):                                     # it isn't possible to use a multiline text, so each instruction has to be drawn separately. For this solution, I asked ChatGPT.
-                instruction_surface = self.font.render(instruction, True, (255,255,255))
+                instruction_surface = self.font.render(instruction, True, WHITE)
                 self.screen.blit(instruction_surface, (10, start_y + i * 30))                       # draw all the instructions beneath each other
 
         if self.victory:
@@ -876,6 +894,8 @@ class Minesweeper:
         draw_instructions_bar()
         write_unclicked_cell_count()
         write_wins_and_losses()
+        write_number_of_games_solved_by_minecount()
+        write_number_of_guesses_so_far()
         if self.highlight_front:
             highlight_front_cells_yellow()
         if self.show_mines:
@@ -969,5 +989,5 @@ if __name__ == '__main__':
     ''' ↓↓↓ STARTS A NEW MINESWEEPER with the ability to play the bot by pressing b ↓↓↓ (instructions in the game) '''
     # Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=False) # IF YOU WANT ONLY simple_solver(), which WORKS at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
     #             width      height     mines
-    Minesweeper(intermediate[0], intermediate[1], intermediate[2], csp_on=True, minecount_demo_number=None, logic_testing_on=True,
-    unnecessary_guesses=False)
+    Minesweeper(expert[0], expert[1], expert[2], csp_on=True, 
+    minecount_demo_number=None, logic_testing_on=False, unnecessary_guesses=False)

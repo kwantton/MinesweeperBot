@@ -1,5 +1,5 @@
 '''to-do:
-- more tests, also on 'botGame.py' side
+- when all vars have at least 1 time as 1, and at least 1 time as 0, then you know that solutions won't come out!
 '''
 from itertools import combinations
 from time import time, sleep
@@ -268,12 +268,14 @@ class CSP_solver:
             return
         
         # (4) done: smarter solution inspection directly via var values instead of via going through every alt solution again
+        # TO-DO: when at least once 1 and at least once 0 per var for ALL vars, NO SOLUTIONS! SPEEDS UP LIKE HELL!!
         def join_comp_groups_into_solutions(compatibility_groups:dict, starting_group) -> tuple:     # also return the whole list of 'possible_whole_solutions'; it's needed IF minecount is needed. If minecount is needed
-            print('join_comp_groups_into_solutions()')
             keyVars_to_keys = keyVars_to_keys_builder(compatibility_groups)
+            print('join_comp_groups_into_solutions()')
             n_groups = len(keyVars_to_keys.keys())
             value_counts_for_each_var = dict()  # done: COUNT HERE, FOR EACH VAR, HOW MANY TIMES 0 AND HOW MANY TIMES 1 it is in minecount-OK alt solutions. SOLVES ALSO PROBLEMS REGARDING GUESSING! If the var has only 1s, then it's solved as 1. If only 0s, then it's solved as 0. Otherwise, the probability is extremely straightforward to calculate!
             possible_whole_solutions = []
+            
             n_times_traversed_for_debugging = [0]
             
             def traverse(this_alt, entered_alts_for_this_build, 
@@ -441,21 +443,25 @@ class CSP_solver:
                 certain mine counts in whole-front solution candidates ('alts') are possible, some are impossible.
                 By eliminating the impossible answers, we're left with the possible answers, and can record 
                 the number of times each variable was 1 or 0 in all these possible alt answers. Doing this,
-                I get the probability [0-100%] for each var being a mine
+                I get the probability [0-100%] for each var being a mine.
                 '''
 
+                seen_var_values = set()                                                         # {(a,0),(a,1), (b,0), (b,1), ....} - once every variable has both 0 and 1, YOU KNOW THAT A SOLUTION FOR A VAR DOESN'T EXIST! -> stop solving
+                no_vars_were_solved = False
                 value_counts_for_each_var = dict()  # COUNT HERE, FOR EACH VAR, HOW MANY TIMES 0 AND HOW MANY TIMES 1 it is in minecount-OK alt solutions. SOLVES ALSO PROBLEMS REGARDING GUESSING! If the var has only 1s, then it's solved as 1. If only 0s, then it's solved as 0. Otherwise, the probability is extremely straightforward to calculate!
                 n_sets = len(sets_nMinesToAltsolutions_minmines_maxmines)                                     # for checking if 'index' has reached the end; for building entire solutions
 
                 # 'current_build' can be a list, the indices of which will tell, what the original set was; if the whole build is ok, then to each separate eq_set_ok_alts, add the ok alt solution of that set. Why: most importantly, combined to whole-front alt solution combination building, this enables (1) usage of 'handle_possible_whole_solutions' for every SEPARATED set on their own, (2) it's using the already-built minecount dictionaries per separated set pretty efficiently, reducing work further; discarding bad whole solutions is done based on sums alone, not needing to build and count every whole-front solution first. Downside; I'll have to make adjustments to the probability calculations of 'handle_possible_whole_solutions()', tracking global max probability of not being a mine, and whatnot, iterating the process for every alt set.
                 def alt_solution_minecount_build_and_check(current_build:list, 
-                    current_sum:int, current_index:int) -> None:
+                    current_sum:int, current_index:int, no_solved_vars:bool) -> None:
 
                     if current_sum > n_mines_remaining:                                                     # if the current sum of mines in the current build so far exceeds the number of mines remaining in the map at the moment, the the current build is impossible - stop building it.
-                        return
+                        return no_solved_vars
+                    if no_solved_vars:                                                           # good: saves work. Bad: worse guessing (could be very misleading)
+                        return no_solved_vars
                     if current_index == n_sets:
                         if current_sum + number_of_unclicked_unseen_cells < n_mines_remaining:              # Example: 8a. Any alt for which this happens is impossible. The max number of mines in 'unclicked unseen cells' is the number of those cells. So if this alt solution + that is less than the actual remaining minecount, then it's impossible
-                            return # impossible whole-alt; too few mines
+                            return no_solved_vars # impossible whole-alt; too few mines
                         else:
                             # -> this front alt (whole-alt) is minecount-ok -> record the values of variables
                             for index in range(n_sets):
@@ -467,6 +473,12 @@ class CSP_solver:
                                         value_counts_for_each_var[var][0] += 1
                                     else:
                                         value_counts_for_each_var[var][1] += 1
+                                    seen_var_values.add((var, value))
+                                    if len(seen_var_values) == 2 * len(self.variables):
+                                        no_solved_vars = True
+                                        print('COOL WARNING!!!!!!!!!!!!!!!!\n!!!!!!!!!!!!!!!!!!!!!!!!\!!!!!!!!!!!!!!!!!!!!!!!!!!\nEVERY VAR IS 1 or 0, no_solved_vars = True!')
+                                        sleep(60)
+                                
                     else:
                         next_set_nMines_to_altSolutions_minmines_maxmines = sets_nMinesToAltsolutions_minmines_maxmines[current_index] # the 'current_index' starts from 1, so this is not +1!
                         next_set_nMines_to_setAltSolutions, next_set_minmines, next_set_maxmines = next_set_nMines_to_altSolutions_minmines_maxmines
@@ -481,12 +493,16 @@ class CSP_solver:
                                 new_build = current_build.copy()
                                 new_build.append(next_set_altSolution)
                                 alt_solution_minecount_build_and_check(current_build = new_build, 
-                                    current_sum = current_sum + next_set_nMines, current_index = current_index + 1)
+                                    current_sum = current_sum + next_set_nMines, current_index = current_index + 1,
+                                    no_solved_vars = no_solved_vars)
+                    return no_solved_vars
 
                 # for nMines_to_setAltSolutions, min_minecount, max_minecount in alt_set_SolutionsMinminesMaxmines:
                 first_set_nMines_to_altSolutions_minmines_maxmines = sets_nMinesToAltsolutions_minmines_maxmines[0] # each index, like this first one [0], in this list is all the altSolutionsMinminexMaxmines for that set; a triple (altSolutions, Minmines, Maxmines) for that eq set. All the altSolutions are in [0] of that triple.
                 set_1_nMines_to_setAltSolutions, set_1_minmines, set_1_maxmines = first_set_nMines_to_altSolutions_minmines_maxmines
                 for nMines, set_1_altSolutions_with_nMines in set_1_nMines_to_setAltSolutions.items():
+                    if no_vars_were_solved:                                       # True, if len(seen_var_values) == 2 * len(self.variables); it means that every var can be 0 or 1 -> no solutions for any var are coming out. Bad side of breaking here; the prob calc will NOT be perfect! It can actually be very bad in the worst cases!
+                        break
                     if only_min_ok:
                         if nMines != set_1_minmines:
                             continue
@@ -494,8 +510,10 @@ class CSP_solver:
                         if nMines != set_1_maxmines:
                             continue
                     for set_1_altSolution_with_nMines in set_1_altSolutions_with_nMines:
-                        alt_solution_minecount_build_and_check(current_build = [set_1_altSolution_with_nMines], 
-                            current_sum = nMines, current_index = 1)
+                        if no_vars_were_solved:
+                            break
+                        no_vars_were_solved = alt_solution_minecount_build_and_check(current_build = [set_1_altSolution_with_nMines], 
+                            current_sum = nMines, current_index = 1, no_solved_vars = False)
                 return value_counts_for_each_var
 
             # let's check the convenient cases first - it saves a lot of work with little cost, if one of these two is true
@@ -508,25 +526,24 @@ class CSP_solver:
                         self.minecount_successful = True
                         self.solved_variables.add((cell, 0))
                         self.minecount_solved_vars.add((cell, 0))
-                        self.solved_new_vars_during_this_round = True
             elif largest_n_mines_in_front_alt_solutions + number_of_unclicked_unseen_cells == n_mines_remaining:    # -> every unseen cell must be a mine, see below comment. So: there can be 0 uu_cells. If that's the case, this is true. If there are more than 0 uu_cells, this is STILL true. This is because of the ' + n_uu_cells' here.
                 only_max_sum_is_ok = True
                 if number_of_unclicked_unseen_cells > 0:
                     for cell in unclicked_unseen_cells:
                         self.minecount_successful = True
-                        self.solved_variables.add((cell, 1))                            # if the number of unclicked unseen + max number of mines encountered in any alt solution == currently remaining minecount, then every single cell in unclicked unseen cells must have a mine. I met one such situation in a random game.
+                        self.solved_variables.add((cell, 1))                                # if the number of unclicked unseen + max number of mines encountered in any alt solution == currently remaining minecount, then every single cell in unclicked unseen cells must have a mine. I met one such situation in a random game.
                         self.minecount_solved_vars.add((cell, 1))
-                        self.solved_new_vars_during_this_round = True
-            if self.solved_new_vars_during_this_round:
-                self.minecount_successful = True    
-                print("✔ FOUND SOLUTIONS FROM EARLY MINECOUNT")                            # it's possibly much faster to return already at this point. During the next round, you can solve more possibly much faster thanks to the new solutions
+            if self.minecount_successful:                                                   # at THIS point, true only if (1) only min ok or only max ok AND (2) there were uu_cells above. Otherwise, have to perform heavier minecount inspection below.
+                self.solved_new_vars_during_this_round = True
+                print("✔ FOUND SOLUTIONS FROM SIMPLE MINECOUNT")                           # it's highly likely much faster to return already at this point. During the next round, you can solve more possibly much faster thanks to the new solutions
+                # sleep(10)
                 return
             if (largest_n_mines_in_front_alt_solutions < n_mines_remaining) and not only_max_sum_is_ok:
                 print("GUESSING, minecount would not help here")
                 choose_best_guess(naive_safest_guess = best_guess, 
                     min_n_mines_in_front = smallest_n_mines_in_front_alt_solutions, best_front_chance = survival_chance)
                 return
-            print("Minecount filtering of alt solutions is needed")
+            print("Minecount filtering of alt solutions is needed: filtering out alt solutions with impossible minecount....")
 
             if only_min_sum_is_ok:
                 value_counts_for_each_var = count_front_sums_to_get_ok_set_alts(only_min_ok = True)
