@@ -331,7 +331,7 @@ class Minesweeper:
         self.missed_logic_count += check_if_solutions_were_missed_in_lost_game(self.last_lost_game, 
             remaining_mines_in_map=self.minecount, all_vars_in_remaining_map=self.get_all_unclicked_cells(), x=x, y=y)
         if self.missed_logic_count:
-            self.auto_on = False    # STOP so I could see what happened. Never happened so far (luckily c:) but this would be very handy in case logic was missed! I could look at the game and see what was missing, dang convenient.
+            self.auto_on = False    # STOP so I could see what happened. Never happened so far (luckily c:) but this would be very handy in case logic was missed! Also, very handy when running with 'unnecessary_guesses = True' for testing of the tester 'constraint_problem....py'. Then you can directly look at the game and see what went wrong / where the unnecessary guess was, which is very convenient.
             self.perpetual = False
     
     def save_lost_game_equations_for_inspection(self) -> None:
@@ -969,5 +969,5 @@ if __name__ == '__main__':
     ''' ↓↓↓ STARTS A NEW MINESWEEPER with the ability to play the bot by pressing b ↓↓↓ (instructions in the game) '''
     # Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=False) # IF YOU WANT ONLY simple_solver(), which WORKS at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
     #             width      height     mines
-    Minesweeper(expert[0], expert[1], expert[2], csp_on=True, minecount_demo_number=None, logic_testing_on=True,
+    Minesweeper(intermediate[0], intermediate[1], intermediate[2], csp_on=True, minecount_demo_number=None, logic_testing_on=True,
     unnecessary_guesses=False)
