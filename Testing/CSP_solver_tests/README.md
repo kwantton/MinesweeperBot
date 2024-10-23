@@ -1,0 +1,1 @@
+The actual tests for the new `CSP_solver` and the old `CSP_solver` (both are used, btw) are in the root folder, because that way they can be more conveniently imported in **CSP_solver.py** and in **CSP_solver_old.py**, respectively.
