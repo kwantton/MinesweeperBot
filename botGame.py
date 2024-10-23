@@ -147,10 +147,10 @@ class Minesweeper:
         '''
         print("AUTOBOT LOOP")    
         while True:
-            self.check_victory()                                                # sets 'self.game_ended = True', etc
-            for event in pygame.event.get():
-                self.inspect_event(event)                                       # if you press 'a' again, this loop will break (among all the other things that are inspected in this 'inspect_event()' as well)
             if self.auto_on:                                                        # this loop itself can set it off -> break the loop, go back to 'self.loop()' instead
+                self.check_victory()                                                # sets 'self.game_ended = True', etc
+                for event in pygame.event.get():
+                    self.inspect_event(event)                                       # if you press 'a' again, this loop will break (among all the other things that are inspected in this 'inspect_event()' as well)
                 if not self.game_ended:
                     if not self.started:
                         self.handle_first_left_click(self.start_x, self.start_y)    # this also starts the timer
@@ -177,7 +177,6 @@ class Minesweeper:
                     self.draw_display()
             else:
                 break                                                               # go back to 'self.loop()' instead, when not 'self.autobot'
-
     def inspect_event(self, event) -> None:
         '''
         inspect pygame events; this is only called if there ARE pygame events
