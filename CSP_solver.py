@@ -356,27 +356,26 @@ class CSP_solver:
             return possible_whole_solutions, best_bet, highest_survival_rate_in_front_cells
 
         # (6) guess if needed. NB! this 'best' guess considers this round only; it doesn't take into account what will happen later
-        def choose_best_guess(naive_safest_guess, min_n_mines_in_front, best_front_chance, 
-            max_n_mines_in_front):
+        def choose_best_guess(naive_safest_guess, min_n_mines_in_front:int, best_front_chance:float, 
+            max_n_mines_in_front:int) -> None:
             print('choose_best_guess():')                                       # NB! This can happen both before it's known if a guess is actually needed (before minecount check, which checks if minecount would be useful, because performing this function is very quick and convenient), and AFTER minecount, if we know that guessing is ABSOLUTELY needed as minecount didn't help. That is; this function is called either 0, 1 or 2 times per round of 'absolut_brut()'. If it happens 2 times, it is KNOWN that these results will be used for guessing. If 1 time, then either they are used (if minecount isn't useful) or not (if minecount IS useful and provides answers)
 
             self.choice = 'FRONT'                                               # default
             self.guess = naive_safest_guess                                     # default. The below might be false -> the default stays.
             self.front_guess = naive_safest_guess                               # as a backup to 'botGame.py' in case there are no unseen cells at all
-            if number_of_unclicked_unseen_cells > 0:                            # Can't guess unseen cell if there are no unseen unclicked cells.
+            if number_of_unclicked_unseen_cells > 0:                            # Can't guess unseen cell if there are no unseen unclicked cells. Also would divide by zero.
                 unclicked_unseen_cell_safety_in_WORST_scenario = 100 - (100 *(n_mines_remaining - min_n_mines_in_front) / number_of_unclicked_unseen_cells)  # 100 - percent mine density in unclicked unseen cells in the case that there's the min possible number of mines remaining in self.front. A good question is which is the best; using the min n mines in front, or average, or max?
                 unclicked_unseen_cell_safety_in_BEST_scenario = 100 - (100 *(n_mines_remaining - max_n_mines_in_front) / number_of_unclicked_unseen_cells)  # 100 - percent mine density in unclicked unseen cells in the case that there's the max possible number of mines remaining in self.front
                 AVERAGE_uu_cell_safety = (unclicked_unseen_cell_safety_in_WORST_scenario + unclicked_unseen_cell_safety_in_BEST_scenario) / 2
-                if best_front_chance < unclicked_unseen_cell_safety_in_BEST_scenario:
+                if best_front_chance < AVERAGE_uu_cell_safety:
                     self.guess = "pick unclicked"                               # for guessing. If 'unclicked' cells have the lowest mine density, then guess there. 
                     self.choice = 'UNSEEN'
-                self.p_success_unseen = round(unclicked_unseen_cell_safety_in_BEST_scenario, 1)
+                self.p_success_unseen = round(AVERAGE_uu_cell_safety, 1)
                 if self.p_success_unseen < 0:
-                    # Note: this CAN be negative especially if using the absolute worst-case scenario (highest possible mine density in uu_cells) regarding uu_cell mine density (the -x then means that the worst case scenarios are impossible in that situation, naturally)! Reason: notice the 'MIN' in 'min_n_mines_in_front'? This assumes there's MAX POSSIBLE mine density in uu cells -> in worst cases, negative probability because of the way I count this probability: `unclicked_unseen_cell_safety_in_worst_scenario = 100 - (100 *(n_mines_remaining - min_n_mines_in_front) / number_of_unclicked_unseen_cells)  which is 100 - percent mine density in unclicked unseen cells in the case that there's the minimum possible number of mines remaining in self.front. In cases where minecount doesn't exactly tell how many mines are in uu cells, it's possible that the min n mines IS INDEED negative, BUT still taking that into account doesn't lead to new absolute solutions for any variable -> this guessing is called -> a negative number can be printed here, because I'm using the WORST CASE SCENARIO. That's why "≥" is written in the game in showing the uu probability ('uu prob ≥ x', written as 'other ≥ x' in the game)! Yes, this is complicated, sorry.
-                    print("worst case p_success_unseen < 0:", self.p_success_unseen)
+                    print("p_success_unseen < 0:", self.p_success_unseen)       # Note: this CAN be negative especially if using the absolute worst-case scenario (highest possible mine density in uu_cells) regarding uu_cell mine density (the -x then means that the worst case scenarios are impossible in that situation, naturally)! Reason: notice the 'MIN' in 'min_n_mines_in_front'? This assumes there's MAX POSSIBLE mine density in uu cells -> in worst cases, negative probability because of the way I count this probability: `unclicked_unseen_cell_safety_in_worst_scenario = 100 - (100 *(n_mines_remaining - min_n_mines_in_front) / number_of_unclicked_unseen_cells)  which is 100 - percent mine density in unclicked unseen cells in the case that there's the minimum possible number of mines remaining in self.front. In cases where minecount doesn't exactly tell how many mines are in uu cells, it's possible that the min n mines IS INDEED negative, BUT still taking that into account doesn't lead to new absolute solutions for any variable -> this guessing is called -> a negative number can be printed here, because I'm using the WORST CASE SCENARIO. That's why "≥" is written in the game in showing the uu probability ('uu prob ≥ x', written as 'other ≥ x' in the game)! Yes, this is complicated, sorry.
                     self.p_success_unseen = 0                                   # this is true, as negative probs are not real. This is not error patching: see my comment above (this assumes highest uu cell mine density, that's why negative values are possible in cases where min n mines in front still has room for more mines even after every uu cell is mined; 'leftovers' in the highest uu cell mine density cases -> negative prob)
                     # sleep(10) # I wanted to inspect these cases, they are ok. Read the comment above, 'Note: ...'
-                print("- p_success(unseen) ≥", self.p_success_unseen, '%')
+                print("- p_success(unseen) ≈", self.p_success_unseen, '%')
             self.p_success_front = round(best_front_chance, 1)
             print('- p_success(front)  ≤', self.p_success_front, '%')
             print('- guess:', self.choice)
@@ -458,17 +457,17 @@ class CSP_solver:
                 '''
 
                 seen_var_values = set()                                                         # {(a,0),(a,1), (b,0), (b,1), ....} - once every variable has both 0 and 1, YOU KNOW THAT A SOLUTION FOR A VAR DOESN'T EXIST! -> stop solving
-                no_vars_were_solved = [False]                                                   # to enable changing this from 'alt_solution_minecount_build_and_check()' without return every time, I'm putting the boolean in a list. The LIST ITSELF is NOT needed per se; it's just convenient here!
+                no_vars_were_solved = [False]                                                   # to enable changing this from 'alt_solution_minecount_build_and_check()' without return every time, I'm putting the boolean in a list. The LIST ITSELF is NOT needed per se; it's just convenient here! Lists are mutable in Python so this 'original' is also changed when the recursions below change it -> no need for a million 'return no_vars_were_solved'
                 value_counts_for_each_var = dict()  # COUNT HERE, FOR EACH VAR, HOW MANY TIMES 0 AND HOW MANY TIMES 1 it is in minecount-OK alt solutions. SOLVES ALSO PROBLEMS REGARDING GUESSING! If the var has only 1s, then it's solved as 1. If only 0s, then it's solved as 0. Otherwise, the probability is extremely straightforward to calculate!
-                n_sets = len(sets_nMinesToAltsolutions_minmines_maxmines)                                     # for checking if 'index' has reached the end; for building entire solutions
+                n_sets = len(sets_nMinesToAltsolutions_minmines_maxmines)                       # for checking if 'index' has reached the end; for building entire solutions
 
                 # 'current_build' can be a list, the indices of which will tell, what the original set was; if the whole build is ok, then to each separate eq_set_ok_alts, add the ok alt solution of that set. Why: most importantly, combined to whole-front alt solution combination building, this enables (1) usage of 'handle_possible_whole_solutions' for every SEPARATED set on their own, (2) it's using the already-built minecount dictionaries per separated set pretty efficiently, reducing work further; discarding bad whole solutions is done based on sums alone, not needing to build and count every whole-front solution first. Downside; I'll have to make adjustments to the probability calculations of 'handle_possible_whole_solutions()', tracking global max probability of not being a mine, and whatnot, iterating the process for every alt set.
                 def alt_solution_minecount_build_and_check(current_build:list, 
                     current_sum:int, current_index:int, no_vars_were_solved:list) -> None:
 
-                    if current_sum > n_mines_remaining:                                                     # if the current sum of mines in the current build so far exceeds the number of mines remaining in the map at the moment, the the current build is impossible - stop building it.
+                    if current_sum > n_mines_remaining:                                         # if the current sum of mines in the current build so far exceeds the number of mines remaining in the map at the moment, the the current build is impossible - stop building it.
                         return
-                    if no_vars_were_solved[0]:                                                           # good: saves work. Bad: worse guessing (could be very misleading)
+                    if no_vars_were_solved[0]:                                                  # good: saves a LOT of work in big cases. Bad: worse guessing (could be misleading), which I'm alleviating by not breaking the chain right away, only before the next alt solution build
                         return
                     if current_index == n_sets:
                         if current_sum + number_of_unclicked_unseen_cells < n_mines_remaining:              # Example: 8a. Any alt for which this happens is impossible. The max number of mines in 'unclicked unseen cells' is the number of those cells. So if this alt solution + that is less than the actual remaining minecount, then it's impossible
@@ -487,8 +486,8 @@ class CSP_solver:
                                     seen_var_values.add((var, value))
                             if len(seen_var_values) == 2 * len(self.variables):
                                 no_vars_were_solved[0] = True
-                                print('⇒ EVERY VAR can be either 1 or 0 in at least one viable solution -> no absolutely solved vars') # this has not happened yet elsewhere than in the CSP_solver tests, which I'm sad bout :c would be cool
-                                # sleep(10) # I just wanna see this, haven't seen yet elsewhere than in a specific test for CSP_solver where no solutions are expected (so that works as expected, that's good). But Why haven't I seen this IRL? It's weird. Could imply an actual bug!
+                                print('⇒ EVERY VAR can be either 1 or 0 in at least one viable solution -> no absolutely solved vars') # I've seen this many times in the console, it works c:
+                                # sleep(10) # If you wanna see it, when this happens and the above comment is printed, just push i+a again to stop and see what the situation looks like
                                 
                     else:
                         next_set_nMines_to_altSolutions_minmines_maxmines = sets_nMinesToAltsolutions_minmines_maxmines[current_index] # the 'current_index' starts from 1, so this is not +1!

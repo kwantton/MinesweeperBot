@@ -121,6 +121,7 @@ class Minesweeper:
         
         self.hit_a_mine = False
         self.game_ended = False
+        self.latest_guess = None
         self.solver = CSP_solver()          # the main, all-capable solver, which is used if easier methods don't work
         self.guessed_cells = set()
         self.obsolete_front = set()         # all those members of 'self.front' that no longer have any unclicked unflagged neighbours
@@ -132,8 +133,6 @@ class Minesweeper:
         self.finished_using_autobot = False                                         # needed for accurate choice between ms timer and standard timer in case autobot was used (=in case automatic bot playing was used)        
         self.n_unclicked = self.width * self.height
         self.solved_new_using_simple_solver = False                                 # if True, continue with simple_solver() (continue with that as long as possible, only go to CSP_solver if simple_solver() is no longer enough)
-        
-        
         
         self.minecount = self.mines
         self.map = [[unclicked for x in range(self.width)] for y in range(self.infobar_height, self.height + self.infobar_height)]   # map = all the mines. Since the infobar is on top, the '0' y for mines = infobar_height. This map records the names of the images of each cell on the map.
@@ -675,6 +674,7 @@ class Minesweeper:
                 if cell_to_open == None:                            # ONLY if I set a timeout timer in `CSP_solver`, otherwise this was never needed (not in 18 000 expert games, at least c:)
                     cell_to_open = guess_preferably_uu()            # ONLY in case of timer timeout in `CSP_solver`
                 self.guessed_cells.add(cell_to_open)
+                self.latest_guess = cell_to_open                    # for highlighting the LATEST guess also, very convenient for seeing what just happened
                 self.probe(x=cell_to_open[0], y=cell_to_open[1])
             
             def bot_execute():
@@ -810,9 +810,15 @@ class Minesweeper:
                 pass
 
         def highlight_guesses_blue() -> None:
-            surface = transparent_highlight_surface(0,0,255,128)
+            guess_surface = transparent_highlight_surface(0,0,255,128)
+            latest_guess_surface = transparent_highlight_surface(255,255,0,150)
             for x,y in self.guessed_cells:
-                self.screen.blit(surface, (x*self.cell_size, y*self.cell_size + self.infobar_height))
+                if (x,y) != self.latest_guess:
+                    self.screen.blit(guess_surface, (x*self.cell_size, y*self.cell_size + self.infobar_height))
+            if self.latest_guess:
+                # if self.latest_guess not in self.mine_locations:                                    # it looks ugly if the mine is red + blue + green, almost opaque and weird
+                    self.screen.blit(latest_guess_surface, 
+                    (self.latest_guess[0]*self.cell_size, self.latest_guess[1]*self.cell_size + self.infobar_height))
 
         def write_minecount_success():
             minecount_success_surface = self.font.render(f'minecount success', True, GREEN)
@@ -823,7 +829,7 @@ class Minesweeper:
             self.screen.blit(p_success_surface, (self.draw_width-230, 55))
 
         def write_p_success_unseen():
-            p_success_surface = self.font.render(f'other ≥ {self.solver.p_success_unseen} % safe', True, WHITE)
+            p_success_surface = self.font.render(f'other ~ {self.solver.p_success_unseen} % safe', True, WHITE)
             self.screen.blit(p_success_surface, (self.draw_width-230, 75))
 
         def write_unclicked_cell_count():
