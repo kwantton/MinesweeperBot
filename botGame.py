@@ -139,6 +139,11 @@ class Minesweeper:
 
         self.reset_timer_vars()
 
+    def reset_vars_at_start_of_bot_execute(self):
+        self.solver.guess = None
+        self.solved_new_using_simple_solver = False                                 # if True, continue with simple_solver() (continue with that as long as possible, only go to CSP_solver if simple_solver() is no longer enough)
+        
+
     def autobot_loop(self) -> None:
         '''
         this loop is performed ~'instead of' the normal 'self.loop()' if you press 'i' in the interface. This
@@ -334,7 +339,7 @@ class Minesweeper:
         self.missed_logic_count += check_if_solutions_were_missed_in_lost_game(self.last_lost_game, 
             remaining_mines_in_map=self.minecount, all_vars_in_remaining_map=self.get_all_unclicked_cells(), x=x, y=y)
         if self.missed_logic_count:
-            self.auto_on = False    # STOP so I could see what happened. Never happened so far (luckily c:) but this would be very handy in case logic was missed! Also, very handy when running with 'unnecessary_guesses = True' for testing of the tester 'constraint_problem....py'. Then you can directly look at the game and see what went wrong / where the unnecessary guess was, which is very convenient.
+            self.auto_on = False    # STOP so I could see what happened. Never happened so far (luckily c:) but this would be very handy in case logic was missed! Also, this IS very handy when running with 'unnecessary_guesses = True' for testing of the tester 'constraint_problem....py'. Then you can directly look at the game and see what went wrong / where the unnecessary guess was.
             self.perpetual = False
     
     def save_lost_game_equations_for_inspection(self) -> None:
@@ -446,9 +451,6 @@ class Minesweeper:
     def bot_act(self) -> None:                                                              # before this, if started with 'b', there's been in order (1) 'self.handle_first_left_click()' (2) 'self.generate_map()' (3) 'self.probe()'
         # print('\nbot_act():')                                                             # the following prints will be '- something', '- something_else'. I like this way of console printing because it makes it faster to search for the useful stuff at a given moment in the console, and makes it clear which print originates from which function.
         
-        width = self.width
-        height = self.height
-        
         def brain() -> None:
 
             def remove_obsolete_front() -> None:
@@ -478,7 +480,6 @@ class Minesweeper:
                         if (x,y) in self.front:
                             self.obsolete_front.add((x,y))
                 remove_obsolete_front()
-            
             
 
             def check_minecount_zero() -> None:
@@ -559,17 +560,20 @@ class Minesweeper:
                 self.solver_old.reset_all()                                                             # reset all before new round
                 self.solver_old.add_equations_if_new(csp_solver_input)
 
-            def csp_solve():
+            def csp_solve() -> bool:
                 '''
-                This uses the `CSP_solver` class! This is used if `simple_solver()` wasn't enough.
+                This uses the `CSP_solver_old` and `CSP_solver` classes. 
+                If `simple_solver()` wasn't enough, CSP_solver_old is used.
+                If CSP_solver_old wasn't enough, CSP_solver is used.
                 The solving functionality is in `CSP_solver.absolut_brut()`, and the instance
                 of `CSP_solver` used is here the variable 'self.solver'. So
                 `self.solver.absolut_brut()` is called with the necessary parameters
                 '''
                 print('\ncsp_solve():')
 
+                solved_new_using_old_csp = False
                 self.solver_old.factor_one_binary_solve()
-                solved_vars = self.solver_old.solved_variables                  # set of tuples: each is a tuple ((x,y), value)
+                solved_vars = self.solver_old.solved_variables              # set of tuples: each is a tuple ((x,y), value)
                 
                 for (x,y), value in solved_vars:
                     if ((x,y), value) not in self.solved_variables:         # avoid repeating already-done work
@@ -578,11 +582,11 @@ class Minesweeper:
                         elif value == 0:
                             self.probe(x, y)
                         self.solved_variables.add(((x,y), value))           # for avoiding repeating work in the future
-                if solved_vars:                                             # VERY often this finds solutions -> next round; do not use heavier machinery than needed!
+                        solved_new_using_old_csp = True
+                if solved_new_using_old_csp:                                  # VERY often this finds solutions -> next round; do not use heavier machinery than needed!
                     print('✔ FOUND SOLUTIONS FROM OLD CSP SOLVER')
-                    self.solver.guess = None                                # this is needed for chain of events logic; don't guess, if solutions were found: this is for loop checking in next phase of `bot_execute()`; only guess, `if self.solver.guess`
                     filter_front_cells()
-                    return
+                    return solved_new_using_old_csp
 
                 all_unclicked_cells = self.get_all_unclicked_cells()
                 unclicked_unseen_cells = get_unclicked_unseen_cells()
@@ -593,6 +597,7 @@ class Minesweeper:
                     unclicked_unseen_cells = unclicked_unseen_cells,        # unclicked cells that are not neighbours of 'self.front'
                     number_of_unclicked_unseen_cells = n_unclicked_unseen_cells)    # the number of the cells above
                 solved_vars = self.solver.solved_variables                  # set of tuples: each is a tuple ((x,y), value)
+                solved_new = False
                 for (x,y), value in solved_vars:
                     if ((x,y), value) not in self.solved_variables:         # avoid repeating already-done work
                         if value == 1:
@@ -600,9 +605,11 @@ class Minesweeper:
                         elif value == 0:
                             self.probe(x, y)
                         self.solved_variables.add(((x,y), value))           # for avoiding repeating work in the future
+                        solved_new = True
                 if self.solver.minecount_successful:
                     self.solved_by_minecount += 1
                 filter_front_cells()                                        # 'self.front' has to be kept up-to-date. It's simple: if a self.front member is no longer surrounded by any unclicked unflagged cells, it is no longer in self.front.
+                return solved_new
             
             def guess_preferably_uu() -> tuple:
                 '''
@@ -618,7 +625,7 @@ class Minesweeper:
                     for y in range (self.height):
                         if self.map[y][x] == unclicked:
                             return x,y
-            
+
             def pick_optimal_unclicked_unseen_cell_for_guessing() -> tuple:
                 '''
                 returns:    the cell (can be string or tuple!) which should be guessed next 
@@ -676,7 +683,7 @@ class Minesweeper:
                 self.guessed_cells.add(cell_to_open)
                 self.latest_guess = cell_to_open                    # for highlighting the LATEST guess also, very convenient for seeing what just happened
                 self.probe(x=cell_to_open[0], y=cell_to_open[1])
-            
+
             def bot_execute():
                 '''
                 ACTUAL BOT LOGIC EVENT CHAIN IS HERE: this performes the above functions in order.
@@ -685,6 +692,7 @@ class Minesweeper:
                 `CSP_solver` as much as possible. It's also cooler to look on the screen as the bot plays in
                 smaller increments this way.
                 '''
+                self.reset_vars_at_start_of_bot_execute()                 # resets 'self.solved_new_using_simple_solver', self.solver.guess
                 simple_solver()
 
                 if self.solved_new_using_simple_solver:                 # IF 'simple_solver()' IS ENOUGH, DO NOT PROCEED FURTHER! Only use the heavier machinery (csp_solve()) if necessary.
@@ -694,14 +702,15 @@ class Minesweeper:
                 if self.debug_csp:
                     self.draw_display()
 
-                feed_csp_solver()
-                
+                feed_csp_solver()                                       # this also resets all old csp solver vars
+
                 if self.csp_on:                                         # (1) it uses self.solver_old, and if that doesn't help (incomplete logic), then self.solver, which is capable of solving everything and calculating probabilities, but it's slower
-                    csp_solve()
-                
-                if self.solver.guess or self.unnecessary_guesses:              # (1) NORMAL USAGE: if CSP_solver has not managed to solve any new variables with 100% certainty ('normal' logic OR minecounting logic), THEN guess. This info is directly obtained from 'self.solver', as you can see (`if self.solver.guess`) (2) TESTING TESTING USAGE: if `self.unnecessary_guesses`, then guesses are done -> the lost game missed logic tester in 'constraint_problem_solver_for_testing.py' will notice that missing logic was found, and the 'missing_logic' counter will increase and turn red, proving that it works. Awesome!
+                    new_vars_solved = csp_solve()
+
+                if (self.solver.guess and not new_vars_solved) or self.unnecessary_guesses:       # (1) NORMAL USAGE: if CSP_solver has not managed to solve any new variables with 100% certainty ('normal' logic OR minecounting logic), THEN guess. This info is directly obtained from 'self.solver', as you can see (`if self.solver.guess`) (2) TESTING TESTING USAGE: if `self.unnecessary_guesses`, then guesses are done -> the lost game missed logic tester in 'constraint_problem_solver_for_testing.py' will notice that missing logic was found, and the 'missing_logic' counter will increase and turn red, proving that it works. Awesome!
                     guess(self.solver.guess)                            # 'self.solver.guess' is the variable that had the highest probability of NOT being a mine (as of 12.10.2024 at least)
-            
+                    self.solver.guess = None                            # so that it doesn't keep repeating forever and ever
+
             bot_execute()
 
         def flag_these(cells) -> None:                              # NB! this ensures that a flag is placed in all, only when appropriate
@@ -718,13 +727,13 @@ class Minesweeper:
         RED = (255,0,0)
         GREEN = (0,255,0)
         WHITE = (255,255,255)
-        
+
         self.screen.fill((0,0,0))
 
         def draw_minecount() -> None:
             minecount_surface = self.font.render(f'Mines left: {self.minecount}', True, WHITE)
             self.screen.blit(minecount_surface, (10,10))
-        
+
         def draw_timer() -> None:
             if not self.started:
                 shown_time = '0'
@@ -743,7 +752,7 @@ class Minesweeper:
                     shown_time = f'{self.elapsed_nonbot_s:.3f} s'                                       # b after clearing the map, show exact time
             timer_surface = self.font.render(f'Time: {shown_time}', True, WHITE)                # 'self.elapsed_time' is 0 by default
             self.screen.blit(timer_surface, (10, 55))
-        
+
         def write_ms_average():
             n_games = sum(self.game_result_counter)
             if n_games:
@@ -754,7 +763,7 @@ class Minesweeper:
                 else:
                     ms_average_surface = self.font.render(f'average: {ms_time_average:.0f} ms/game', True, WHITE)                # 'self.elapsed_time' is 0 by default
                 self.screen.blit(ms_average_surface, (10, 75))
-            
+
         def draw_victory() -> None:
             if not self.hit_a_mine:
                 text = 'MAP CLEARED!'
@@ -766,7 +775,7 @@ class Minesweeper:
                 x = self.draw_width-230
             victory_surface = self.font.render(text, True, GREEN)
             self.screen.blit(victory_surface, (x, y))
-        
+
         def draw_hit_a_mine() -> None:
             hit_a_mine_surface = self.font.render(f'HIT A MINE!', True, RED)
             self.screen.blit(hit_a_mine_surface, (self.draw_width-230, 10))
@@ -777,7 +786,7 @@ class Minesweeper:
             highlight_surface = pygame.Surface((self.cell_size, self.cell_size), pygame.SRCALPHA)           # I want to have alpha for the highlights so they don't cover everything. For this, I asked ChatGPT
             highlight_surface.fill((r,g,b,a))                                                               # R,G,B,alpha. Asked ChatGPT to get the alpha
             return highlight_surface
-        
+
         def highlight_front_cells_yellow() -> None:                                                         # highlight yellow every cell that's in 'self.front'. This is for visualization and debugging in the bot_logic development                  
             surface = transparent_highlight_surface(255,255,0,128)
             for x,y in self.front:

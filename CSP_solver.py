@@ -338,15 +338,17 @@ class CSP_solver:
             # 'starting_group' is the group from where all arrows leave, and back to which no arrows return; an alt origin for an alt rooted tree, essentially!
             for alt_origin in starting_group:                                       # E.g.: ('d', 'e'), [(('d',1),('e',0)), (('d',0),('e',1))]. This quarantees that they build unidentical solution trees that together encompass all possible whole solutions.
                 if self.timeout:
-                    timeout_guess()
-                    print('TOOK LONGER THAN', self.time_limit, 's - therefore GUESSING NEXT')
-                    return 'time', 'out', 'occurred'
+                    break
                 if alt_origin in compatibility_groups:                              # some might have been filtered out as they were no longer fitting ALL other groups; the whole key has been deleted from 'compatibility_groups' if it's not compatible with ANY alt solution from its paired group (paired equation)
                     seen_proposed_vectors = set()                                   # PER alt answer, of course - that's why it's initialized here and not at the top of this 'join_groups_into_solutions'
                     handled_groups = []
                     alt_solution_build = {}
                     traverse(alt_origin, seen_proposed_vectors, 
                         alt_solution_build, handled_groups, n_times_traversed_for_debugging)                         # 'traverse' builds alternative 'possible_whole_solutions' and saves all viable ones to 'possible_whole_solutions'
+            if self.timeout:
+                timeout_guess()
+                print('TOOK LONGER THAN', self.time_limit, 's - therefore GUESSING NEXT')
+                return 'time', 'out', 'occurred'
                     
             
             # done: Count also at this point, use the ready function for that!; if max mines in front < minecount, there's NO NEED for minecount (this is checked in minecount situation checking functions later) -> use this instead!!!! That will significantly make the worst cases faster!!
@@ -446,7 +448,7 @@ class CSP_solver:
                     print("✔ FOUND SOLUTIONS FROM MINECOUNT FILTERING")
                     # sleep(5) # UN-COMMENT THIS when you wanna see examples of these cases; if happens, press i and a in the game (BOTH!!) to stop the progression of the game after the 10s has elapsed! Otherwise you won't SEE anything!! My experience: roughly 80% of minecout situations are 'simple', and roughly 20% are these, complex 'minecount filtering' cases, so far.
             else:
-                return best_bet, highest_survival_rate_in_front_cells * 100 # if not called from minecount and no solutions, continue to minecount. For that, this info is needed in case a guess must be made (= in case the minecount logic still is not enough)
+                return best_bet, highest_survival_rate_in_front_cells * 100 # if not called from minecount and no solutions, continue to minecount, IN ENGLISH, don't just automatically go to guessing unlike above even if no solutions were found. For that, this info is needed in case a guess must be made (= in case the minecount logic still is not enough)
 
         # For every eq set: 'sets_altSolutionsMinminesMaxmines', get possible sums of mines, and count the number of times every alt is seen in any combination with others - this will be used in guessing, if needed ((If possible, return 'nMines_to_frontAltSolutions' like it was before.))
         def check_minecount_need_and_guess_or_minecount(sets_nMinesToAltsolutions_minmines_maxmines:list,
@@ -697,6 +699,7 @@ class CSP_solver:
             for compatibility_groups, starting_group in compGroups_and_startingGroup:
                 possible_whole_solutions, best_bet, highest_survival_rate_in_front_cells = join_comp_groups_into_solutions(compatibility_groups, starting_group)
                 if self.timeout:
+                    # to-do: huh? Where's the guessing? lol äksdee
                     return
                 eq_set_possible_solutions_and_guessing_info_in_case_minecount_is_not_needed.append(
                     (possible_whole_solutions, best_bet, highest_survival_rate_in_front_cells))
