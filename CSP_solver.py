@@ -352,7 +352,7 @@ class CSP_solver:
             # done: Count also at this point, use the ready function for that!; if max mines in front < minecount, there's NO NEED for minecount (this is checked in minecount situation checking functions later) -> use this instead!!!! That will significantly make the worst cases faster!!
             print(' → `traverse` called', n_times_traversed_for_debugging[0], 'times')
             best_bet, highest_survival_rate_in_front_cells = handle_minecount_results(
-                value_counts_for_each_var)
+                value_counts_for_each_var, called_from_minecount=False)
             return possible_whole_solutions, best_bet, highest_survival_rate_in_front_cells
 
         # (6) guess if needed. NB! this 'best' guess considers this round only; it doesn't take into account what will happen later
@@ -381,9 +381,14 @@ class CSP_solver:
             print('- guess:', self.choice)
 
         def handle_minecount_results(value_counts_for_each_var:dict, 
-            min_n_mines_in_front = -1, max_n_mines_in_front = -1) -> tuple:
+            min_n_mines_in_front = None, max_n_mines_in_front = None,
+            called_from_minecount = bool) -> tuple:                             # if called from minecount: if no answers, guess. If NOT called from minecount: if no results, check need for minecount.
             '''
-            Parameter 'value_counts_for_each_var' (dictionary) is exactly what it says:
+            If called_from_minecount = True: if no answers, guess is needed. This is because minecount logic is used last,
+            only if other solution methods were not successful before that.
+            If NOT called from minecount: if no results, check the need for minecount. If it's needed, use it, otherwise guess (not handled here!)
+
+            The parameter 'value_counts_for_each_var' (dictionary) is exactly what it says:
             for each variable, it's been counted before calling this equation, how many times it was
             0 and how many times it was 1 in the alt solutions. If only 0s are recorded for the variable,
             then it's solved as 0. If only 1s, it's solved as 1.
@@ -401,9 +406,12 @@ class CSP_solver:
             but it slightly favours guessing in self.front, which could be a better strategy, as guessing in the 
             front safest spot often reveals solutions (no quarantee of that though!))
             '''
-            called_from_minecount = True
-            if min_n_mines_in_front == -1:
-                called_from_minecount = False
+            # called_from_minecount = True
+            # if min_n_mines_in_front == None:
+            #     called_from_minecount = False
+            # else: 
+            #     if max_n_mines_in_front == None:
+            #         raise ValueError('max n of mines in front should NOT have been None since min n was not None either')
             best_bet = None
             var_to_survivalChance = dict()
             highest_survival_rate_in_front_cells = 0
@@ -438,7 +446,7 @@ class CSP_solver:
                     print("✔ FOUND SOLUTIONS FROM MINECOUNT FILTERING")
                     # sleep(5) # UN-COMMENT THIS when you wanna see examples of these cases; if happens, press i and a in the game (BOTH!!) to stop the progression of the game after the 10s has elapsed! Otherwise you won't SEE anything!! My experience: roughly 80% of minecout situations are 'simple', and roughly 20% are these, complex 'minecount filtering' cases, so far.
             else:
-                return best_bet, highest_survival_rate_in_front_cells * 100
+                return best_bet, highest_survival_rate_in_front_cells * 100 # if not called from minecount and no solutions, continue to minecount. For that, this info is needed in case a guess must be made (= in case the minecount logic still is not enough)
 
         # For every eq set: 'sets_altSolutionsMinminesMaxmines', get possible sums of mines, and count the number of times every alt is seen in any combination with others - this will be used in guessing, if needed ((If possible, return 'nMines_to_frontAltSolutions' like it was before.))
         def check_minecount_need_and_guess_or_minecount(sets_nMinesToAltsolutions_minmines_maxmines:list,
@@ -508,12 +516,14 @@ class CSP_solver:
 
                 # for nMines_to_setAltSolutions, min_minecount, max_minecount in alt_set_SolutionsMinminesMaxmines:
                 first_set_nMines_to_altSolutions_minmines_maxmines = sets_nMinesToAltsolutions_minmines_maxmines[0] # each index, like this first one [0], in this list is all the altSolutionsMinminexMaxmines for that set; a triple (altSolutions, Minmines, Maxmines) for that eq set. All the altSolutions are in [0] of that triple.
+                
+                # set_1 is the STARTING set of equations here (remember: a 'separated set of equations' is such that every equation in that set shares variables directly or via other eqs of that set, and different sets have 0 common variables between each other), from where the alt solution builing starts. The purpose is to check the n of mines in the alt solutions. If at any point it's observed that EVERY var can be 0 or 1 (seen at least once in a minecount-eligible alt solution), then the minecount solving here ends (almost) immediately, proceeding to guessing -> won't take long to arrive at that result! c: Why 'almost' immediately? Because I still want some data about how often each var is 0 vs 1, so that the following guessing doesn't suck too much.
                 set_1_nMines_to_setAltSolutions, set_1_minmines, set_1_maxmines = first_set_nMines_to_altSolutions_minmines_maxmines
                 for nMines, set_1_altSolutions_with_nMines in set_1_nMines_to_setAltSolutions.items():
-                    if no_vars_were_solved[0]:                                       # True, if len(seen_var_values) == 2 * len(self.variables); it means that every var can be 0 or 1 -> no solutions for any var are coming out. Bad side of breaking here; the prob calc will NOT be perfect! It could actually be very bad if you get unlucky the worst cases!
+                    if no_vars_were_solved[0]:                                          # True, if len(seen_var_values) == 2 * len(self.variables); it means that every var can be 0 or 1 -> no solutions for any var are coming out. Bad side of breaking here; the prob calc will NOT be perfect! It could actually be very bad if you get unlucky the worst cases!
                         break
                     if only_min_ok:
-                        if nMines != set_1_minmines:
+                        if nMines != set_1_minmines:                                    # if only min count sum of mines in front is possible (otherwise would exceed n mines remaining in the map at the moment), then only include min counts in the possible solutions, as simple as that
                             continue
                     elif only_max_ok:
                         if nMines != set_1_maxmines:
@@ -547,13 +557,17 @@ class CSP_solver:
                 print("✔ FOUND SOLUTIONS FROM SIMPLE MINECOUNT")                           # it's highly likely much faster to return already at this point. During the next round, you can solve more possibly much faster thanks to the new solutions
                 # sleep(10)
                 return
-            if (largest_n_mines_in_front_alt_solutions < n_mines_remaining) and not only_max_sum_is_ok:
-                print("GUESSING, minecount would not help here")
-                choose_best_guess(naive_safest_guess = best_guess, 
-                    min_n_mines_in_front = smallest_n_mines_in_front_alt_solutions, 
-                    best_front_chance = survival_chance,
-                    max_n_mines_in_front = largest_n_mines_in_front_alt_solutions)
-                return
+            if (largest_n_mines_in_front_alt_solutions < n_mines_remaining) and not only_max_sum_is_ok:                 # IF (1) there are no whole-front alt solutions with too MANY mines AND
+                print('- largest_n_mines_in_front_alt_solutions < n_mines_remaining')
+                if (smallest_n_mines_in_front_alt_solutions + number_of_unclicked_unseen_cells >= n_mines_remaining):   # ... (2) there are no whole-front alt solutions with NOT ENOUGH mines, THEN there is NO NEED FOR MINECOUNT FILTERING. IN ALL OTHER CASES, SOME ALT SOLUTIONS ARE NOT OK -> MINECOUNT FILTERING IS NEEDED. I had forgotten this (2) before, oopsie woopsie.
+                    print('- smallest_n_mines_in_front_alt_solutions + n_uu_cells >= n_mines_remaining')
+                    print("-> GUESSING, minecount would not help here")
+                    # sleep(3)    # how to use: press i once. Then press a. As soon as you see the message above, press a again -> you'll see the situation where the solver arrived at this conclusion. To continue, press a again, then the same thing.
+                    choose_best_guess(naive_safest_guess = best_guess, 
+                        min_n_mines_in_front = smallest_n_mines_in_front_alt_solutions, 
+                        best_front_chance = survival_chance,
+                        max_n_mines_in_front = largest_n_mines_in_front_alt_solutions)
+                    return
             print("Minecount filtering of alt solutions is needed\nfiltering out alt solutions with impossible minecount...")
 
             if only_min_sum_is_ok:
@@ -563,8 +577,8 @@ class CSP_solver:
             else:
                 value_counts_for_each_var = count_front_sums_to_get_ok_set_alts()                                   # what I need; for every separated set, a list of alts that are ok regarding minecount. From those, just record every variable: is it this time 0 or 1? Count the times of 0 and 1 per variable, and that's it. That is enough info to either solve it OR to make the best possible guess, if a guess is necessary after all this.
 
-            handle_minecount_results(value_counts_for_each_var, 
-                smallest_n_mines_in_front_alt_solutions)
+            handle_minecount_results(value_counts_for_each_var,                                                     # no return value is needed here; minecount was the last resort logic; if it didn't produce answers, you need to guess, and this decision is done in the 'handle_minecount_results()'
+                smallest_n_mines_in_front_alt_solutions, largest_n_mines_in_front_alt_solutions, called_from_minecount = True)
 
         def remove_empty_sets(eq_set_possible_solutions):
             nonempty_eq_set_possible_solutions = []
