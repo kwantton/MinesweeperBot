@@ -77,14 +77,14 @@ class Minesweeper:
         self.highlight_csp_solved = self.debug_csp
         self.instructions = '''
         a : automatic bot play (pressing "a" mid-game will stop the game; you can see where the bot ended up)
-        v : toggle visual, 30 fps version of "a" (you also need to press a after this to use auto bot play)
-        i = toggle infinite mode of "a"; if the bot loses or wins, it will start another game. PRESS ALSO "a" after this to start!
+        v : toggle visual, 30 fps version of "a" (you also need to press "a" after this to use auto bot play)
+        i : toggle infinite mode of "a"; if the bot loses or wins, it will start another game. PRESS ALSO "a" after this to start!
         x or n : single bot move (you can mash them as fast as you want)
         f : front highlighting
         c : highlight csp-solved cells
         h : highlight minecount-solved cells
         spacebar : new game
-        g : highlight guessed cells
+        g : highlight guessed cells (latest guess is golden, others are blue)
         m : show mine locations
         q: quit'''.split('\n        ')                                              # This way of writing lists is used a lot on the 'Data analysis with Python' course, it's very handy for writing longer lists quickly. This splits at each '\n        ' to form a list.
         self.unnecessary_guesses = unnecessary_guesses
@@ -811,7 +811,7 @@ class Minesweeper:
 
         def highlight_guesses_blue() -> None:
             guess_surface = transparent_highlight_surface(0,0,255,128)
-            latest_guess_surface = transparent_highlight_surface(255,255,0,150)
+            latest_guess_surface = transparent_highlight_surface(255,255,0,128)
             for x,y in self.guessed_cells:
                 if (x,y) != self.latest_guess:
                     self.screen.blit(guess_surface, (x*self.cell_size, y*self.cell_size + self.infobar_height))
