@@ -37,14 +37,17 @@ class Minesweeper:
         self.debug_csp = debug_csp
         self.visual_autobot = False                     # when this is on, the 30 fps screen draw is ON. This limits the speed of the bot, but looks cool :D press v to activate, WHEN you have pressed a
         self.logic_testing_on = logic_testing_on           # when this is on, for every lost game, a check will commence in 'constraint_problem_solver_for_testing.py'
-        self.minecount_demo = minecount_demo_number
+        self.minecount_demo_number = minecount_demo_number
+
+        if self.minecount_demo_number:
+            self.height = self.width = 9
         
         self.clock = pygame.time.Clock()
 
         if (self.width, self.height, self.mines) in [expert, intermediate]:
             self.cell_size = 50-int(0.8*height)                             # how many px in height and width should each cell be?
         else:
-            self.cell_size = max(18, min(50, 800 // max(width, height)))    # dynamic cell size calculation based on map dimensions
+            self.cell_size = max(18, min(50, 800 // max(self.width, self.height)))    # dynamic cell size calculation based on map dimensions
         self.draw_width = max(self.cell_size*width, 1000)
         self.initialize_debug_features(unnecessary_guesses)
         self.game_result_counter = [0,0]                # [wins, losses]
@@ -140,7 +143,7 @@ class Minesweeper:
         self.reset_timer_vars()
 
     def reset_vars_at_start_of_bot_execute(self):
-        self.solver.guess = None
+        self.solver.guess = None                                                    # why? Because if 'self.solver.guess', 
         self.solved_new_using_simple_solver = False                                 # if True, continue with simple_solver() (continue with that as long as possible, only go to CSP_solver if simple_solver() is no longer enough)
         
 
@@ -253,8 +256,8 @@ class Minesweeper:
         Also, the first clicked cell is ensured to be 0 in classical minesweeper - that's how I'm doing it also.
         '''
         print('\ngenerate_map()')
-        if self.minecount_demo:
-            self.generate_simple_minecount_demo(self.minecount_demo)
+        if self.minecount_demo_number:
+            self.generate_simple_minecount_demo(self.minecount_demo_number)
         else:
             danger_x = set(x for x in range(self.width) if x-1 <= mouse_x <= x+1)
             danger_y = set(y for y in range(self.height) if y-1 <= mouse_y <= y+1)
@@ -269,6 +272,7 @@ class Minesweeper:
         it must be used wisely, ONLY when needed; otherwise you could have an equation with
         450 variables (expert map has 480 cells!) and {450 \choose 90} combinations. Yeah, would be bad.)
         '''
+        self.height = self.width = 9
         self.minecount = self.mines = demo_number + 1
         self.cells_to_open = self.width*self.height - self.minecount        # exact same formula as normally (normally would be width*height-mines, but here minecount is correct for this)
         if demo_number == 1:
@@ -277,6 +281,7 @@ class Minesweeper:
             self.mine_locations = set([(0,7), (1,8), (2,6)])               # 2 mines after normal solving, NO solution
         elif demo_number == 3:
             self.mine_locations = set([(0,7), (1,8), (0,8), (2,6)])        # 3 mines after normal solving, minecountable solution
+        
 
     def probe(self, x:int, y:int, primary=False) -> None:           # if primary = False, then don't go to 'handle_probing_of_already_opened_cell', otherwise it can loop and cause another chord! The chording is meant ONLY for actual chording
         '''
@@ -526,19 +531,19 @@ class Minesweeper:
                 '''
                 self.solved_new_using_simple_solver = False                                                                  # do not go to csp_solver if csp_solver has solved new variables during this round; instead return (so that you can repeat, by pressing 'b' or 'p' again c:)
                 for x,y in self.front:
-                    label = self.map[y][x]    
                     neighbours = self.get_neighbours_of(x,y)                                                    # self.bot_x and self.bot_y had been initially set in self.handle_first_left_click as the x (column number) and y (row number) of the first click
-                    n_surrounding_flags = self.count_cells_of_type(flag, neighbours)
                     unflagged_unclicked_neighbours = self.get_cells_of_type(unclicked, neighbours)              # this is indeed 'unclicked unflagged neighbours', since label 'unclicked' means exactly that; the picture for 'unclicked' is an unprobed cell. A big confusing perhaps, I know.
 
-                    if len(unflagged_unclicked_neighbours) > 0:
+                    if len(unflagged_unclicked_neighbours) > 0:                                             # if not, there's NOTHING to solve here! (unless someone had placed too many flags around, for example)
+                        label = self.map[y][x]    
+                        n_surrounding_flags = self.count_cells_of_type(flag, neighbours)
+
                         if label == labellize(len(unflagged_unclicked_neighbours) + n_surrounding_flags):   # If the number of surrounding ('unclicked' + 'flag') cells equals to the label of this (x,y) front cell in question (for example, 1 flagged + 2 unclicked = 3 = the label of the cell),
-                            flag_these(unflagged_unclicked_neighbours)                          # then flag the remaining unflagged cells around the front cell in question (flag the remaining 2 unclicked cells in this example case).
+                            flag_these(unflagged_unclicked_neighbours)                                      # then flag the remaining unflagged cells around the front cell in question (flag the remaining 2 unclicked cells in this example case).
                             self.solved_new_using_simple_solver = True
-                        if label == labellize(n_surrounding_flags):                             # NB! 'if', not 'elif'. If the number of flagged neighbours equals to the label of the current front cell,
-                            if len(unflagged_unclicked_neighbours) >= 1:                        # then if there also are unclicked cells around the current front cell,
-                                self.solved_new_using_simple_solver = True
-                                self.handle_chord(x,y)                                          # then open all of them (i.e. 'chord' at this current front cell (x,y)).
+                        elif label == labellize(n_surrounding_flags):         # NB! 'if', not 'elif'. Think what happens if n_surrounding_flags = x and un. If the number of flagged neighbours equals to the label of the current front cell,
+                            self.solved_new_using_simple_solver = True
+                            self.handle_chord(x,y)                                          # then open all of them (i.e. 'chord' at this current front cell (x,y)).
                 
                 check_minecount_zero()                                                          # if minecount is zero, then probe all 'unclicked' cells, since they cannot be mines -> map completed! Of course, this requires, that all the flags were placed correctly by the bot (they always are). This situation needs separate handling because the last 'unclicked' cells can be inside completely flagged boxes, isolating them from 'self.front'. It took me 5 weeks to even arrive in that kind of a situation! It's extremely rare, as it needs at least 3 already-flagged cells in a cordner, or 5 in a center edge, or 8 or more in the middle! Awesomesauce.
                 filter_front_cells()
@@ -573,17 +578,17 @@ class Minesweeper:
 
                 solved_new_using_old_csp = False
                 self.solver_old.factor_one_binary_solve()
-                solved_vars = self.solver_old.solved_variables              # set of tuples: each is a tuple ((x,y), value)
+                solved_vars = self.solver_old.solved_variables                  # set of tuples: each is a tuple ((x,y), value)
                 
                 for (x,y), value in solved_vars:
-                    if ((x,y), value) not in self.solved_variables:         # avoid repeating already-done work
+                    if ((x,y), value) not in self.solved_variables:             # avoid repeating already-done work
                         if value == 1:
                             flag_these([(x,y)])
                         elif value == 0:
                             self.probe(x, y)
-                        self.solved_variables.add(((x,y), value))           # for avoiding repeating work in the future
+                        self.solved_variables.add(((x,y), value))               # for avoiding repeating work in the future
                         solved_new_using_old_csp = True
-                if solved_new_using_old_csp:                                  # VERY often this finds solutions -> next round; do not use heavier machinery than needed!
+                if solved_new_using_old_csp:                                    # VERY often this finds solutions -> next round; do not use heavier machinery than needed!
                     print('✔ FOUND SOLUTIONS FROM OLD CSP SOLVER')
                     filter_front_cells()
                     return solved_new_using_old_csp
@@ -593,10 +598,10 @@ class Minesweeper:
                 n_unclicked_unseen_cells = len(unclicked_unseen_cells)
                 
                 self.solver.absolut_brut(n_mines_remaining = self.minecount,        # the right top of normal minesweeper shows this number
-                    all_unclicked = all_unclicked_cells,                    # all unclicked cells (excludes flagged ones)
-                    unclicked_unseen_cells = unclicked_unseen_cells,        # unclicked cells that are not neighbours of 'self.front'
+                    all_unclicked = all_unclicked_cells,                            # all unclicked cells (excludes flagged ones)
+                    unclicked_unseen_cells = unclicked_unseen_cells,                # unclicked cells that are not neighbours of 'self.front'
                     number_of_unclicked_unseen_cells = n_unclicked_unseen_cells)    # the number of the cells above
-                solved_vars = self.solver.solved_variables                  # set of tuples: each is a tuple ((x,y), value)
+                solved_vars = self.solver.solved_variables                          # set of tuples: each is a tuple ((x,y), value)
                 solved_new = False
                 for (x,y), value in solved_vars:
                     if ((x,y), value) not in self.solved_variables:         # avoid repeating already-done work
@@ -692,7 +697,7 @@ class Minesweeper:
                 `CSP_solver` as much as possible. It's also cooler to look on the screen as the bot plays in
                 smaller increments this way.
                 '''
-                self.reset_vars_at_start_of_bot_execute()                 # resets 'self.solved_new_using_simple_solver', self.solver.guess
+                self.reset_vars_at_start_of_bot_execute()               # resets 'self.solved_new_using_simple_solver', self.solver.guess
                 simple_solver()
 
                 if self.solved_new_using_simple_solver:                 # IF 'simple_solver()' IS ENOUGH, DO NOT PROCEED FURTHER! Only use the heavier machinery (csp_solve()) if necessary.
@@ -709,7 +714,6 @@ class Minesweeper:
 
                 if (self.solver.guess and not new_vars_solved) or self.unnecessary_guesses:       # (1) NORMAL USAGE: if CSP_solver has not managed to solve any new variables with 100% certainty ('normal' logic OR minecounting logic), THEN guess. This info is directly obtained from 'self.solver', as you can see (`if self.solver.guess`) (2) TESTING TESTING USAGE: if `self.unnecessary_guesses`, then guesses are done -> the lost game missed logic tester in 'constraint_problem_solver_for_testing.py' will notice that missing logic was found, and the 'missing_logic' counter will increase and turn red, proving that it works. Awesome!
                     guess(self.solver.guess)                            # 'self.solver.guess' is the variable that had the highest probability of NOT being a mine (as of 12.10.2024 at least)
-                    self.solver.guess = None                            # so that it doesn't keep repeating forever and ever
 
             bot_execute()
 
@@ -983,6 +987,8 @@ if __name__ == '__main__':
     (2) run the Minesweeper() with parameter 'unnecessary_guesses = True'. This enables unnecessary guessing
     -> validity testing in 'constraint_problem....py' will find that unnecessary guesses were done,
     proving that validity testing works Perfect! c:
+
+    Minecount demo number: choose 1, 2 or 3 -> demonstrates minecount situations
     '''
 
     beginner = 9,9,10                   # width, height, mines

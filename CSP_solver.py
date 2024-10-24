@@ -25,17 +25,19 @@ class CSP_solver:
         self.time_limit = 20                                            # NB! Here you can set max time limit for 'traverse()' in 'join_comp_groups_into_solutions()'. If no limit is set, the worst games will be killed automatically
         self.solved_variables = set()                                   # DNR! Do not reset. ((x,y), value); the name of the variable is (x,y) where x and y are its location in the minesweeper map (if applicable), and the value of the variable is either 0 or 1, if everything is ok (each variable is one cell in the minesweeper map, and its value is the number of mines in the cell; 0 or 1, that is)
         self.minecount_solved_vars = set()                              # DNR! for highlighting in botGame.py. Do NOT reset every round
-        self.initialize_those_that_are_needed_in_botGame()
+        self.initialize_those_that_are_immediately_needed_in_botGame()
 
-    def initialize_those_that_are_needed_in_botGame(self):
+    def initialize_those_that_are_immediately_needed_in_botGame(self):
         '''Vars that however need to exist from the very beginning
-        for botGame to work properly, BUT should not be reset
-        every round of CSP_solve or equation adding'''
+        for botGame to work properly, at least in certain situtions, 
+        BUT should not be reset every round of CSP_solve or equation adding'''
         # self.variables = set()
+        self.front_guess = None                                         # Needed when 'self.unnecessary_guesses = True' in botGame. save the safest possible front cell here if guess is needed
         self.choice = None                                              # either 'FRONT' or 'UNSEEN'; this tells you if the next guess is located next to 'self.front' (botGame.py has 'self.front') or in the cells unseen by self.front ('unseen unclicked', please remember this term 'unseen unclicked cells', or 'uu_cells'). This is for choosing where to guess, and for passing this info to 'botGame.py' after the choice has been made. This is also for printing in pygame
         self.p_success_front = None                                     # initialize. Otherwise 'draw' section in 'pyGame.py' complains that there's no such attribute. This is the highest probability that the most safe unclicked cell next to self.front is safe (has no mine).
         self.p_success_unseen = None                                    # initialize. Equal probability for each of the unclicked unseen cells to NOT be a mine at the moment
         self.minecount_successful = False                               # used in 'botGame.py' for printing 'minecount successful' when it's used. Convenient for debugging!
+        
     
     def reset_variables_at_the_start_of_new_round_of_csp_solving(self): # NB! NOT ALL TO-BE-RESET VARS ARE HERE!!!! Some should ONLY be reset BEFORE ADDING NEW EQS. They are in 'reset_vars_before_adding_new_equations()', you guessed it.
         self.guess = None                                               # # The safest cell to guess is saved here for use in botGame.py, if there is a need to guess. If (1) normal solving doesn't help AND (2.1) no need for minecount or (2.2) mine counting didn't solve variables either, THEN guess the safest cell. This info, 'self.guess', is passed on to 'botGame.py' where the guess is made. I made a separate variable for this to be able to recognize this guessing situation in 'botGame.py' to distinguish it from normal solving; this makes it possible to add visuals, etc... what is the next guess, if needed? If this is not 'None', then guess is needed. Resetting this to 'None' at the start of every round of 'absolut_brut()', in case the previous round was a guess. (12.10.2024): this is the default value. If even mine counting doesn't help, then this is set to True in 'handle_possible_whole_solutions()'. That info is then read in 'botGame.py' to handle the guessing.
@@ -46,7 +48,7 @@ class CSP_solver:
         self.p_success_front = None                                     # probability of surviving the safest front cell guess
         self.p_success_unseen = None                                    # prob of surviving any of the safest non-front cell (aka. unseen unclicked cell) guesses; they are equal, as they are unseen, so they all have the same (naive) probability
         self.minecount_successful = False                               # was a new solution found via minecount? This info is used in printing in 'botGame.py': write 'minecount successful' in the game, if minecount was used. For debugging, and most especially for showing off and looking smart.
-        self.solved_new_vars_during_this_round = False                  # the most straightforward way of checking if                # the most straightforward way of checking if guessing is ACTUALLY needed, as long as you remember to set this to 'True' when appropriate!
+        self.solved_new_vars_during_this_round = False                  # the most straightforward way of checking if guessing is ACTUALLY needed, as long as you remember to set this to 'True' when appropriate!
 
     def reset_vars_before_adding_new_equations(self):
         self.variables = set()                                          # ALL variables, solved or not. NB! If I uncomment, a test will not pass.
@@ -268,6 +270,7 @@ class CSP_solver:
             return incompatible_pma
         
         def timeout_guess():                                                        # here's the possibility to use a timer; in case it takes too long, guess either the optimal unclicked unseen cell, OR a random cell
+            print('- self.guess = timeout')
             self.guess = 'timeout'
             return
         
@@ -325,15 +328,16 @@ class CSP_solver:
                         new_matches = compatibility_groups[this_alt]                    # continue to matches of this alt solution ONLY if none of the values of this alt solution disagree with values that have already been recorded in 'possible_solution_build' as values of the variables
                         entered_alts_for_this_build_local.add(this_alt)
 
-                        # only do this if the above has not been fulfilled; it's not possible to gain another answer by trying to add yet another alt solution in the case where all the equations (all groups) have already been satisfied, which is checked in the 'if' clause above. SO: for every set of new_matches, I want the info that was updated according to what happened in the specific alternative solution above; which alt solution ('proposed_matching_alt') was 'entered' (seen, processed), which 'group' (equation) in question was handled. Since all the alternatives in the above loop are indeed ALTERNATIVES, they are NOT all saved immediately! (that would be incorrect), instead that is done after the 'traverse()'s below!
+                        # only do this if the above 'if' has not been fulfilled; it's not possible to gain another answer by trying to add yet another alt solution in the case where all the equations (all groups) have already been satisfied, which is checked in the 'if' clause above. SO: for every set of new_matches, I want the info that was updated according to what happened in the specific alternative solution above; which alt solution ('proposed_matching_alt') was 'entered' (seen, processed), which 'group' (equation) in question was handled. Since all the alternatives in the above loop are indeed ALTERNATIVES, they are NOT all saved immediately! (that would be incorrect), instead that is done after the 'traverse()'s below!
                         if new_matches:
                             for new_match in new_matches:
+                                if self.timeout:
+                                    return
                                 if new_match not in entered_alts_for_this_build_local:    # technically redundant, probably almost no effect regarding computing efficiency, BUT it's nice for clarity, and showing the logic still (even if double check)
                                     traverse(new_match, entered_alts_for_this_build_local, 
                                         possible_solution_build_local, already_handled_groups_local,
                                         n_times_traversed_for_debugging)
-                                    if self.timeout:
-                                        return
+                                    
                         
             # 'starting_group' is the group from where all arrows leave, and back to which no arrows return; an alt origin for an alt rooted tree, essentially!
             for alt_origin in starting_group:                                       # E.g.: ('d', 'e'), [(('d',1),('e',0)), (('d',0),('e',1))]. This quarantees that they build unidentical solution trees that together encompass all possible whole solutions.
@@ -346,14 +350,14 @@ class CSP_solver:
                     traverse(alt_origin, seen_proposed_vectors, 
                         alt_solution_build, handled_groups, n_times_traversed_for_debugging)                         # 'traverse' builds alternative 'possible_whole_solutions' and saves all viable ones to 'possible_whole_solutions'
             if self.timeout:
-                timeout_guess()
                 print('TOOK LONGER THAN', self.time_limit, 's - therefore GUESSING NEXT')
+                timeout_guess()
                 return 'time', 'out', 'occurred'
                     
             
             # done: Count also at this point, use the ready function for that!; if max mines in front < minecount, there's NO NEED for minecount (this is checked in minecount situation checking functions later) -> use this instead!!!! That will significantly make the worst cases faster!!
             print(' → `traverse` called', n_times_traversed_for_debugging[0], 'times')
-            best_bet, highest_survival_rate_in_front_cells = handle_minecount_results(
+            best_bet, highest_survival_rate_in_front_cells = handle_var_value_count_results(
                 value_counts_for_each_var, called_from_minecount=False)
             return possible_whole_solutions, best_bet, highest_survival_rate_in_front_cells
 
@@ -374,21 +378,28 @@ class CSP_solver:
                     self.choice = 'UNSEEN'
                 self.p_success_unseen = round(AVERAGE_uu_cell_safety, 1)
                 if self.p_success_unseen < 0:
-                    print("p_success_unseen < 0:", self.p_success_unseen)       # Note: this CAN be negative especially if using the absolute worst-case scenario (highest possible mine density in uu_cells) regarding uu_cell mine density (the -x then means that the worst case scenarios are impossible in that situation, naturally)! Reason: notice the 'MIN' in 'min_n_mines_in_front'? This assumes there's MAX POSSIBLE mine density in uu cells -> in worst cases, negative probability because of the way I count this probability: `unclicked_unseen_cell_safety_in_worst_scenario = 100 - (100 *(n_mines_remaining - min_n_mines_in_front) / number_of_unclicked_unseen_cells)  which is 100 - percent mine density in unclicked unseen cells in the case that there's the minimum possible number of mines remaining in self.front. In cases where minecount doesn't exactly tell how many mines are in uu cells, it's possible that the min n mines IS INDEED negative, BUT still taking that into account doesn't lead to new absolute solutions for any variable -> this guessing is called -> a negative number can be printed here, because I'm using the WORST CASE SCENARIO. That's why "≥" is written in the game in showing the uu probability ('uu prob ≥ x', written as 'other ≥ x' in the game)! Yes, this is complicated, sorry.
+                    print("p_success_unseen < 0:", self.p_success_unseen)       # Note: this CAN be negative if using the absolute worst-case scenario (highest possible mine density in uu_cells) regarding uu_cell mine density (the -x then means that the worst case scenarios are impossible in that situation, naturally) OR if using average! Reason: notice the 'MIN' in 'min_n_mines_in_front'? This assumes there's MAX POSSIBLE mine density in uu cells -> in worst cases, negative probability because of the way I count this probability: `unclicked_unseen_cell_safety_in_worst_scenario = 100 - (100 *(n_mines_remaining - min_n_mines_in_front) / number_of_unclicked_unseen_cells)  which is 100 - percent mine density in unclicked unseen cells in the case that there's the minimum possible number of mines remaining in self.front. In cases where minecount doesn't exactly tell how many mines are in uu cells, it's possible that the min n mines IS INDEED negative, BUT still taking that into account doesn't lead to new absolute solutions for any variable -> this guessing is called -> a negative number can be printed here, because I'm using the WORST CASE SCENARIO. That's why "≈" is written in the game in showing the uu probability ('uu prob ≥ x', written as 'other ≥ x' in the game)! Yes, this is complicated, sorry. ALSO! This can be over 100%, IF average or max front minecount is used, because neither of those might be the case! Yes, it's complicated
                     self.p_success_unseen = 0                                   # this is true, as negative probs are not real. This is not error patching: see my comment above (this assumes highest uu cell mine density, that's why negative values are possible in cases where min n mines in front still has room for more mines even after every uu cell is mined; 'leftovers' in the highest uu cell mine density cases -> negative prob)
                     # sleep(10) # I wanted to inspect these cases, they are ok. Read the comment above, 'Note: ...'
+                elif self.p_success_unseen > 100:
+                    print("p_success_unseen > 0:", self.p_success_unseen)       # 
+                    self.p_success_unseen = 100
                 print("- p_success(unseen) ≈", self.p_success_unseen, '%')
             self.p_success_front = round(best_front_chance, 1)
             print('- p_success(front)  ≤', self.p_success_front, '%')
             print('- guess:', self.choice)
 
-        def handle_minecount_results(value_counts_for_each_var:dict, 
+        def handle_var_value_count_results(value_counts_for_each_var:dict, 
             min_n_mines_in_front = None, max_n_mines_in_front = None,
             called_from_minecount = bool) -> tuple:                             # if called from minecount: if no answers, guess. If NOT called from minecount: if no results, check need for minecount.
             '''
-            If called_from_minecount = True: if no answers, guess is needed. This is because minecount logic is used last,
-            only if other solution methods were not successful before that.
-            If NOT called from minecount: if no results, check the need for minecount. If it's needed, use it, otherwise guess (not handled here!)
+            Logic:
+
+            If called_from_minecount: 
+                if no answers, guess is needed. This is because minecount logic is used last,
+                only if other logic was not enough before that
+            If not called_from_minecount: 
+                if no solved vars, check the need for minecount. (If it's needed, use it, otherwise guess (not handled here!))
 
             The parameter 'value_counts_for_each_var' (dictionary) is exactly what it says:
             for each variable, it's been counted before calling this equation, how many times it was
@@ -408,12 +419,6 @@ class CSP_solver:
             but it slightly favours guessing in self.front, which could be a better strategy, as guessing in the 
             front safest spot often reveals solutions (no quarantee of that though!))
             '''
-            # called_from_minecount = True
-            # if min_n_mines_in_front == None:
-            #     called_from_minecount = False
-            # else: 
-            #     if max_n_mines_in_front == None:
-            #         raise ValueError('max n of mines in front should NOT have been None since min n was not None either')
             best_bet = None
             var_to_survivalChance = dict()
             highest_survival_rate_in_front_cells = 0
@@ -579,7 +584,7 @@ class CSP_solver:
             else:
                 value_counts_for_each_var = count_front_sums_to_get_ok_set_alts()                                   # what I need; for every separated set, a list of alts that are ok regarding minecount. From those, just record every variable: is it this time 0 or 1? Count the times of 0 and 1 per variable, and that's it. That is enough info to either solve it OR to make the best possible guess, if a guess is necessary after all this.
 
-            handle_minecount_results(value_counts_for_each_var,                                                     # no return value is needed here; minecount was the last resort logic; if it didn't produce answers, you need to guess, and this decision is done in the 'handle_minecount_results()'
+            handle_var_value_count_results(value_counts_for_each_var,                                                     # no return value is needed here; minecount was the last resort logic; if it didn't produce answers, you need to guess, and this decision is done in the 'handle_minecount_results()'
                 smallest_n_mines_in_front_alt_solutions, largest_n_mines_in_front_alt_solutions, called_from_minecount = True)
 
         def remove_empty_sets(eq_set_possible_solutions):
@@ -699,7 +704,6 @@ class CSP_solver:
             for compatibility_groups, starting_group in compGroups_and_startingGroup:
                 possible_whole_solutions, best_bet, highest_survival_rate_in_front_cells = join_comp_groups_into_solutions(compatibility_groups, starting_group)
                 if self.timeout:
-                    # to-do: huh? Where's the guessing? lol äksdee
                     return
                 eq_set_possible_solutions_and_guessing_info_in_case_minecount_is_not_needed.append(
                     (possible_whole_solutions, best_bet, highest_survival_rate_in_front_cells))
