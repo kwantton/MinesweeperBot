@@ -31,11 +31,12 @@ class CSP_solver:
         '''Vars that however need to exist from the very beginning
         for botGame to work properly, at least in certain situtions, 
         BUT should not be reset every round of CSP_solve or equation adding'''
-        # self.variables = set()
-        self.front_guess = None                                         # Needed when 'self.unnecessary_guesses = True' in botGame. save the safest possible front cell here if guess is needed
         self.choice = None                                              # either 'FRONT' or 'UNSEEN'; this tells you if the next guess is located next to 'self.front' (botGame.py has 'self.front') or in the cells unseen by self.front ('unseen unclicked', please remember this term 'unseen unclicked cells', or 'uu_cells'). This is for choosing where to guess, and for passing this info to 'botGame.py' after the choice has been made. This is also for printing in pygame
+        self.variables = set()
+        self.front_guess = None                                         # Needed when 'self.unnecessary_guesses = True' in botGame. save the safest possible front cell here if guess is needed
         self.p_success_front = None                                     # initialize. Otherwise 'draw' section in 'pyGame.py' complains that there's no such attribute. This is the highest probability that the most safe unclicked cell next to self.front is safe (has no mine).
         self.p_success_unseen = None                                    # initialize. Equal probability for each of the unclicked unseen cells to NOT be a mine at the moment
+        self.unique_equations = set()                                   # init. Needed if you play a few clicks, then play n.
         self.minecount_successful = False                               # used in 'botGame.py' for printing 'minecount successful' when it's used. Convenient for debugging!
         
     

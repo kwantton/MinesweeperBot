@@ -171,7 +171,7 @@ csp.add_equations_if_new([eq1, eq2, eq3, eq4, eq5])
 csp.factor_one_binary_solve(2)                                  # NB! This needs 2 rounds!
 # TO-DO: Thanks to this, I added more CSP conditions -> now it's sometimes ENTIRELY solved, sometimes NOT AT ALL (0 variables solved!)
 
-print_solved_variables(csp, 'test 5a, letters. c0, d0, e1, f1, g0, h0, i0, j0 expected', '00110000') # expected: cdefg 00110
+print_solved_variables(csp, 'test 5a, letters (flaky, incomplete answers!). c0, d0, e1, f1, g0, h0, i0, j0 expected', '00110000') # expected: cdefg 00110
 
 
 '''

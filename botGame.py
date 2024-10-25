@@ -19,10 +19,11 @@ class Minesweeper:
     Testing of lost games: 'constraing_problem_solver_for_testing.py' which finds if logic was missed in a lost game.
     '''
     
-    def __init__(self, width, height, mines, csp_on=True, debug_csp=False, minecount_demo_number = None, 
+    def __init__(self, map_measurements:tuple, csp_on=True, minecount_demo_number = None, 
                  logic_testing_on = False, unnecessary_guesses = False):
         pygame.init()
         pygame.display.set_caption('MINESWEEPER')
+        width, height, mines = map_measurements
         self.cells_to_open = width*height - mines
         
         # Note! Put here ONLY those that are not reset at every 'new_game()'
@@ -34,7 +35,6 @@ class Minesweeper:
         self.perpetual = False
         self.infobar_height = 100                       # pixels for the infobar above the minesweeper map
         self.ms_bot_time_TOTAL = 0
-        self.debug_csp = debug_csp
         self.visual_autobot = False                     # when this is on, the 30 fps screen draw is ON. This limits the speed of the bot, but looks cool :D press v to activate, WHEN you have pressed a
         self.logic_testing_on = logic_testing_on           # when this is on, for every lost game, a check will commence in 'constraint_problem_solver_for_testing.py'
         self.minecount_demo_number = minecount_demo_number
@@ -76,8 +76,8 @@ class Minesweeper:
         self.highlight_front = False                                                # 'front' cells = number-labeled cells that neighbour unsolved cells, i.e. cells in x € {1,2,...8} that do not have x flags marked around them. When this is 'True', it draws a yellow rectangle around each such cell.
         self.solved_by_minecount = 0
         self.highlight_guesses = False
+        self.highlight_csp_solved = False
         self.highlight_minecount_solved = False
-        self.highlight_csp_solved = self.debug_csp
         self.instructions = '''
         a : automatic bot play (pressing "a" mid-game will stop the game; you can see where the bot ended up)
         v : toggle visual, 30 fps version of "a" (you also need to press "a" after this to use auto bot play)
@@ -692,9 +692,9 @@ class Minesweeper:
             def bot_execute():
                 '''
                 ACTUAL BOT LOGIC EVENT CHAIN IS HERE: this performes the above functions in order.
-                Like you see, if 'self.solved_new_using_simple_solver == True', it RETURNS instead of
+                Like you see, if 'self.solved_new_using_simple_solver = True', it RETURNS instead of
                 going to csp_solve(). The purpose is to reduce the number of equations going to 
-                `CSP_solver` as much as possible. It's also cooler to look on the screen as the bot plays in
+                `CSP_solver` as much as possible. It also looks much better as the bot plays in
                 smaller increments this way.
                 '''
                 self.reset_vars_at_start_of_bot_execute()               # resets 'self.solved_new_using_simple_solver', self.solver.guess
@@ -702,10 +702,6 @@ class Minesweeper:
 
                 if self.solved_new_using_simple_solver:                 # IF 'simple_solver()' IS ENOUGH, DO NOT PROCEED FURTHER! Only use the heavier machinery (csp_solve()) if necessary.
                     return
-
-                # if I don't 'draw_display()' here, when using debugger, I wouldn't be able to see the map before csp-section code is executed c:
-                if self.debug_csp:
-                    self.draw_display()
 
                 feed_csp_solver()                                       # this also resets all old csp solver vars
 
@@ -1009,7 +1005,7 @@ if __name__ == '__main__':
     minecount_demonstration_sometimes = 5,5,15
 
     ''' ↓↓↓ STARTS A NEW MINESWEEPER with the ability to play the bot by pressing b ↓↓↓ (instructions in the game) '''
-    # Minesweeper(beginner[0], beginner[1], beginner[2], csp_on=False) # IF YOU WANT ONLY simple_solver(), which WORKS at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
+    # Minesweeper(beginner, csp_on=False) # IF YOU WANT ONLY simple_solver(), which WORKS at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
     #             width      height     mines
-    Minesweeper(expert[0], expert[1], expert[2], csp_on=True, 
+    Minesweeper(expert, csp_on=True, 
     minecount_demo_number=None, logic_testing_on=False, unnecessary_guesses=False)
