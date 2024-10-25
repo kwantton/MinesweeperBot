@@ -23,7 +23,7 @@ class CSP_solver:
     # DNR = Do not reset! (every round of CSP_solve or every round of equation adding)
     def __init__(self):
         # DNR = do not reset every round
-        self.time_limit = 20                                            # Note! Here you can set max time limit for 'traverse()' in 'join_comp_groups_into_solutions()'. If no limit is set, the worst games will be killed automatically
+        self.time_limit = 60000000                                      # Note! Here you can set max time limit for 'traverse()' in 'join_comp_groups_into_solutions()'. If no limit is set, the worst games will be killed automatically
         self.solved_variables = set()                                   # DNR! Do not reset. ((x,y), value); the name of the variable is (x,y) where x and y are its location in the minesweeper map (if applicable), and the value of the variable is either 0 or 1, if everything is ok (each variable is one cell in the minesweeper map, and its value is the number of mines in the cell; 0 or 1, that is)
         self.minecount_solved_vars = set()                              # DNR! for highlighting in botGame.py. Do NOT reset every round
         self.initialize_those_that_are_immediately_needed_in_botGame()
@@ -51,12 +51,12 @@ class CSP_solver:
         self.minecount_successful = False                               # was a new solution found via minecount? This info is used in printing in 'botGame.py': write 'minecount successful' in the game, if minecount was used. For debugging, and most especially for showing off and looking smart.
         self.minecount_was_left_unfinished = False
         self.solved_new_vars_during_this_round = False                  # the most straightforward way of checking if guessing is ACTUALLY needed, as long as you remember to set this to 'True' when appropriate!
-        self.best_front_guess_in_all_eq_set_pre_minecount = None
+        self.best_front_guess_in_all_eq_sets_pre_minecount = None
         self.highest_front_survival_rate_in_all_eq_sets_pre_minecount = 0
 
     def reset_vars_before_adding_new_equations(self):
         self.variables = set()                                          # ALL variables, solved or not. Note! If I uncomment, a test will not pass.
-        self.unique_equations = []
+        self.unique_equations = set()
         self.variable_to_equations = dict()
     
     # SOLVER ↓
@@ -76,7 +76,7 @@ class CSP_solver:
         (7) if nothing else above helps, if `self.solved_new_vars_during_this_round = False` at this point, then guess.
         '''
         
-        print('\nabsolut_brut()')
+        print('\nabsolut_brut():')
 
         def common_vars(vars1, vars2) -> bool:
             '''
@@ -101,7 +101,7 @@ class CSP_solver:
             def add_eqs_containing_current_var_to_current_group(group_n, variable):
                 if variable in called_vars:                                         # this function will pass this check (i.e. will NOT return) exactly as many times as how many UNIQUE variables there are; if a,b,c,d, then 4 times in total, no more. Quite practical.
                     return
-                next_up = self.variable_to_equations[variable]
+                next_up = sorted(self.variable_to_equations[variable])
                 called_vars.add(variable)
                 for vars, summa in next_up:
                     for var in vars:
@@ -114,7 +114,7 @@ class CSP_solver:
                         add_eqs_containing_current_var_to_current_group(group_n, var)
 
             group_n = 1
-            for key, eqs in self.variable_to_equations.items():
+            for variable, eqs in self.variable_to_equations.items():
                 if len(called_vars) == len(self.variables):                         # if ALL the variables have been classified, then return. Usually, this return happens after the first round, if all the variables are connected! This saves quite a bit of work. This saves a LOT of work later on when connecting equation pairs, and when building solution trees; I'm keeping separate groups separate!
                     return groupN_to_vars
                 groupN_to_vars[group_n] = set()                                     # initialize for this 'group_n'
@@ -372,24 +372,18 @@ class CSP_solver:
             self.guess = naive_safest_guess                                     # default. The below might be false -> the default stays.
             self.front_guess = naive_safest_guess                               # as a backup to 'botGame.py' in case there are no unseen cells at all
             if self.minecount_was_left_unfinished:                              # use this likely more reliable probability in case minecount-related var 0s and 1s count was left unfinished!
-                self.guess = self.front_guess = self.best_front_guess_in_all_eq_set_pre_minecount
+                self.guess = self.front_guess = self.best_front_guess_in_all_eq_sets_pre_minecount
                 best_front_chance = self.highest_front_survival_rate_in_all_eq_sets_pre_minecount * 100 # had forgotten this * 100, BUT THAT LED TO BETTER RESULTS! So, opting for uu guesses more might be a good idea!
             if number_of_unclicked_unseen_cells > 0:                            # Can't guess unseen cell if there are no unseen unclicked cells. Also would divide by zero.
                 unclicked_unseen_cell_safety_in_WORST_scenario = 100 - (100 *(n_mines_remaining - min_n_mines_in_front) / number_of_unclicked_unseen_cells)  # 100 - percent mine density in unclicked unseen cells in the case that there's the min possible number of mines remaining in self.front. A good question is which is the best; using the min n mines in front, or average, or max?
                 unclicked_unseen_cell_safety_in_BEST_scenario = 100 - (100 *(n_mines_remaining - max_n_mines_in_front) / number_of_unclicked_unseen_cells)  # 100 - percent mine density in unclicked unseen cells in the case that there's the max possible number of mines remaining in self.front
-                # AVERAGE_uu_cell_safety = (unclicked_unseen_cell_safety_in_WORST_scenario + unclicked_unseen_cell_safety_in_BEST_scenario) / 2
                 uu_comparison_choice = unclicked_unseen_cell_safety_in_WORST_scenario               # THIS SEEMS THE BEST OPTION! This prefers front guessing. Of course, it's essential in this case that the front probs are as accurate as possible. For that, I recorded the 'exact' non-minecount probs before minecount in case minecount calc is not finished, so that can be used!
-                if self.minecount_was_left_unfinished:
+
+                if self.minecount_was_left_unfinished:                                              # = if minecount filtering, which WAS needed, did NOT produce results.
                     uu_comparison_choice = unclicked_unseen_cell_safety_in_BEST_scenario            # if minecount was left unfinished, then its info is non-complete -> let's favour uu_cell guessing here!
-                # if best_front_chance < uu_comparison_choice:                                      # NOT AS GOOD RESULTS!
-                if best_front_chance < uu_comparison_choice or self.minecount_was_left_unfinished:  # BEST RESULTS!
+                if best_front_chance < uu_comparison_choice or self.minecount_was_left_unfinished:  # BEST RESULTS! It makes sense that this is the optimal guess here if MCF didn't produce results; this guess may lead to (1) opening up new solutions directly or (2) MCF providing answers NEXT round, so kinda double chance of being helpful in this situation!
                     self.guess = "pick unclicked"                               # for guessing. If 'unclicked' cells have the lowest mine density, then guess there. 
                     self.choice = 'UNSEEN'
-                    # if self.minecount_was_left_unfinished:
-                    #     if best_front_chance > uu_comparison_choice + 30:     # if front is clearly better, pick front. HOWEVER! This alone did NOT make the results better, which is very interesting. That's why the additional condition below (higher than 90%, at least at the time of writing this, ignore if doesn't make sense)
-                    #         if best_front_chance > 90:                        # EVEN STRICTER conditions for front guessing
-                    #             self.guess = self.front_guess
-                    #             self.choice = 'FRONT'
                 self.p_success_unseen = round(uu_comparison_choice, 1)
                 if self.p_success_unseen < 0:
                     print("p_success_unseen < 0:", self.p_success_unseen)       # Note: this CAN be negative if using the absolute worst-case scenario (highest possible mine density in uu_cells) regarding uu_cell mine density (the -x then means that the worst case scenarios are impossible in that situation, naturally) OR if using average! Reason: notice the 'MIN' in 'min_n_mines_in_front'? This assumes there's MAX POSSIBLE mine density in uu cells -> in worst cases, negative probability because of the way I count this probability: `unclicked_unseen_cell_safety_in_worst_scenario = 100 - (100 *(n_mines_remaining - min_n_mines_in_front) / number_of_unclicked_unseen_cells)  which is 100 - percent mine density in unclicked unseen cells in the case that there's the minimum possible number of mines remaining in self.front. In cases where minecount doesn't exactly tell how many mines are in uu cells, it's possible that the min n mines IS INDEED negative, BUT still taking that into account doesn't lead to new absolute solutions for any variable -> this guessing is called -> a negative number can be printed here, because I'm using the WORST CASE SCENARIO. That's why "≈" is written in the game in showing the uu probability ('uu prob ≥ x', written as 'other ≥ x' in the game)! Yes, this is complicated, sorry. ALSO! This can be over 100%, IF average or max front minecount is used, because neither of those might be the case! Yes, it's complicated
@@ -455,7 +449,7 @@ class CSP_solver:
                         best_bet = var
                         highest_survival_rate_in_front_cells = zeros / (zeros + ones)
                     if (zeros / (zeros + ones)) > self.highest_front_survival_rate_in_all_eq_sets_pre_minecount:    # RECORD FOR GUESSING RELIABLY IN CASE MINECOUNT IS NOT FINISHED
-                        self.best_front_guess_in_all_eq_set_pre_minecount = var
+                        self.best_front_guess_in_all_eq_sets_pre_minecount = var
                         self.highest_front_survival_rate_in_all_eq_sets_pre_minecount = zeros / (zeros + ones)
 
             if called_from_minecount: # Note! if false, this function was NOT called from minecount but earlier, from after `join_comp_groups...()`, which means I don't want to guess just yet, since the need for minecount hasn't been checked yet! If it's NOT needed (= if it doesn't benefit me), THEN I'll use this guessing c:
@@ -739,12 +733,12 @@ class CSP_solver:
             self.reset_vars_before_adding_new_equations()
         for x,y, variables, summa in equations:                                                                                         # (x,y, variables, sum_of_variables). The x and y are the origin of the equation - actually unnecessary at the moment, I'm not using it for anything atm.
             variables = tuple(sorted(variables))
-            self.unique_equations.append((variables, summa))
+            self.unique_equations.add((variables, summa))
             for var in variables:
                 if var not in self.variable_to_equations:
                     self.variables.add(var)
-                    self.variable_to_equations[var] = []
-                self.variable_to_equations[var].append((variables, summa))     
+                    self.variable_to_equations[var] = set()
+                self.variable_to_equations[var].add((variables, summa))     
         pass  
 
 def format_equation_for_csp_solver(x:int, y:int, variables:tuple, surrounding_mine_count:int) -> list:
