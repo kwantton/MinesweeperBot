@@ -7,14 +7,12 @@ see [how_to_clone.md](how_to_clone.md)
 
 ## results (as of 25.10.2024)
 [Win_percentages_and_average_time_per_game](./Testing/Win_percentages_and_average_time_per_game.pdf)
-Out of the 183 696 expert games so far (after latest changes), 38.80 % have been solved with average time 147 ms per game.
-After latest fixes and improvements, out of 32 069 expert games, 38.76% have been won, average 77 ms per game.
 
-Expert games: 38.76% won, average 77 ms / game, n = 32 069 (new)
+Expert games: 38.84% won, average 77 ms/game, n = 50 561, 2.67 guesses/game (new)
 
-Intermediate games: 83.6% won, average 11 ms / game, n=26 430 (old, before latest fixes and improvements)
+Intermediate games: 83.20% won, average 12 ms/game, n=20 145, 0.73 guesses/game (new)
 
-Beginner games: 95.9% won, average 5 ms / game, n=25 038 (old, before latest fixes and improvements)
+Beginner games: 95.69% won, average 6 ms/game, n=23 474, 0.25 guesses/game (new)
 
 Validity testing: 
 [Logic validity testing](./Testing/Logic_validity_testing/Logic_validity_testing.pdf)
