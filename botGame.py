@@ -692,10 +692,29 @@ class Minesweeper:
             def bot_execute():
                 '''
                 ACTUAL BOT LOGIC EVENT CHAIN IS HERE: this performes the above functions in order.
-                Like you see, if 'self.solved_new_using_simple_solver = True', it RETURNS instead of
-                going to csp_solve(). The purpose is to reduce the number of equations going to 
-                `CSP_solver` as much as possible. It also looks much better as the bot plays in
+                Each step below has return possibility in case vars are solved; no need to go further
+                    The purpose of this return possibility is to reduce the number of equations going into
+                `CSP_solver` as much as possible. It also looks significantly better as the bot plays in
                 smaller increments this way.
+
+                (1) reset vars
+                (2) simple solver, repeat as long as possible
+                (3) feed old and new csp solver if (2) wasn't enough
+                (4) old CSP_solver: produces answers quickly in simplish situations by subtracting equations from each other
+                (5) new CSP_solver if old wasn't enough
+                    5.0 divide equations into separated sets so that no set has common variables with other sets
+                    Then, for each set:
+                        5.1 equation chain build + backtracking (check conflicts) in trees
+                        - discard impossible (conflicting) alt answers, 
+                        - record number of times each var was 0 and 1
+                    5.2 if 5.1 wasn't enough, check need for minecount (two conditions)
+                    5.3 if minecount is needed, use 'simple minecount' if possible
+                        - if minecount is not needed, use vars' counts or 0 and 1 recorded in 5.1 for guessing
+                    5.4 if 5.3 wasn't enough, use minecount filtering
+                        - (the moment each var has been recorded as 0 and 1 at least once, can return; no var is solved in this case)
+                        - record number of 0s and 1s for each var
+                        - check if answers were found
+                        - guess if no vars solved
                 '''
                 self.reset_vars_at_start_of_bot_execute()               # resets 'self.solved_new_using_simple_solver', self.solver.guess
                 simple_solver()
@@ -1007,5 +1026,5 @@ if __name__ == '__main__':
     ''' ↓↓↓ STARTS A NEW MINESWEEPER with the ability to play the bot by pressing b ↓↓↓ (instructions in the game) '''
     # Minesweeper(beginner, csp_on=False) # IF YOU WANT ONLY simple_solver(), which also works at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
     
-    Minesweeper(beginner, csp_on=True, 
+    Minesweeper(expert, csp_on=True, 
     minecount_demo_number=None, logic_testing_on=False, unnecessary_guesses=False)
