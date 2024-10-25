@@ -935,7 +935,7 @@ class Minesweeper:
                 write_choice()
 
         pygame.display.flip()                                               # display.flip() will update the contents of the entire display. display.update() enables updating of just a part IF you specify which part
-        self.clock.tick(30)
+        self.clock.tick(100)
 
     def loop(self) -> None:
         '''
@@ -1005,7 +1005,7 @@ if __name__ == '__main__':
     minecount_demonstration_sometimes = 5,5,15
 
     ''' ↓↓↓ STARTS A NEW MINESWEEPER with the ability to play the bot by pressing b ↓↓↓ (instructions in the game) '''
-    # Minesweeper(beginner, csp_on=False) # IF YOU WANT ONLY simple_solver(), which WORKS at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
-    #             width      height     mines
-    Minesweeper(expert, csp_on=True, 
+    # Minesweeper(beginner, csp_on=False) # IF YOU WANT ONLY simple_solver(), which also works at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
+    
+    Minesweeper(beginner, csp_on=True, 
     minecount_demo_number=None, logic_testing_on=False, unnecessary_guesses=False)
