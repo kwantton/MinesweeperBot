@@ -758,9 +758,11 @@ class Minesweeper:
                 shown_time = '0'
                 if not self.visual_autobot:
                     shown_time += ' ms'
+                else:
+                    shown_time += ' s'
             elif not self.game_ended:
                 self.current_time = pygame.time.get_ticks()
-                shown_time = f'{((self.current_time - self.start_time) // 1000)}'
+                shown_time = f'{((self.current_time - self.start_time) // 1000)} s'
             else:                                                                                       # GAME END: hit a mine or won; GAME ENDED:
                 if self.finished_using_autobot and not self.visual_autobot:
                     ms_time = self.elapsed_bot_ms                                                       # autobot timer; the goal is to be as precise as possible

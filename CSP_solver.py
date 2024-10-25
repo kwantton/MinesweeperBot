@@ -49,6 +49,7 @@ class CSP_solver:
         self.p_success_front = None                                     # probability of surviving the safest front cell guess
         self.p_success_unseen = None                                    # prob of surviving any of the safest non-front cell (aka. unseen unclicked cell) guesses; they are equal, as they are unseen, so they all have the same (naive) probability
         self.minecount_successful = False                               # was a new solution found via minecount? This info is used in printing in 'botGame.py': write 'minecount successful' in the game, if minecount was used. For debugging, and most especially for showing off and looking smart.
+        self.minecount_was_left_unfinished = False
         self.solved_new_vars_during_this_round = False                  # the most straightforward way of checking if guessing is ACTUALLY needed, as long as you remember to set this to 'True' when appropriate!
 
     def reset_vars_before_adding_new_equations(self):
@@ -374,10 +375,13 @@ class CSP_solver:
                 unclicked_unseen_cell_safety_in_WORST_scenario = 100 - (100 *(n_mines_remaining - min_n_mines_in_front) / number_of_unclicked_unseen_cells)  # 100 - percent mine density in unclicked unseen cells in the case that there's the min possible number of mines remaining in self.front. A good question is which is the best; using the min n mines in front, or average, or max?
                 unclicked_unseen_cell_safety_in_BEST_scenario = 100 - (100 *(n_mines_remaining - max_n_mines_in_front) / number_of_unclicked_unseen_cells)  # 100 - percent mine density in unclicked unseen cells in the case that there's the max possible number of mines remaining in self.front
                 AVERAGE_uu_cell_safety = (unclicked_unseen_cell_safety_in_WORST_scenario + unclicked_unseen_cell_safety_in_BEST_scenario) / 2
-                if best_front_chance < AVERAGE_uu_cell_safety:
+                uu_comparison_choice = unclicked_unseen_cell_safety_in_WORST_scenario       # THIS SEEMS THE BEST OPTION!
+                if self.minecount_was_left_unfinished:
+                    uu_comparison_choice = unclicked_unseen_cell_safety_in_BEST_scenario      # if minecount was left unfinished, then its info is non-complete -> let's favour uu_cell guessing here!
+                if best_front_chance < uu_comparison_choice:
                     self.guess = "pick unclicked"                               # for guessing. If 'unclicked' cells have the lowest mine density, then guess there. 
                     self.choice = 'UNSEEN'
-                self.p_success_unseen = round(AVERAGE_uu_cell_safety, 1)
+                self.p_success_unseen = round(uu_comparison_choice, 1)
                 if self.p_success_unseen < 0:
                     print("p_success_unseen < 0:", self.p_success_unseen)       # Note: this CAN be negative if using the absolute worst-case scenario (highest possible mine density in uu_cells) regarding uu_cell mine density (the -x then means that the worst case scenarios are impossible in that situation, naturally) OR if using average! Reason: notice the 'MIN' in 'min_n_mines_in_front'? This assumes there's MAX POSSIBLE mine density in uu cells -> in worst cases, negative probability because of the way I count this probability: `unclicked_unseen_cell_safety_in_worst_scenario = 100 - (100 *(n_mines_remaining - min_n_mines_in_front) / number_of_unclicked_unseen_cells)  which is 100 - percent mine density in unclicked unseen cells in the case that there's the minimum possible number of mines remaining in self.front. In cases where minecount doesn't exactly tell how many mines are in uu cells, it's possible that the min n mines IS INDEED negative, BUT still taking that into account doesn't lead to new absolute solutions for any variable -> this guessing is called -> a negative number can be printed here, because I'm using the WORST CASE SCENARIO. That's why "≈" is written in the game in showing the uu probability ('uu prob ≥ x', written as 'other ≥ x' in the game)! Yes, this is complicated, sorry. ALSO! This can be over 100%, IF average or max front minecount is used, because neither of those might be the case! Yes, it's complicated
                     self.p_success_unseen = 0                                   # this is true, as negative probs are not real. This is not error patching: see my comment above (this assumes highest uu cell mine density, that's why negative values are possible in cases where min n mines in front still has room for more mines even after every uu cell is mined; 'leftovers' in the highest uu cell mine density cases -> negative prob)
@@ -502,6 +506,7 @@ class CSP_solver:
                                     seen_var_values.add((var, value))
                             if len(seen_var_values) == 2 * len(self.variables):
                                 no_vars_were_solved[0] = True
+                                self.minecount_was_left_unfinished = True
                                 print('⇒ EVERY VAR can be either 1 or 0 in at least one viable solution -> no absolutely solved vars') # I've seen this many times in the console, it works c:
                                 # sleep(10) # If you wanna see it, when this happens and the above comment is printed, just push i+a again to stop and see what the situation looks like
                                 
