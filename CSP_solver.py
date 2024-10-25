@@ -23,7 +23,6 @@ class CSP_solver:
     # DNR = Do not reset! (every round of CSP_solve or every round of equation adding)
     def __init__(self):
         # DNR = do not reset every round
-        self.time_limit = 60000000                                      # Note! Here you can set max time limit for 'traverse()' in 'join_comp_groups_into_solutions()'. If no limit is set, the worst games will be killed automatically
         self.solved_variables = set()                                   # DNR! Do not reset. ((x,y), value); the name of the variable is (x,y) where x and y are its location in the minesweeper map (if applicable), and the value of the variable is either 0 or 1, if everything is ok (each variable is one cell in the minesweeper map, and its value is the number of mines in the cell; 0 or 1, that is)
         self.minecount_solved_vars = set()                              # DNR! for highlighting in botGame.py. Do NOT reset every round
         self.initialize_those_that_are_immediately_needed_in_botGame()
@@ -44,7 +43,6 @@ class CSP_solver:
         self.guess = None                                               # # The safest cell to guess is saved here for use in botGame.py, if there is a need to guess. If (1) normal solving doesn't help AND (2.1) no need for minecount or (2.2) mine counting didn't solve variables either, THEN guess the safest cell. This info, 'self.guess', is passed on to 'botGame.py' where the guess is made. I made a separate variable for this to be able to recognize this guessing situation in 'botGame.py' to distinguish it from normal solving; this makes it possible to add visuals, etc... what is the next guess, if needed? If this is not 'None', then guess is needed. Resetting this to 'None' at the start of every round of 'absolut_brut()', in case the previous round was a guess. (12.10.2024): this is the default value. If even mine counting doesn't help, then this is set to True in 'handle_possible_whole_solutions()'. That info is then read in 'botGame.py' to handle the guessing.
         self.choice = None                                              # the best possible front cell (lowest chance of mine in front) OR unseen unclicked cells? The guess is always one of these two
         self.start = time()                                             # can use this to stop if takes a ridicilous amount of time per round
-        self.timeout = False                                            # I had forgotten to add this here c: kiesus effin crispr. This tells this CSP_solver, 'do not guess'. If the timer expires, this is True, in which case a guess will commence. This is to get rid of extreme-worst-case scenarios, where the solver could be churning for over an hour (yep, that happend once, 70 minutes)
         self.front_guess = None                                         # save the safest possible front cell here if guess is needed
         self.p_success_front = None                                     # probability of surviving the safest front cell guess
         self.p_success_unseen = None                                    # prob of surviving any of the safest non-front cell (aka. unseen unclicked cell) guesses; they are equal, as they are unseen, so they all have the same (naive) probability
@@ -291,11 +289,6 @@ class CSP_solver:
             def traverse(this_alt, entered_alts_for_this_build, 
                 possible_solution_build, already_handled_groups,
                 n_times_traversed_for_debugging) -> None:                                # returns 'n_times_traversed...'
-
-                elapsed = time() - self.start
-                if elapsed > self.time_limit:
-                    self.timeout = True
-                    return
                 n_times_traversed_for_debugging[0] += 1
 
                 already_handled_groups_local = already_handled_groups.copy()
@@ -334,8 +327,6 @@ class CSP_solver:
                         # only do this if the above 'if' has not been fulfilled; it's not possible to gain another answer by trying to add yet another alt solution in the case where all the equations (all groups) have already been satisfied, which is checked in the 'if' clause above. SO: for every set of new_matches, I want the info that was updated according to what happened in the specific alternative solution above; which alt solution ('proposed_matching_alt') was 'entered' (seen, processed), which 'group' (equation) in question was handled. Since all the alternatives in the above loop are indeed ALTERNATIVES, they are NOT all saved immediately! (that would be incorrect), instead that is done after the 'traverse()'s below!
                         if new_matches:
                             for new_match in new_matches:
-                                if self.timeout:
-                                    return
                                 if new_match not in entered_alts_for_this_build_local:    # technically redundant, probably almost no effect regarding computing efficiency, BUT it's nice for clarity, and showing the logic still (even if double check)
                                     traverse(new_match, entered_alts_for_this_build_local, 
                                         possible_solution_build_local, already_handled_groups_local,
@@ -344,18 +335,12 @@ class CSP_solver:
                         
             # 'starting_group' is the group from where all arrows leave, and back to which no arrows return; an alt origin for an alt rooted tree, essentially!
             for alt_origin in starting_group:                                       # E.g.: ('d', 'e'), [(('d',1),('e',0)), (('d',0),('e',1))]. This quarantees that they build unidentical solution trees that together encompass all possible whole solutions.
-                if self.timeout:
-                    break
                 if alt_origin in compatibility_groups:                              # some might have been filtered out as they were no longer fitting ALL other groups; the whole key has been deleted from 'compatibility_groups' if it's not compatible with ANY alt solution from its paired group (paired equation)
                     seen_proposed_vectors = set()                                   # PER alt answer, of course - that's why it's initialized here and not at the top of this 'join_groups_into_solutions'
                     handled_groups = []
                     alt_solution_build = {}
                     traverse(alt_origin, seen_proposed_vectors, 
                         alt_solution_build, handled_groups, n_times_traversed_for_debugging)                         # 'traverse' builds alternative 'possible_whole_solutions' and saves all viable ones to 'possible_whole_solutions'
-            if self.timeout:
-                print('TOOK LONGER THAN', self.time_limit, 's - therefore GUESSING NEXT')
-                timeout_guess()
-                return 'time', 'out', 'occurred'    
 
             # done: Count also at this point, use the ready function for that!; if max mines in front < minecount, there's NO NEED for minecount (this is checked in minecount situation checking functions later) -> use this instead!!!! That will significantly make the worst cases faster!!
             print(' → `traverse` called', n_times_traversed_for_debugging[0], 'times')
@@ -714,8 +699,6 @@ class CSP_solver:
             eq_set_possible_solutions_and_guessing_info_in_case_minecount_is_not_needed = []                                                                                                  # eg. this could be[{a:1,b:0}, {a:0,b:1}] for a situation where there's one fifty-fifty ending, AND in addition an x number of unclicked unseen cells. If the minecount is 1, then all the unclicked unseen cells must be zero.
             for compatibility_groups, starting_group in compGroups_and_startingGroup:
                 possible_whole_solutions, best_bet, highest_survival_rate_in_front_cells = join_comp_groups_into_solutions(compatibility_groups, starting_group)
-                if self.timeout:
-                    return
                 eq_set_possible_solutions_and_guessing_info_in_case_minecount_is_not_needed.append(
                     (possible_whole_solutions, best_bet, highest_survival_rate_in_front_cells))
 

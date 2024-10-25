@@ -628,21 +628,6 @@ class Minesweeper:
                     self.solved_by_minecount += 1
                 filter_front_cells()                                        # 'self.front' has to be kept up-to-date. It's simple: if a self.front member is no longer surrounded by any unclicked unflagged cells, it is no longer in self.front.
                 return solved_new
-            
-            def guess_preferably_uu() -> tuple:
-                '''
-                this is only in the rarest of special cases, when `CSP_solver` timeout timer is exceeded
-                in the worst cases (currently it's set to 10 seconds per solving round). This random_guess()
-                chooses a random cell only, if no unseen unclicked cells remain at all.
-                '''
-                for x, y in self.front:
-                    for n in self.get_neighbours_of(x,y):
-                        if self.map[y][x] == unclicked:
-                            return x,y
-                for x in range (self.width):
-                    for y in range (self.height):
-                        if self.map[y][x] == unclicked:
-                            return x,y
 
             def pick_optimal_unclicked_unseen_cell_for_guessing() -> tuple:
                 '''
@@ -684,7 +669,6 @@ class Minesweeper:
                                         return n
                 for cell in uu_cells:                               # if there are no suitable neighbours' neighbours, then just pick the first unclicked unseen cell that you come across
                     return cell
-                return None                                         # if there are no uu_cells (I'm only needing this in case I'm using a timer timeout in CSP_solver in the worst cases! Never else is this used (I know because I had played tens of thousands of games without this before implementing this c:))
 
             def guess(cell_to_open) -> None:                        # I'm not specifying the 'cell_to_open' as string of tuple, as both can be used.
                 '''
@@ -692,12 +676,10 @@ class Minesweeper:
                 returns:    Nothing. Performs the guessing via `probe(cell_to_open)`
                 '''
                 self.guesses += 1
-                if cell_to_open in ['pick unclicked', 'timeout']:
+                if cell_to_open == 'pick unclicked':
                     cell_to_open = pick_optimal_unclicked_unseen_cell_for_guessing()
                 if cell_to_open == None:
                     cell_to_open = self.solver.front_guess
-                if cell_to_open == None:                            # ONLY if I set a timeout timer in `CSP_solver`, otherwise this was never needed (not in 18 000 expert games, at least c:)
-                    cell_to_open = guess_preferably_uu()            # ONLY in case of timer timeout in `CSP_solver`
                 self.guessed_cells.add(cell_to_open)
                 self.latest_guess = cell_to_open                    # for highlighting the LATEST guess also, very convenient for seeing what just happened
                 self.probe(x=cell_to_open[0], y=cell_to_open[1])
