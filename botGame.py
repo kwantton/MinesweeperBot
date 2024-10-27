@@ -670,6 +670,21 @@ class Minesweeper:
                 for cell in uu_cells:                               # if there are no suitable neighbours' neighbours, then just pick the first unclicked unseen cell that you come across
                     return cell
 
+            def guess_preferably_uu() -> tuple:                     # when 'unnecessary_guesses = True', this is needed. Just guess, quality doesn't matter.
+                '''
+                this is only in the rarest of special cases, when `CSP_solver` timeout timer is exceeded
+                in the worst cases (currently it's set to 10 seconds per solving round). This random_guess()
+                chooses a random cell only, if no unseen unclicked cells remain at all.
+                '''
+                for x, y in self.front:
+                    for n in self.get_neighbours_of(x,y):
+                        if self.map[y][x] == unclicked:
+                            return x,y
+                for x in range (self.width):
+                    for y in range (self.height):
+                        if self.map[y][x] == unclicked:
+                            return x,y
+            
             def guess(cell_to_open) -> None:                        # I'm not specifying the 'cell_to_open' as string of tuple, as both can be used.
                 '''
                 parameters: cell_to_open; can be string or tuple
@@ -680,6 +695,8 @@ class Minesweeper:
                     cell_to_open = pick_optimal_unclicked_unseen_cell_for_guessing()
                 if cell_to_open == None:
                     cell_to_open = self.solver.front_guess
+                if cell_to_open == None:
+                    cell_to_open = guess_preferably_uu()
                 self.guessed_cells.add(cell_to_open)
                 self.latest_guess = cell_to_open                    # for highlighting the LATEST guess also, very convenient for seeing what just happened
                 self.probe(x=cell_to_open[0], y=cell_to_open[1])
@@ -723,7 +740,8 @@ class Minesweeper:
                     new_vars_solved = csp_solve()
 
                 if (self.solver.guess and not new_vars_solved) or self.unnecessary_guesses:       # (1) NORMAL USAGE: if CSP_solver has not managed to solve any new variables with 100% certainty ('normal' logic OR minecounting logic), THEN guess. This info is directly obtained from 'self.solver', as you can see (`if self.solver.guess`) (2) TESTING TESTING USAGE: if `self.unnecessary_guesses`, then guesses are done -> the lost game missed logic tester in 'constraint_problem_solver_for_testing.py' will notice that missing logic was found, and the 'missing_logic' counter will increase and turn red, proving that it works. Awesome!
-                    guess(self.solver.guess)                            # 'self.solver.guess' is the variable that had the highest probability of NOT being a mine (as of 12.10.2024 at least)
+                    if self.n_unclicked > 0:                            # it would otherwise be possible to try to guess after just having finished the map -> error
+                        guess(self.solver.guess)                        # 'self.solver.guess' is the variable that had the highest probability of NOT being a mine (as of 12.10.2024 at least)
 
             bot_execute()
 
@@ -1038,4 +1056,4 @@ if __name__ == '__main__':
     # Minesweeper(beginner, csp_on=False) # IF YOU WANT ONLY simple_solver(), which also works at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
     
     Minesweeper(expert, csp_on=True, 
-    minecount_demo_number=None, logic_testing_on=False, unnecessary_guesses=False)
+    minecount_demo_number=None, logic_testing_on=False, unnecessary_guesses=True)
