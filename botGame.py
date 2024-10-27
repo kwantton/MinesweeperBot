@@ -366,7 +366,7 @@ class Minesweeper:
         solver to see, if solutions were missed!
         '''
         eq_list = []
-        for eq in self.solver.unique_equations:
+        for eq in self.solver.all_unique_equations:
             eq_list.append(eq)        
         self.last_lost_game = eq_list
         print('GAME LOST')
