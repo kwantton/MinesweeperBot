@@ -28,7 +28,7 @@ Ratkaisu (arvaukset mukaanlukien) on kahdeksanvaiheinen (19.10.2024):
 
 Toteutuksessani halusin väsätä kaiken 'itse'. Saatan käyttää coupled subsets CSP:tä (CSCSP:tä, kuten Becerra 2015), mutta en ole lukenut työtä kunnolla, ja esim. yhtälöiden ketjuttamisen keksin itse (se siis nimenomaan on ketju eikä verkko, ja vaati ymmärryksen siitä, että kaikkien settien kaikkien yhtälöiden globaalit ratkaisut koostuvat niistä alteista, jotka myös joka ikinen yhtälöpari jakaa keskenään, eli ketjuttamisjärjestyksellä ei ole väliä, kaikki globaalit ratkaisut löydetään järjestyksestä riippumatta). 
 
-Ainoa lähteeni on Becerra, 2015. Becerran työssä ei tietääkseni puhuta minecount-tilanteista, mutta päästään lähes identtisiin tuloksiin kuin mihin itse pääsen (ks. "vertailu tunnettuihin miinaharava-algoritmeihin"-otsikko).
+Alkuperäinen lähteeni on Becerra, 2015. Becerran työssä ei tietääkseni puhuta minecount-tilanteista, mutta saadaan ratkaisuprosenttien suhteen identtiset tulokset kuin mihin itse pääsen (ks. "vertailu tunnettuihin miinaharava-algoritmeihin"-otsikko). Paras tulos, johon olen törmännyt, on 41% voitettuja klassisia Expert-kenttiä (https://github.com/DavidNHill/JSMinesweeper#readme). Toiseksi paras on päälle 39% (Tu, Li, Chen et al., 2017, AAAI-17 Workshop on What's Next for AI in Games?).
 
 Päädyin kolmannella viikolla tekemään ratkaisijan `CSP_solver` pitkälti uudestaan niin, että (voi olla osittain vanhentunutta)
 
@@ -118,12 +118,15 @@ Syy voi olla seuraava: en yhdistä eriytettyjen rintamien ('disjoint subsets') t
 
 Erinomainen lähde tälle asialle lienee käyttäjänimi 'Shuffler' Minesweeper Community -Discord-kanavalla (https://github.com/DavidNHill/JSMinesweeper#readme). Hän on tehnyt ratkaisijan+arvaajan, joka voittaa hieman yli 41% (mikä on ällistyttävän hyvä) klassisista (1. ruutu 0-8) Expert-kentistä, ja on tietääkseni vastuussa siitä, että minesweeper.online-sivuston 'win rate' -prosentit ovat sitä mitä ovat (esim. kentälle 30x16|99, eli expert, win rate on 40.1%, joka on täydellinen logiikka + täydelliset arvaukset MIINUS jonkin suuruinen inhimillisen virheen vara, joka on sitä isompi, mitä isompi ja vaikeampi kenttä on kyseessä; tämä on tapa, jolla nämä lukuarvot sivustolla on saatu, lähteenäni kyseisen sivuston chat). Tämä on parempi kuin paras löytämäni tieteellisen artikkelin saavuttama ratkaisuprosentti, joka on 39.62% (Tu, Li, Chen et.al. 2017, AAAI-17 Workshop on What's Next for AI in Games?).
 
+**Tärkeää!** Käyttäjänimen 'Shuffler' algoritmi(sto) voittaa 5.1% Expert-peleistä ilman arvauksia, ja pääsen itse samaan tulokseen. Häneltä kysyttyäni tämä on vahva todiste siitä, että kaikki mahdollinen ratkaisulogiikka on käytössä ja toimii (lähde: Discord-keskustelu). Samoin, validiteettitestauksessa ei ole tullut ilmi ongelmia, MUTTA tässä testauksessa EI oteta minecount-tilanteita huomioon, koska muuten tämä tarkastaja tukehtuisi kyseiseen yhtälöön (tarkastaja brute-forceaa kaikki mahdolliset ratkaisut, mikä on käyttökelvotonta minecountin tapauksessa, sillä minecount-yhtälö toteaa, että kaikkien jäljelläolevien muuttujien summa = jäljellä olevien miinojen lukumäärä. Mahdollisia ratkaisuja on siis melkein aina liikaa lueteltavaksi, jos tämä yhtälö otetaan mukaan)
+
 Niin omassa työssäni kuin ei Becerran työssäkään tarkastella, mitä tapahtuu arvauksen jälkeen; siis arvaukset ovat 'naiiveja' sen suhteen, mitä arvauksen jälkeen tapahtuu - vaikka kussakin pelitilanteessa löydetäänkin kyseisellä hetkellä turvallisin arvaus, tämä ei takaa sitä, että tämä 'turvallisin' arvaus olisi oikeasti paras koko loppumapin ratkaisemisen kannalta. On esimerkiksi tilanteita, joissa arvaus, vaikka ei osuisikaan miinaan, ei kerro mitään loppujen miinojen sijainneista, eli voi tosiasiassa olla kaikkein huonoin arvaus, vaikka olisikin akuutisti 'turvallisin'. Toisin on nimimerkin 'Shuffler' ratkaisijan tapauksessa, joka saa 41% klassisista Expert-kentistä voitettua.
 
-## to-do: viitteet: 
+## viitteet: 
 
 Becerra, David J. 2015. Algorithmic Approaches to Playing Minesweeper. Bachelor's thesis,
 Harvard College (permalink: http://nrs.harvard.edu/urn-3:HUL.InstRepos:14398552).
+Paras tulos, johon olen törmännyt, on 41% voitettuja klassisia Expert-kenttiä (https://github.com/DavidNHill/JSMinesweeper#readme). Toiseksi paras on päälle 39% (Tu, Li, Chen et al., 2017, AAAI-17 Workshop on What's Next for AI in Games?).
 
 ## huomioita
 (1) Kirjoitin, että $r$ rivillä ja $s$ sarakkeella miinoja $m$ voi olla $m < rs-9$. "Klassisessa" miinaharavassa siten kuin se yleensä ymmärretään, ja kuten esim. minesweeper.online toimii (Vista, 2007, mappi generoidaan 1. klikkauksen jälkeen, 1. klikkaus on 0-8), jonka itsekin toteutin, taataan aina että ensimmäinen klikattu ruutu on 0-8. Koska on mahdollista klikata muualle kuin reunaan/kulmaan, on siis maksimimäärä miinoja, joita mappiin mahtuu, $rs-8$. Tämä on ihan mukavaa pelaajalle, ja mukavampaa testaamisen ja demoamisen kannalta myös (ettei joka ikisellä expert-pelillä aloiteta tilanteessa, jossa nurkassa on "1" tai "2" -> pakko arvata seuraavaksi).
