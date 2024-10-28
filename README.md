@@ -3,6 +3,8 @@ Course _Aineopintojen harjoitustyö - algoritmit ja tekoäly_, University of Hel
 
 **Note!** There are two general versions of Minesweeper: the 'classic' version where the first click is guaranteed to be a number cell with number 0...8, and the so-called 'modern' minesweeper where the first click is guaranteed to be a 0 (meaning, there's an opening guaranteed at the very start).
 
+**Note!** This version does not clone the probability engine of the original minesweeper. Here the all the mines are placed after evenly **after** the first click.
+
 I had originally thought that these were the other way around, since minesweeper.online (where I play https://minesweeper.online/player/2600486) is a quite modern site, and I'm too young to have touched the original minesweeper. Hence, thus far (28.10.24), I had used win percentages for the modern version, thinking it was the classic version, in all my statistics. I am currently running games using the classic version (WIP).
 
 ## git cloning
