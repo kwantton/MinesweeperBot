@@ -28,7 +28,7 @@ Ratkaisu (arvaukset mukaanlukien) on kahdeksanvaiheinen (19.10.2024):
 
 Toteutuksessani halusin väsätä kaiken 'itse'. Saatan käyttää coupled subsets CSP:tä (CSCSP:tä, kuten Becerra 2015), mutta en ole lukenut työtä kunnolla, ja esim. yhtälöiden ketjuttamisen keksin itse (se siis nimenomaan on ketju eikä verkko, ja vaati ymmärryksen siitä, että kaikkien settien kaikkien yhtälöiden globaalit ratkaisut koostuvat niistä alteista, jotka myös joka ikinen yhtälöpari jakaa keskenään, eli ketjuttamisjärjestyksellä ei ole väliä, kaikki globaalit ratkaisut löydetään järjestyksestä riippumatta). 
 
-Ainoa lähteeni on Becerra, 2015. Becerran työssä ei tietääkseni puhuta minecount-tilanteista, eikä CSCSP-solver pääse 32.90 % korkeampaan ratkaisuprosenttiin, kun taas oma toteutukseni ratkaisee 10 sekunnin aikarajoituksella per peli 38.20% (n=12292) Expert-mapeista keskimääräisessä ajassa 153 ms / peli (19.10.2024).
+Ainoa lähteeni on Becerra, 2015. Becerran työssä ei tietääkseni puhuta minecount-tilanteista, mutta päästään lähes identtisiin tuloksiin kuin mihin itse pääsen (ks. "vertailu tunnettuihin miinaharava-algoritmeihin"-otsikko).
 
 Päädyin kolmannella viikolla tekemään ratkaisijan `CSP_solver` pitkälti uudestaan niin, että (voi olla osittain vanhentunutta)
 
