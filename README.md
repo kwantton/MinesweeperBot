@@ -7,7 +7,7 @@ Course _Aineopintojen harjoitustyö - algoritmit ja tekoäly_, University of Hel
 
 I had originally thought that 'classic' and 'modern' minesweeper were the other way around, since minesweeper.online (where I play https://minesweeper.online/player/2600486) is a quite modern site, and I'm too young to have touched the original minesweeper. Hence, thus far (28.10.24), I had used win percentages for the modern version, thinking it was the classic version, in all my statistics. I am currently running games using the classic version (WIP).
 
-To summarize short: in classic Minesweeper, the results of which I'm focusing on, the win percentages of all maps are significantly lower, since the first cell is 0...8 instead of always 0, leading to less information being revealed by the 1st click on average.
+To summarize: in classic Minesweeper, the results of which I'm focusing on, the win percentages of all maps are significantly lower, since the first cell is 0...8 instead of always 0, leading to less information being revealed by the 1st click on average.
 
 ## git cloning
 
