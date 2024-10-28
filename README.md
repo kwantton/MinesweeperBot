@@ -1,6 +1,10 @@
 # MinesweeperBot
 Course _Aineopintojen harjoitustyö - algoritmit ja tekoäly_, University of Helsinki
 
+Note: there are two general versions of Minesweeper: the 'classic' version where the first click is guaranteed to be a number cell with number 0...8, and the so-called 'modern' minesweeper where the first click is guaranteed to be a 0 (meaning, there's an opening guaranteed at the very start).
+
+I had originally thought that these were the other way around, since minesweeper.online is a quite modern site, and I'm too young to have touched the original minesweeper. Hence, thus far (28.10.24), I had used win percentages for the modern version, thinking it was the classic version. Currently running games using the classic version (WIP).
+
 ## git cloning
 
 see [how_to_clone.md](how_to_clone.md)
@@ -8,11 +12,15 @@ see [how_to_clone.md](how_to_clone.md)
 ## results (as of 25.10.2024)
 [Win_percentages_and_average_time_per_game](./Testing/Win_percentages_and_average_time_per_game.pdf)
 
-Expert games: 38.84% won, average 77 ms/game, n = 50 561, 2.67 guesses/game (new)
+Expert games: 
+- classic: 33.91% won, average 67 ms/game, n = 68 357, 3.07 guesses/game
+- modern: 39.81% won, average 83 ms/game, n = 102 317, 2.68 guesses/game
 
-Intermediate games: 83.20% won, average 12 ms/game, n=20 145, 0.73 guesses/game (new)
+Intermediate games:
+- modern: 83.20% won, average 12 ms/game, n=20 145, 0.73 guesses/game (new)
 
-Beginner games: 95.69% won, average 6 ms/game, n=23 474, 0.25 guesses/game (new)
+Beginner games:
+- modern: 95.69% won, average 6 ms/game, n=23 474, 0.25 guesses/game (new)
 
 Validity testing: 
 [Logic validity testing](./Testing/Logic_validity_testing/Logic_validity_testing.pdf)
@@ -37,4 +45,4 @@ The goal is to implement a bot that's capable of solving all solvable minesweepe
 - implemented: chain link equations with (usually) high overlap regarding shared variables, discarding impossible alt solutions per equation based on this pairing. This builds a chain of equations, which eliminates the need to couple each equation directly to all other equations
 - implemented: a timer (20 seconds per `CSP_solver` call) is be used to opt for performance in the worst cases of expert rather than absolute solving and accurate probability calculations
 - implemented: in minecount, the moment that all variables have recorded value as both 0 and 1 at least once (i.e. in at least one viable alt solution), then you know that no absolutely solved var exists. This has  sped up the solving logic and the overall time from ~140 ms/expert game to ~77 ms/expert game!
-- ensuring maximum overlap between equations in equation chaining in each separated subset of equations. This would speed up `join_comp_groups_into_solutions()` in the worst cases.
+- implemented: ensuring high overlap between each pair of equations in equation chaining in each disjoint subset of equations. This speeds up `join_comp_groups_into_solutions()` also in the slowest cases
