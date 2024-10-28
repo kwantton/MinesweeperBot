@@ -14,16 +14,19 @@ To summarize short: in classic Minesweeper, the results of which I'm focusing on
 see [how_to_clone.md](how_to_clone.md)
 
 ## results (as of 28.10.2024)
+[Win_percentages_and_average_time_per_game](./Testing/Win_percentages_and_average_time_per_game_only_classic.pdf)
 [Win_percentages_and_average_time_per_game](./Testing/Win_percentages_and_average_time_per_game.pdf)
 
 Expert games: 
-- classic: 33.18% won, average 67 ms/game, n = 79 043, 3.07 guesses/game
+- classic: 33.41% won, average 77 ms/game, n = 204 817, 3.07 guesses/game, 5.10% games won without guessing
 - modern: 39.81% won, average 83 ms/game, n = 102 317, 2.68 guesses/game
 
 Intermediate games:
-- modern: 83.20% won, average 12 ms/game, n=20 145, 0.73 guesses/game (new)
+- classic: 75.94% won, average 12 ms/game, n = 207537, 1.28 guesses/game, 34.5% games won without guessing 
+- modern: 83.20% won, average 12 ms/game, n = 20 145, 0.73 guesses/game (new)
 
 Beginner games:
+- classic: 91.28% won, average 4 ms/game, n = 282 770, 0.68 guesses/game, 54.6% games won without guessing
 - modern: 95.69% won, average 6 ms/game, n=23 474, 0.25 guesses/game (new)
 
 Validity testing: 
