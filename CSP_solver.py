@@ -79,7 +79,7 @@ class CSP_solver:
         (7) if nothing else above helps, if `self.solved_new_vars_during_this_round = False` at this point, then guess.
         '''
         
-        print('\nabsolut_brut():')
+        print('new CSP_solver:')
 
         def common_vars(vars1, vars2) -> bool:
             '''
@@ -92,7 +92,7 @@ class CSP_solver:
                     common = True
                     break
             return common
-        
+
         # (1.1) 
         def divide_vars_to_disjoint_sets() -> dict:                             # finds sets of variables that do not share a single variable between the var sets. For example a+b=1 and b+c=1 would be one equation set, separate from e+f+g=2, if there was only those three equations in total in self.unique_equations.
             '''
@@ -462,13 +462,13 @@ class CSP_solver:
             if number_of_unclicked_unseen_cells > 0:                            # Can't guess unseen cell if there are no unseen unclicked cells. Also would divide by zero.
                 unclicked_unseen_cell_safety_in_WORST_scenario = 100 - (100 *(n_mines_remaining - min_n_mines_in_front) / number_of_unclicked_unseen_cells)  # 100 - percent mine density in unclicked unseen cells in the case that there's the min possible number of mines remaining in self.front. A good question is which is the best; using the min n mines in front, or average, or max?
                 unclicked_unseen_cell_safety_in_BEST_scenario = 100 - (100 *(n_mines_remaining - max_n_mines_in_front) / number_of_unclicked_unseen_cells)  # 100 - percent mine density in unclicked unseen cells in the case that there's the max possible number of mines remaining in self.front
-                uu_comparison_choice = unclicked_unseen_cell_safety_in_WORST_scenario               # THIS SEEMS THE BEST OPTION! This prefers front guessing. Of course, it's essential in this case that the front probs are as accurate as possible. For that, I recorded the 'exact' non-minecount probs before minecount in case minecount calc is not finished, so that can be used!
+                uu_comparison_choice = unclicked_unseen_cell_safety_in_WORST_scenario               # Utilizing 'best' or 'worst' here yield surprisingly similar results. Of course, it's essential in this case that the front probs are as accurate as possible. For that, I recorded the 'exact' non-minecount probs before minecount in case minecount calc is not finished, so that can be used!
                 uu_comparison = '≥'
 
                 if self.minecount_was_left_unfinished:                                              # = if minecount filtering, which WAS needed, did NOT produce results.
                     uu_comparison_choice = unclicked_unseen_cell_safety_in_BEST_scenario            # if minecount was left unfinished, then its info is non-complete -> let's favour uu_cell guessing here!
                     uu_comparison = '≤'
-                if best_front_chance < uu_comparison_choice or self.minecount_was_left_unfinished:  # BEST RESULTS! It makes sense that this is the optimal guess here if MCF didn't produce results; this guess may lead to (1) opening up new solutions directly or (2) MCF providing answers NEXT round, so kinda double chance of being helpful in this situation!
+                if best_front_chance < uu_comparison_choice or self.minecount_was_left_unfinished:  # BEST RESULTS! It kind of makes sense that this is the optimal guess here if MCF didn't produce results; this guess may lead to (1) opening up new solutions directly or (2) MCF providing answers NEXT round, so kinda double chance of being helpful in this situation!
                     self.guess = "pick unclicked"                               # for guessing. If 'unclicked' cells have the lowest mine density, then guess there. 
                     self.choice = 'UNSEEN'
                 self.p_success_unseen = round(uu_comparison_choice, 1)

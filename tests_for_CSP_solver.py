@@ -371,7 +371,7 @@ eq16    = [-1, -1, ('u', 'v', 'a3'), 2]
 eq17    = [-1, -1, ('w', 'x', 'y', 'a4', 'a5'), 1]
 eq18    = [-1, -1, ('a2', 'a9'), 1]
 
-name = 'Test 8c: solvable only with minecount, complex. 0001 ??? expected. 0 unseen cells.'
+name = 'Test 8c: solvable only with minecount, and too complex for humans. 0001 expected. 0 unseen cells.'
 csp = CSP_solver(no_early_return=True)
 csp.handle_incoming_equations([eq1, eq2, eq3, eq4, eq5, eq6, eq7, eq8, eq9, eq10, eq11, eq12, eq13, eq14, eq15, eq16, eq17, eq18])
 csp.absolut_brut(n_mines_remaining=13, all_unclicked='a b c d e f g h i j k l m n o p q r s t u v w x y z a1 a2 a3 a4 a5 a6 a7 a8 a9'.split(), number_of_unclicked_unseen_cells=0) # 8c
