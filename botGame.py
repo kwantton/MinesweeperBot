@@ -19,7 +19,7 @@ class Minesweeper:
     Testing of lost games: 'constraing_problem_solver_for_testing.py' which finds if logic was missed in a lost game.
     '''
     
-    def __init__(self, map_measurements:tuple, csp_on=True, minecount_demo_number = None, 
+    def __init__(self, map_measurements:tuple, classic=True, csp_on=True, minecount_demo_number = None, 
                  logic_testing_on = False, unnecessary_guesses = False):
         pygame.init()
         pygame.display.set_caption('MINESWEEPER')
@@ -29,9 +29,11 @@ class Minesweeper:
         # Note! Put here ONLY those that are not reset at every 'new_game()'
         self.mines = mines
         self.width = width
+        
         self.auto_on = False                            # if set to true, then the bot will play as long as it hits a mine or wins; no need to smash p or b manually
         self.csp_on = csp_on
         self.height = height                            # map height measured in rows
+        self.classic = classic                          # classic: first click is in  [0...8] (more difficult). Modern (non-classic): first click = 0 (easier)
         self.perpetual = False
         self.infobar_height = 100                       # pixels for the infobar above the minesweeper map
         self.ms_bot_time_TOTAL = 0
@@ -270,9 +272,12 @@ class Minesweeper:
         if self.minecount_demo_number:
             self.generate_simple_minecount_demo(self.minecount_demo_number)
         else:
-            danger_x = set(x for x in range(self.width) if x-1 <= mouse_x <= x+1)
-            danger_y = set(y for y in range(self.height) if y-1 <= mouse_y <= y+1)
-            available_coordinates = [(x,y) for y in range(self.height) for x in range(self.width) if not x in danger_x or not y in danger_y]
+            if self.classic:
+                available_coordinates = [(x,y) for y in range(self.height) for x in range(self.width) if not (x,y) == (mouse_x, mouse_y)]
+            else:
+                danger_x = set(x for x in range(self.width) if x-1 <= mouse_x <= x+1)
+                danger_y = set(y for y in range(self.height) if y-1 <= mouse_y <= y+1)
+                available_coordinates = [(x,y) for y in range(self.height) for x in range(self.width) if not x in danger_x or not y in danger_y]
             self.mine_locations = set(sample(available_coordinates, self.mines))   # NB! This line of code 'generates' the map by deciding mine locations! This samples a 'self.mines' number of mines (e.g. 99 in an expert game) from 'available_cordinates' which excludes the opening cell that was clicked.
         # print(f'- clicked coordinates {mouse_x, mouse_y} and placed the mines as follows:\n', self.mine_locations)
     
@@ -1055,5 +1060,5 @@ if __name__ == '__main__':
     ''' ↓↓↓ STARTS A NEW MINESWEEPER with the ability to play the bot by pressing b ↓↓↓ (instructions in the game) '''
     # Minesweeper(beginner, csp_on=False) # IF YOU WANT ONLY simple_solver(), which also works at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
     
-    Minesweeper(expert, csp_on=True, 
-    minecount_demo_number=None, logic_testing_on=False, unnecessary_guesses=True)
+    Minesweeper(intermediate, classic=True, csp_on=True,
+    minecount_demo_number=None, logic_testing_on=False, unnecessary_guesses=False)

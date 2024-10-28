@@ -25,13 +25,14 @@ class CSP_solver:
         # DNR = do not reset every round
         self.solved_variables = set()                                   # DNR! Do not reset. ((x,y), value); the name of the variable is (x,y) where x and y are its location in the minesweeper map (if applicable), and the value of the variable is either 0 or 1, if everything is ok (each variable is one cell in the minesweeper map, and its value is the number of mines in the cell; 0 or 1, that is)
         self.minecount_solved_vars = set()                              # DNR! for highlighting in botGame.py. Do NOT reset every round
-        self.no_early_return = no_early_return                          # this is to not break the tests
+        self.no_early_return = no_early_return                          # this is to not break the tests. Default = false, so this IS used by default, since it's faster and has the potential to be LOADS faster. In tests, however, if it's false, it would only produce a part of the answers per round.
         self.initialize_those_that_are_immediately_needed_in_botGame()
 
     def initialize_those_that_are_immediately_needed_in_botGame(self):
-        '''Vars that however need to exist from the very beginning
-        for botGame to work properly, at least in certain situtions, 
-        BUT should not be reset every round of CSP_solve or equation adding'''
+        '''Vars that need to exist from the very beginning
+        for botGame to work properly, at least in certain situations, 
+        BUT should not be reset every round of CSP_solve or 
+        every round of adding new equations'''
         self.choice = None                                              # either 'FRONT' or 'UNSEEN'; this tells you if the next guess is located next to 'self.front' (botGame.py has 'self.front') or in the cells unseen by self.front ('unseen unclicked', please remember this term 'unseen unclicked cells', or 'uu_cells'). This is for choosing where to guess, and for passing this info to 'botGame.py' after the choice has been made. This is also for printing in pygame
         self.variables = set()
         self.front_guess = None                                         # Needed when 'self.unnecessary_guesses = True' in botGame. save the safest possible front cell here if guess is needed
@@ -69,6 +70,7 @@ class CSP_solver:
 
         (1) group equations to sets (1.1 and 1.2); all the members of one such equation set share variables directly or indirectly with each other (indirectly means, via other equations in that set). That is, sets do NOT share variables with other sets, ever.
         (2) 'find_and_group_possible_answers_per_single_equation()': find all alt combinations of 1s PER EACH EQUATION (in each set, which doesn't matter at this step). Each equation MUST have ONE solution (i.e. each number cell on the minesweeper map). There are not too many combinations per equation, since the max length of an equation is 8 (8 variables max, usually 2-6, roughly speaking), and the max sum is 8 for any equation. Almost always these equations are a+b=1, or a+b+c=2, or c+e+f+g+h+j=3, or the like.
+        (2.5) Note! New, and works: for each disjoint set of equations, for each pair of equations in it in a CHAIN, i.e. each equation once and no more (i.e., NOT a big graph, instead a CHAIN/queue (= technically, a very simple directed graph, which has a start and an end, and exactly 1 branch per link in the chain = a real chain/queue)) get a high-overlap pairing order that is used in (3) below; order equations in each set so that a high (sometimes max) number of variables are shared between the equations in each pair in the chain; thanks to this, conflicts are found at (3) more likely, and much faster in (4). If answers are found thanks to this in (3), a return of these solutions follows immediately. THIS CHAIN BUILDING WITH HIGH OVERLAP IS SIGNIFICANT! It made the worst cases much faster. Note! Solving this 'chain building' in a 'perfect' manner (max overlap for ALL links in the chain) would require finding if a Hamiltonian path exists for every disjoint eq set, and I settled for less, which is good enough, simpler, and faster, and is a common-case good solution.
         (3) chain link equations: for each disjoint set of equations, find compatible alt solutions in a chain of equations (practically, thanks to ordering, this chain starts from top left of the map and goes to right, then to next row!), filtering out those alternative answers (alt answers, alts) that are not compatible with adjacent equations, for each equation. Each group of alt solutions = one equation's alt solutions: from all of the alternative combinations of 1s and 0s that DO satisfy the CURRENT equation (group), filter out those alternatives that are incompatible with ALL alt answers from THE NEXT EQUATION IN THE ORDERED EQUATION CHAIN that is in the same equation set (shares variables directly or indirectly with other members of that equation set). This filters away impossible alt answers and helps building the solution trees in the next step (where conflicts are checked):
         (4) from the possibly ok (pair-filtered) alt equations per equation, build alt solution trees from the equation chain; the root is an alt answer for the starting equation, and during construction of these trees, conflicting variable value causes backtracking -> the branch (up until the last chance to go somewhere else than the current confilct) is discarded
         (5) for each eq set -derived bunch of alt solution trees, from the alt solutions, for each var record the number of times the variable value was 0, and the times it was 1. During this, also record the best-bet cell to guess in case a guess is needed later. In effect: find variables that were always 0 or always 1 -> those variables have been solved as 0 or 1 respectively. If can't find those, then you have the best guess cell from the front-seen cells, and if that chance of being mine is lower than unclicked unseen cells' chance of being mine, the best bet guess is the lowest-mine-chance front-seen cell, otherwise it's any of the unclicked unseen cells.
@@ -107,7 +109,7 @@ class CSP_solver:
             def add_eqs_containing_current_var_to_current_group(group_n, variable):
                 if variable in called_vars:                                         # this function will pass this check (i.e. will NOT return) exactly as many times as how many UNIQUE variables there are; if a,b,c,d, then 4 times in total, no more. Quite practical.
                     return
-                next_up = sorted(self.variable_to_equations[variable])              # why sorted: because `if (vars, summa) not in completely_grouped_eqs` below
+                next_up = sorted(self.variable_to_equations[variable])              # why sorted: because `if (vars, summa) not in completely_grouped_eqs` below; so I MUST ensure that the order is alphabetical (or some else definitive exact order, that's the point here) always, or actual errors will occur
                 called_vars.add(variable)
                 for vars, summa in next_up:
                     for var in vars:
@@ -218,15 +220,16 @@ class CSP_solver:
             # for each disjoint eq set, do this to ensure that a long stretch of pairing will occur
             def better_overlap_order_eqs_of_disjoint_eq_set(list_of_alternative_answers_per_eq:list) -> list:
                 '''
-                Hamiltonian path would be the best, BUT
+                Hamiltonian path would be the theoretically best solution to find here, BUT
                 (1) it doesn't always exist
                 (2) I'm settling for SOME overlap between MOST pairs; the purpose is to ENSURE overlap without
                 using a ton of computation, not to necessarily get maximum overlap;
-                the goal is to (1) possibly get solutions from `chain_link...()` earlier, 
-                (2) reduce work that happens later in `join_comp_groups_into_solutions()`. The less
+                the goal is to 
+                    - (1) possibly get solutions from `chain_link...()` earlier, 
+                    - (2) reduce work that happens later in `join_comp_groups_into_solutions()`. The less
                 overlap and the less filtering from overlapping eq pairing there is, the less likely it is
                 that answers will come out early, and the more work there is to be
-                done in `join_comp_groups_into_solutions()` later.
+                done in `join_comp_groups_into_solutions()` without this function, since it would take longer to find conflicts.
                 '''
                 if not list_of_alternative_answers_per_eq:
                     return []
@@ -285,18 +288,18 @@ class CSP_solver:
                 max_overlap_ordered_alt_answers = []
                 for vars in holy_order:
                     max_overlap_ordered_alt_answers.append(vars_to_alt_answers[vars])
-                return max_overlap_ordered_alt_answers
+                return max_overlap_ordered_alt_answers                                  # it's not really MAX overlap, it's HIGH overlap, but max overlap is much clearer, shorter, and most importantly, it sounds cooler
     
             comp_groups_and_starting_groups = []
-            for list_of_alternative_answers_per_eq in lists_of_alternative_answers_per_equation_per_set_of_eqs:
-                list_of_alternative_answers_per_eq = sorted(list_of_alternative_answers_per_eq) # using `sorted()`, try pairing equations with max overlap; essentially, keep them in coordinate-adjacent order, that's it
-                list_of_alternative_answers_per_eq = better_overlap_order_eqs_of_disjoint_eq_set(list_of_alternative_answers_per_eq)
+            for list_of_alternative_answers_per_eq_per_set in lists_of_alternative_answers_per_equation_per_set_of_eqs:
+                list_of_alternative_answers_per_eq_per_set = sorted(list_of_alternative_answers_per_eq_per_set) # sorted() here affects the choice of the 1st equation in `better_overlap...()` below
+                list_of_alternative_answers_per_eq_per_set = better_overlap_order_eqs_of_disjoint_eq_set(list_of_alternative_answers_per_eq_per_set)
                 compatibility_groups = dict()                                   # { possible solution : all related possible solutions (i.e. those which share variables and do not disagree for any variable value for those variables that are present in both the key and each of the values in this dictionary for that key!) }. There's no need for explicit bookkeeping regarding which of the value solutions belong to which original equation, because the variables included themselves are enough to identify the origin.
 
-                for a in range(len(list_of_alternative_answers_per_eq)):        # e.g. ( (('a',0), ('b',1)), (('a',1),('b',0)) ) would constitute one 'group' (length 2) for the equation 'a+b=1' which is stored as ((a,b),1) in 'self.unique_variables'; that is, all the possible solutions for that equation constitute a 'group'
+                for a in range(len(list_of_alternative_answers_per_eq_per_set)):        # e.g. ( (('a',0), ('b',1)), (('a',1),('b',0)) ) would constitute one 'group' (length 2) for the equation 'a+b=1' which is stored as ((a,b),1) in 'self.unique_variables'; that is, all the possible solutions for that equation constitute a 'group'
                     if a == 0:
-                        groupA = list_of_alternative_answers_per_eq[a]
-                        starting_group = list_of_alternative_answers_per_eq[a]
+                        groupA = list_of_alternative_answers_per_eq_per_set[a]
+                        starting_group = list_of_alternative_answers_per_eq_per_set[a]
                     else:
                         groupA = sorted(tuple(next_round_groupA))               # from the previous round! Since this is from a set, it may become disordered -> for comparison if equal with groupB, sorting is needed!
                         if len(groupA) == 1:
@@ -305,12 +308,12 @@ class CSP_solver:
                                     self.solved_variables.add((var,value))
                                     self.solved_new_vars_during_this_round = True
                                 return comp_groups_and_starting_groups
-                    if a == len(list_of_alternative_answers_per_eq)-1:          # Note! See comment below. Here, I need to add the keys also for the last groupA even though it has no groupB to pair it with. This is because checks in 'traverse()' later require the existence of at least one viable alt per group in the keys of 'compatibility_groups', for EVERY group (i.e. for all original equations from the minesweeper map)
+                    if a == len(list_of_alternative_answers_per_eq_per_set)-1:          # Note! See comment below. Here, I need to add the keys also for the last groupA even though it has no groupB to pair it with. This is because checks in 'traverse()' later require the existence of at least one viable alt per group in the keys of 'compatibility_groups', for EVERY group (i.e. for all original equations from the minesweeper map)
                         for alt in groupA:
                             compatibility_groups[alt] = set()                   # all viable alts must be found in keys of 'compatibilty_groups'. On the last round, groupA consists of the compatible alt solutions of last round's groupB, and these are all ok. Therefore, all of them must be added to 'compatibility_groups'.
                         break
                     b = a+1
-                    groupB = list_of_alternative_answers_per_eq[b]
+                    groupB = list_of_alternative_answers_per_eq_per_set[b]
                     if groupA==groupB:
                         raise ValueError('groupA==groupB, why?')                # This never happens (GOOD! This is currently the expected result). It should NEVER happen as long as I don't change this whole function (again...).
                     next_round_groupA = set()
@@ -376,7 +379,7 @@ class CSP_solver:
         # Note! I can't, with information up to this point (can't know if minecount is needed at this point), conclude that there are no solutions from this function, even if every var is at least once 0 or 1, unlike in minecount alt solution filtering further below where I CAN conclude that there are no vars solved if every var is 0 and 1 at least once from (minecount-)eligible answers. Would there be a solution for that at this point? I don't know. (it would be extremely stupid to just feed an equation with every single var remaining on the map summing up to remaining minecount at the situation, given how this function works - I tried that once, it barely works if you have 15 cells remaining in the map, it's exponential, I tried that at one point. My solution for that is the minecount-section, which is pretty damn good, but it makes it impossible to say 'no answers' at THIS point already)
         def join_comp_groups_into_solutions(compatibility_groups:dict, starting_group) -> tuple:     # also return the whole list of 'possible_whole_solutions'; it's needed IF minecount is needed. If minecount is needed
             keyVars_to_keys = keyVars_to_keys_builder(compatibility_groups)
-            print('join_comp_groups_into_solutions()')
+            print('join_comp_groups_into_solutions()...')
             n_groups = len(keyVars_to_keys.keys())
             value_counts_for_each_var = dict()  # done: COUNT HERE, FOR EACH VAR, HOW MANY TIMES 0 AND HOW MANY TIMES 1 it is in minecount-OK alt solutions. SOLVES ALSO PROBLEMS REGARDING GUESSING! If the var has only 1s, then it's solved as 1. If only 0s, then it's solved as 0. Otherwise, the probability is extremely straightforward to calculate!
             possible_whole_solutions = []
@@ -473,7 +476,7 @@ class CSP_solver:
                     print("p_success_unseen < 0:", self.p_success_unseen)       # Note: this CAN be negative if using the absolute worst-case scenario (highest possible mine density in uu_cells) regarding uu_cell mine density (the -x then means that the worst case scenarios are impossible in that situation, naturally) OR if using average! Reason: notice the 'MIN' in 'min_n_mines_in_front'? This assumes there's MAX POSSIBLE mine density in uu cells -> in worst cases, negative probability because of the way I count this probability: `unclicked_unseen_cell_safety_in_worst_scenario = 100 - (100 *(n_mines_remaining - min_n_mines_in_front) / number_of_unclicked_unseen_cells)  which is 100 - percent mine density in unclicked unseen cells in the case that there's the minimum possible number of mines remaining in self.front. In cases where minecount doesn't exactly tell how many mines are in uu cells, it's possible that the min n mines IS INDEED negative, BUT still taking that into account doesn't lead to new absolute solutions for any variable -> this guessing is called -> a negative number can be printed here, because I'm using the WORST CASE SCENARIO. That's why "≈" is written in the game in showing the uu probability ('uu prob ≥ x', written as 'other ≥ x' in the game)! Yes, this is complicated, sorry. ALSO! This can be over 100%, IF average or max front minecount is used, because neither of those might be the case! Yes, it's complicated
                     self.p_success_unseen = 0                                   # this is of course true, as negative probs are not real. This is not error patching: see my comment above (this assumes highest uu cell mine density, that's why negative values are possible in cases where min n mines in front still has room for more mines even after every uu cell is mined; 'leftovers' in the highest uu cell mine density cases -> negative prob)
                 elif self.p_success_unseen > 100:
-                    print("p_success_unseen > 0:", self.p_success_unseen)
+                    print("p_success_unseen > 100:", self.p_success_unseen)
                     self.p_success_unseen = 100
                 print("- p_success(unseen)", uu_comparison, self.p_success_unseen, '%')
             self.p_success_front = round(best_front_chance, 1)
@@ -659,9 +662,9 @@ class CSP_solver:
                 print("✔ FOUND SOLUTIONS FROM SIMPLE MINECOUNT")                           # it's highly likely much faster to return already at this point. During the next round, you can solve more possibly much faster thanks to the new solutions
                 # sleep(10)
                 return
-            if (largest_n_mines_in_front_alt_solutions < n_mines_remaining) and not only_max_sum_is_ok:                 # IF (1) there are no whole-front alt solutions with too MANY mines AND
+            if (largest_n_mines_in_front_alt_solutions <= n_mines_remaining):               # IF (1) there are no whole-front alt solutions with too MANY mines AND
                 print('- largest_n_mines_in_front_alt_solutions < n_mines_remaining')
-                if (smallest_n_mines_in_front_alt_solutions + number_of_unclicked_unseen_cells >= n_mines_remaining):   # ... (2) there are no whole-front alt solutions with NOT ENOUGH mines, THEN there is NO NEED FOR MINECOUNT FILTERING. IN ALL OTHER CASES, SOME ALT SOLUTIONS ARE NOT OK -> MINECOUNT FILTERING IS NEEDED. I had forgotten this (2) before, oopsie woopsie.
+                if (smallest_n_mines_in_front_alt_solutions + number_of_unclicked_unseen_cells >= n_mines_remaining):   # ... (2) there are no whole-front alt solutions with NOT ENOUGH (too FEW) mines, THEN there is NO NEED FOR MINECOUNT FILTERING. IN ALL OTHER CASES, SOME ALT SOLUTIONS ARE NOT OK -> MINECOUNT FILTERING IS NEEDED. I had forgotten this (2) before, oopsie woopsie.
                     print('- smallest_n_mines_in_front_alt_solutions + n_uu_cells >= n_mines_remaining')
                     print("-> GUESSING, minecount would not help here")
                     # sleep(3)    # how to use: press i once. Then press a. As soon as you see the message above, press a again -> you'll see the situation where the solver arrived at this conclusion. To continue, press a again, then the same thing.
