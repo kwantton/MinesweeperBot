@@ -14,17 +14,31 @@ Minesweeper(expert, classic=True, csp_on=True,
 ```
 on ihan 'tavallinen' tapa ajaa kyseinen peli: tällöin alkaa expert-mappi, ja ohjeet näkyvät sen alalaidassa.
 
-Tässä voit painaa `b`-näppäintä botin ajamiseksi; tähän `botGame.py`:hyn on siis integroitu <i>valinnaisena</i> osiona botti `CSP_solver.py`:n luokasta `CSP_solver` (eli integroituna peliin on halutessaan käytettävissä oleva "tekoäly" jos sitä siksi haluaa perinteisesti nimittää; huom! Tässä työssä kuitenkaan <b>ei</b> käytetä mitään adaptiivista koneoppimista, neuroverkkoja tai sen sellaista, eli <b>ei</b> käytetä oikeaa tekoälyä; botti tasan 'oppii' mitä se kussakin mapissa näkee, ja unohtaa kaiken oppimansa uuden pelin aloittaessa; se siis pelaa samoin kun ihminenkin (paitsi että toisinaan vähän puutteellisesti tällä hetkellä ainakin))
+Tässä voit painaa `x`-tai `n`-näppäintä botin yhden 'kierroksen' ajamiseksi, kuten pelin alaosan ohjeissa lukee; tähän `botGame.py`:hyn on siis integroitu botti **CSP_solver.py**:n luokasta `CSP_solver` (eli integroituna peliin on halutessaan käytettävissä oleva "tekoäly" jos sitä siksi haluaa perinteisesti nimittää. Tässä työssä kuitenkaan <b>ei</b> käytetä mitään adaptiivista koneoppimista, neuroverkkoja tai sen sellaista, eli <b>ei</b> käytetä oikeaa tekoälyä; botti ainoastaan 'näkee' kullakin hetkellä mitä pelaajakin näkee; se siis pelaa samoin kun ihminenkin)
 
-`CSP_solver.py`
+**tests_for_CSP_solver.py**
 
-Tämän ajaminen ajaa `CSP_solver`-luokkaa testaavat 'yksikkötestit', jotka kaikki koostuvat seuraavasta: (1) syötetään yhtälöitä luotuun `CSP_solver`-luokkaan, (2) yritetään ratkaista niin paljon kuin voidaan, joko yhdellä tai useammalla rundilla, (3) tarkistetaan ja tulostetaan tulokset; mukaan lukien, mitä odotettiin, ja mitä saatiin, ja menikö testi läpi.
+Tämän ajaminen ajaa `CSP_solver`-luokkaa testaavat 'yksikkötestit', jotka kaikki koostuvat seuraavasta: (1) syötetään yhtälöitä luotuun `CSP_solver`-luokkaan, (2) ratkaistaan niin paljon muuttujia kuin voidaan, (3) tarkistetaan ja tulostetaan tulokset; mukaan lukien, mitä odotettiin, ja mitä saatiin, ja menikö testi läpi, ja kuinka monta testiä meni läpi, ja mitkä testit eivät menneet läpi.
+
+**tests_for_CSP_solver_old.py**
+
+Tämän ajaminen ajaa `CSP_solver`-luokkaa testaavat 'yksikkötestit', jotka kaikki koostuvat seuraavasta: (1) syötetään yhtälöitä luotuun `CSP_solver`-luokkaan, (2) ratkaistaan niin paljon muuttujia kuin saadaan (yhden tai useamman rundin aikana), (3) tarkistetaan ja tulostetaan tulokset; mukaan lukien, mitä odotettiin, ja mitä saatiin, ja menikö testi läpi. Tässä testiluokassa _ei_ ole yhteenvetoa siitä, moniko testeistä meni läpi ja moniko ei, ja kuten sinne on kirjoitettu, viimeinen testi joskus ratkaisee kaikki muuttujat, joskus osan, joskus ei mitään, mikä johtuu joukkojen (`set()`) iteraatiojärjestyksen vaihtelevuudesta. Tämä 'vanha' versio onkin ainoastaan nopea ratkaisuapuri, joka suoritetaan ennen uutta `CSP_solver`:ia, eikä tämän vanhan version ole tarkoituskaan osata kaikkea (huom. olisihan se siis hyvin mukava jos osaisi, mutta ei osaa, toisin kuin uusi `CSP_solver`).
 
 <h2> Miten eri toiminnallisuuksia käytetään </h2>
 
 **botGame.py**:
 
-Vaihda pelimoodia tämän tiedoston alalaidasta (`if __name__ == __main__`-osasto). Käynnistä peli ajamalla itse koodi (joka siis on alaosassa osiossa `if __name__ == __main__`)
+Voit vaihtaa pelimoodia, laittaa testimoodin päälle, jne, muuttamalla parametreja tiedoston alalaidassa `if __name__ == __main__`-osastossa `Minesweeper()`-komennossa:
+
+- `expert` oletusarvoisesti (30x16, 99 miinaa)
+- `classic=True` oletusarvoisesti eli 'klassinen' miinaharava, jossa aloitusruutu on 0....8
+- `csp_on=True` oletusarvoisesti eli sekä vanha että uusi `CSP_solver` ovat käytössä, mukaanlukien uuden `CSP_solver`:in sisään leivotut arvauksentunnistussysteemit jotka saavat aikaan arvaukset jos muuttujia ei saada ratkaistua (eli jos ei päästä etenemään ilman arvauksia)
+- `minecount_demo_number=None` oletusarvoisesti, eli ei demoa 'minecount'-tilanteista (numerot 1-3 demoavat),
+ratkaistua - jos tämä on `False`, on käytännössä mahdollista voittaa vain osa beginner-kentistä, koska muuhun logiikka ei riitä
+tämän tiedoston alalaidasta (`if __name__ == __main__`-osasto). Peli käynnistetään ajamalla itse koodi (joka siis on alaosassa osiossa `if __name__ == __main__`)
+- `logic_testing_on=False` oletusarvoisesti; kun `True`, käytössä on **constraint_problem_solver_for_testing.py**:n `check_if_solutions_were_missed_in_lost_game()`. Katso lisää [testausmanuaalista](../Testing/Logic_validity_testing/Testing_manual.pdf)
+- `unnecessary_guesses=False` oletusarvoisesti. Kuten kirjoitan **botGame.py**:ssä: normaalisti arvataan vain, kun ratkaisuja ei tapahdu. Kuitenkin "when 'self.unnecessary_guesses = True', it guesses anyways, 
+even if it already found answers in CSP_solver_old or CSP_solver (sidenote: simple_solver will loop as long as it produces solutions, so if it DOES provide solutions, it will return and not go here ever -> no guesses will commence)". Tämän avulla voidaan _testata testaajaa_: kun `unnecessary_guesses=True`, voi nähdä, kuinka laskuri nousee aina, kun peli hävitään turhalla arvauksella
 
 - jos painat `x`- tai `n`-näppäintä, pelaat botilla, eli käytät sitä algoritmistoa, joka tämän algoritmikurssin varsinainen aihe oli
 - mapin loppuun asti automaattisesti pelaaminen: paina 'a' (automatic). Jos haluat keskeyttää, paina `a`; tämä suorittaa nykyisen komennon loppuun ja sitten EI jatka eteenpäin botin logiikassa.
