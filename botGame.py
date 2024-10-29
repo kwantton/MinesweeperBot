@@ -1051,15 +1051,19 @@ if __name__ == '__main__':
     `if self.solver.guess or self.unnecessary_guesses:                 # (1) NORMAL USAGE: if CSP_solver has not managed to solve any new variables with 100% certainty ('normal' logic OR minecounting logic), THEN guess. This info is directly obtained from 'self.solver', as you can see (`if self.solver.guess`) (2) TESTING TESTING USAGE: if `self.unnecessary_guesses`, then guesses are done -> the lost game missed logic tester in 'constraint_problem_solver_for_testing.py' will notice that missing logic was found, and the 'missing_logic' counter will increase and turn red, proving that it works. Awesome!
         guess(self.solver.guess)                                # you guessed it, it guesses. When 'self.solver.guess' is None, then it performs a not-terrible guess first into corners, then to edges of the map (they have highest chance of being 0, so highest chance of revealing a lot of new information)
     
-    ^^ normally the above ensures that a guess is done only when necessary. 
+    ^^ so, normally the above ensures that a guess is done only when necessary. 
     When 'self.unnecessary_guesses = True', it guesses anyways, 
     even if it already found answers in CSP_solver_old or CSP_solver
     (sidenote: simple_solver will loop as long as it produces solutions, 
-    so if it DOES provide solutions, it will return and not go here ever)
+    so if it DOES provide solutions, it will return and not go here ever -> no guesses will commence)
     
     (2) run the Minesweeper() with parameter 'unnecessary_guesses = True'. This enables unnecessary guessing
     -> validity testing in 'constraint_problem....py' will find that unnecessary guesses were done,
     proving that validity testing works Perfect! c:
+
+    (3) run expert games, and observe that 5.1% of games are won without guesses. This has empirically been proven
+    to verify that all usable logic is used, by 'Shuffler' in Minesweeper Community Discord
+    ()
 
     -----------------------------------------------------------------------------
     `minecount_demo_number`: demoing minecount situations
@@ -1085,7 +1089,7 @@ if __name__ == '__main__':
     
     minecount_demonstration_sometimes = 5,5,15
 
-    ''' ↓↓↓ STARTS A NEW MINESWEEPER with the ability to play the bot by pressing b ↓↓↓ (instructions in the game) '''
+    ''' ↓↓↓ STARTS A NEW MINESWEEPER with the ability to play the bot by pressing b ↓↓↓ (instructions in the game). Read above orange text for more instructions! '''
     # Minesweeper(beginner, csp_on=False) # IF YOU WANT ONLY simple_solver(), which also works at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
     
     Minesweeper(expert, classic=True, csp_on=True,
