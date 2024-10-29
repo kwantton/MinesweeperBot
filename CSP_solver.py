@@ -658,11 +658,11 @@ class CSP_solver:
                         self.minecount_solved_vars.add((cell, 1))
             if self.minecount_successful:                                                   # at THIS point, true only if (1) only min ok or only max ok AND (2) there were uu_cells above. Otherwise, have to perform heavier minecount inspection below.
                 self.solved_new_vars_during_this_round = True
-                print("✔ FOUND SOLUTIONS FROM SIMPLE MINECOUNT")                           # it's highly likely much faster to return already at this point. During the next round, you can solve more possibly much faster thanks to the new solutions
+                print("✔ FOUND SOLUTIONS FROM SIMPLE MINECOUNT")                            # it's highly likely much faster to return already at this point. During the next round, you can solve more possibly much faster thanks to the new solutions
                 # sleep(10)
                 return
             if (largest_n_mines_in_front_alt_solutions <= n_mines_remaining):               # IF (1) there are no whole-front alt solutions with too MANY mines AND
-                print('- largest_n_mines_in_front_alt_solutions < n_mines_remaining')
+                print('- largest_n_mines_in_front_alt_solutions <= n_mines_remaining')
                 if (smallest_n_mines_in_front_alt_solutions + number_of_nonclicked_unseen_cells >= n_mines_remaining):   # ... (2) there are no whole-front alt solutions with NOT ENOUGH (too FEW) mines, THEN there is NO NEED FOR MINECOUNT FILTERING. IN ALL OTHER CASES, SOME ALT SOLUTIONS ARE NOT OK -> MINECOUNT FILTERING IS NEEDED. I had forgotten this (2) before, oopsie woopsie.
                     print('- smallest_n_mines_in_front_alt_solutions + n_uu_cells >= n_mines_remaining')
                     print("-> GUESSING, minecount would not help here")
