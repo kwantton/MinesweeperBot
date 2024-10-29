@@ -3,11 +3,11 @@ Course _Aineopintojen harjoitustyö - algoritmit ja tekoäly_, University of Hel
 
 **Note!** There are two general versions of Minesweeper: the 'classic' version where the first click is guaranteed to be a number cell with number 0...8, and the so-called 'modern' minesweeper where the first click is guaranteed to be a 0 (meaning, there's an opening guaranteed at the very start).
 
-**Note!** This version does not clone the mine layout generator of the original minesweeper; the very original ones up until 2007 _first_ generate the map, then move the mine to the 1st row in case the user would have hit it on the 1st click (so the 1st click is guaranteed to be safe by replacing the mine to the first vacant cell on the map). Windows Vista onwards (2007), the map is generated _after_ the first click, and that's the way my `Minesweeper()` works as well. So in post-2007 implementations of minesweeper, including in this work all the mines are randomly placed **after** the first click, not before it.
+**Note!** This version does not clone the mine layout generator of the original minesweeper; the very original ones up until 2007 _first_ generate the map, then move the mine to the 1st row in case the user would have hit it on the 1st click (so the 1st click is guaranteed to be safe by replacing the mine to the first vacant cell on the map). Windows Vista onwards (2007), the map is generated _after_ the first click, and that's the way my `Minesweeper()` works as well. So in post-2007 implementations of minesweeper, including this project, all the mines are randomly placed **after** the first click, not before it.
 
-I had originally thought that 'classic' and 'modern' minesweeper were the other way around, since minesweeper.online (where I play https://minesweeper.online/player/2600486) is a quite modern site, and I'm too young to have touched the original minesweeper. Hence, thus far (28.10.24), I had used win percentages for the modern version, thinking it was the classic version, in all my statistics. I am currently running games using the classic version (WIP).
+I had originally thought that 'classic' and 'modern' minesweeper were the other way around, since minesweeper.online (where I play https://minesweeper.online/player/2600486) is a quite modern site, and I'm too young to have ever touched the original minesweeper. Hence, thus far (29.10.24), I had used win percentages for the modern version, thinking it was the classic version, in all my statistics. I now have test results for both the classic version and for the modern version (see 'results' below!).
 
-To summarize: in classic Minesweeper, the results of which I'm focusing on, the win percentages of all maps are significantly lower, since the first cell is 0...8 instead of always 0, leading to less information being revealed by the 1st click on average.
+To summarize: in classic Minesweeper, the results of which I'm mainly focusing on now, the win percentages of all maps are quite significantly lower, since the first cell is 0...8 instead of always 0, leading to less information being revealed by the 1st click on average.
 
 ## git cloning
 
@@ -18,7 +18,7 @@ see [how_to_clone.md](how_to_clone.md)
 - ["Modern" game mode where 1st cell = 0](./Testing/Win_percentages_and_average_time_per_game.pdf)
 
 Expert games: 
-- classic: 33.41% won, average 77 ms/game, n = 204 817, 3.07 guesses/game, 5.10% games won without guessing
+- classic: 33.41% won, average 77 ms/game, n = 204 817, 3.07 guesses/game, 5.10% games won without guessing implying complete logic (https://github.com/DavidNHill/JSMinesweeper#readme)
 - modern: 39.81% won, average 83 ms/game, n = 102 317, 2.68 guesses/game
 
 Intermediate games:
