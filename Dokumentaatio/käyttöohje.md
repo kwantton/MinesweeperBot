@@ -1,8 +1,18 @@
 <h2>Miten ohjelma suoritetaan</h2>
 
-`botGame.py`:
-Tämän ajaminen aloittaa miinaharava-pelin, jonka alalaidassa on ohjeet, mitä tässä avatussa pelissä voi tehdä (btw: voit myös klikata, eli pelata kuten ihan oikeaa miinaharavaa!)
-Täällä alalaidassa voit valita, minkälaisen mapin haluat. Valmiina on kirjoitettu pelimuotojen `beginner`, `intermediate` ja `expert` leveydet, korkeudet, ja miinat.
+**botGame.py**:
+Täällä asuu itse miinaharavapeli, ja siihen integroidun bottilogiikan tapahtumaketju `bot_execute()` jossa siis määritellään, mitä botti tekee ja missä järjestyksessä.
+
+Tämän **botGame.py**:n ajaminen aloittaa miinaharavapelin, jonka alalaidassa on ohjeet, mitä tässä avatussa pelissä voi tehdä (btw: voit myös klikata, eli pelata kuten ihan oikeaa miinaharavaa!)
+Tiedoston **botGame.py** alalaidassa voit valita, minkälaisen mapin haluat: expert, beginner, intermediate, jne jne.. Valmiina on siis kirjoitettu pelimuotojen `beginner`, `intermediate` ja `expert` leveydet, korkeudet, ja miinat.
+
+Esim.
+
+```python
+Minesweeper(expert, classic=True, csp_on=True,
+    minecount_demo_number=None, logic_testing_on=False, unnecessary_guesses=False)
+```
+on ihan 'tavallinen' tapa ajaa kyseinen peli: tällöin alkaa expert-mappi, ja ohjeet näkyvät sen alalaidassa.
 
 Tässä voit painaa `b`-näppäintä botin ajamiseksi; tähän `botGame.py`:hyn on siis integroitu <i>valinnaisena</i> osiona botti `CSP_solver.py`:n luokasta `CSP_solver` (eli integroituna peliin on halutessaan käytettävissä oleva "tekoäly" jos sitä siksi haluaa perinteisesti nimittää; huom! Tässä työssä kuitenkaan <b>ei</b> käytetä mitään adaptiivista koneoppimista, neuroverkkoja tai sen sellaista, eli <b>ei</b> käytetä oikeaa tekoälyä; botti tasan 'oppii' mitä se kussakin mapissa näkee, ja unohtaa kaiken oppimansa uuden pelin aloittaessa; se siis pelaa samoin kun ihminenkin (paitsi että toisinaan vähän puutteellisesti tällä hetkellä ainakin))
 
@@ -12,14 +22,16 @@ Tämän ajaminen ajaa `CSP_solver`-luokkaa testaavat 'yksikkötestit', jotka kai
 
 <h2> Miten eri toiminnallisuuksia käytetään </h2>
 
-`botGame.py` :
+**botGame.py**:
 
 Vaihda pelimoodia tämän tiedoston alalaidasta (`if __name__ == __main__`-osasto). Käynnistä peli ajamalla itse koodi (joka siis on alaosassa osiossa `if __name__ == __main__`)
 
-- jos painat `b`-näppäintä, pelaat botilla, eli käytät sitä pikkuohjelmistoa, joka tämän algoritmikurssin varsinainen aihe oli
+- jos painat `x`- tai `n`-näppäintä, pelaat botilla, eli käytät sitä algoritmistoa, joka tämän algoritmikurssin varsinainen aihe oli
+- mapin loppuun asti automaattisesti pelaaminen: paina 'a' (automatic). Jos haluat keskeyttää, paina `a`; tämä suorittaa nykyisen komennon loppuun ja sitten EI jatka eteenpäin botin logiikassa.
+- loputon pelaaminen: paina `i` (infinite) ja `a` (automatic). Kun haluat lopettaa, paina uudestaan `i`
 - hiiren vasemmalla avataan ruutu
 - hiiren oikealla merkataan lippu
-- jos ruudun `x`, esim. olkoon tämä `x` nyt ruutu jossa näkyy vihreä numero 2, ympärille olet laittanut 2 lippua (tasan 2), niin vasemmalla klikatessasi tätä kakkosta, avaat kaikki kakkosen ympärillä olevat ruudut, oli niissä sitten miinaa/miinoja tai ei. Tätä kutsutaan englanniksi nimellä `chording`, ja nimen alkuperä on se, että siinä avataan monta yhdellä painalluksella, ikään kuin muka soittaisi soinnun jollain instrumentilla, tsiisus khraist mikä nimi...
+- jos ruudun $x$, esim. olkoon tämä $x=2$ eli ruutu jossa näkyy vihreä numero 2, ympärille olet laittanut 2 lippua (tasan 2), niin vasemmalla klikatessasi tätä kakkosta, avaat kaikki kakkosen ympärillä olevat ruudut, oli niissä sitten miinaa/miinoja tai ei. Tätä kutsutaan englanniksi nimellä `chording`, ja nimen alkuperä on se, että siinä avataan monta yhdellä painalluksella, ikään kuin muka soittaisi soinnun jollain instrumentilla, tsiisus khraist mikä nimi... eli monta yhdellä, 'chord', sointu. Tämä sitten vissiin olisi se 'harava' joka osuu miinaan ja antaa luvan kävellä sen välittömässä ympäristössä (tämä ei välttämättä päde oikeassa elämässä oikealla miinakentällä)
 - `space` aloitaa uuden pelin
 - `f` näyttää `self.front`:in keltaisena. Kannattaa kokeilla! Oli todella hyödyllinen tätä tehdessä, mukaan lukien (etenkin) debuggatessa
 - `c` highlightaa kaikki `CSP_solver`:in ratkaisemat ruudut; vihreällä ne, joissa tämän solverin laskujen mukaan ei ole miinaa, ja punaisella ne, joissa on miinat
