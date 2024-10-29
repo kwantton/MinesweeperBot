@@ -14,8 +14,8 @@ To summarize: in classic Minesweeper, the results of which I'm focusing on, the 
 see [how_to_clone.md](how_to_clone.md)
 
 ## results (as of 29.10.2024)
-[Win_percentages_and_average_time_per_game](./Testing/Win_percentages_and_average_time_per_game_only_classic.pdf)
-[Win_percentages_and_average_time_per_game](./Testing/Win_percentages_and_average_time_per_game.pdf)
+- [Classic game mode where 1st cell = 0...8](./Testing/Win_percentages_and_average_time_per_game_only_classic.pdf)
+- ["Modern" game mode where 1st cell = 0](./Testing/Win_percentages_and_average_time_per_game.pdf)
 
 Expert games: 
 - classic: 33.41% won, average 77 ms/game, n = 204 817, 3.07 guesses/game, 5.10% games won without guessing
