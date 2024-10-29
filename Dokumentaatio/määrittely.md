@@ -122,7 +122,7 @@ Erinomainen lähde tälle asialle lienee käyttäjänimi 'Shuffler' Minesweeper 
 
 Niin omassa työssäni kuin ei Becerran työssäkään tarkastella, mitä tapahtuu arvauksen jälkeen; siis arvaukset ovat 'naiiveja' sen suhteen, mitä arvauksen jälkeen tapahtuu - vaikka kussakin pelitilanteessa löydetäänkin kyseisellä hetkellä turvallisin arvaus, tämä ei takaa sitä, että tämä 'turvallisin' arvaus olisi oikeasti paras koko loppumapin ratkaisemisen kannalta. On esimerkiksi tilanteita, joissa arvaus, vaikka ei osuisikaan miinaan, ei kerro mitään loppujen miinojen sijainneista, eli voi tosiasiassa olla kaikkein huonoin arvaus, vaikka olisikin akuutisti 'turvallisin'. Toisin on nimimerkin 'Shuffler' ratkaisijan tapauksessa, joka saa 41% klassisista Expert-kentistä voitettua.
 
-## viitteet: 
+## viitteet
 
 Becerra, David J. 2015. Algorithmic Approaches to Playing Minesweeper. Bachelor's thesis,
 Harvard College (permalink: http://nrs.harvard.edu/urn-3:HUL.InstRepos:14398552).
