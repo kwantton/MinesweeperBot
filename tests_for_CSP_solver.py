@@ -85,7 +85,7 @@ test_info_dict[name] = [csp, expected_result]
 
 ############################ Test 1b: same as 1a, but using (x,y) format for variables instead of letters ############################################
 
-###### a minesweeper map, where X means 'unclicked' cell, * is a 'mine' cell (not seen by the player), and 1 is '1' cell, 2 is '2' cell. Every # is edge of the map, essentially means nothing
+###### a minesweeper map, where X means 'nonclicked' cell, * is a 'mine' cell (not seen by the player), and 1 is '1' cell, 2 is '2' cell. Every # is edge of the map, essentially means nothing
 #X*X*#
 #1121#
 ######
@@ -169,7 +169,7 @@ test_info_dict[name] = [csp, expected_result]
 
 ############################ Test 3a: letters ############################################
 
-###### a minesweeper map, where X means 'unclicked' cell, * is a 'mine' cell (not seen by the player), and 1 is a '1' cell, 3 is a '3' cell. Every # is edge of the map, essentially means nothing
+###### a minesweeper map, where X means 'nonclicked' cell, * is a 'mine' cell (not seen by the player), and 1 is a '1' cell, 3 is a '3' cell. Every # is edge of the map, essentially means nothing
 #001*#
 #113X#
 #X*X*#
@@ -197,7 +197,7 @@ test_info_dict[name] = [csp, expected_result]
 
 ############################ Test 3b: (x,y) ############################################
 
-###### a minesweeper map, where X means 'unclicked' cell, * is a 'mine' cell (not seen by the player), and 1 is a '1' cell, 3 is a '3' cell. Every # is edge of the map, essentially means nothing
+###### a minesweeper map, where X means 'nonclicked' cell, * is a 'mine' cell (not seen by the player), and 1 is a '1' cell, 3 is a '3' cell. Every # is edge of the map, essentially means nothing
 #001*#
 #113X#
 #X*X*#
@@ -256,15 +256,15 @@ expected_result = '00110000'
 test_info_dict[name] = [csp, expected_result]
 
 
-########################## Test 6a: letters. Minecount! Make a situation where there's one number cell '1' pointing to two adjacent cells, a and b, and there's also a third cell 'c' that's not seen by any number cell, called 'unclicked unseen' cell; it's boxed by flags so it's not adjacent to 'self.front'! I just ran into a situation like this and the minecount didn't thus work back then; so this is a test that was made for real-case debugging #########
+########################## Test 6a: letters. Minecount! Make a situation where there's one number cell '1' pointing to two adjacent cells, a and b, and there's also a third cell 'c' that's not seen by any number cell, called 'nonclicked unseen' cell; it's boxed by flags so it's not adjacent to 'self.front'! I just ran into a situation like this and the minecount didn't thus work back then; so this is a test that was made for real-case debugging #########
 
 eq1     = [-1, -1, ('a', 'b'), 1]                         
 
 name = 'test 6a, letters, MINECOUNT=1. c=0 expected.'
 csp = CSP_solver(no_early_return=True)
 csp.handle_incoming_equations([eq1])
-csp.absolut_brut(n_mines_remaining=1, all_unclicked=['a','b','c'], number_of_unclicked_unseen_cells=1,
-    unclicked_unseen_cells=['c'])                 # 6a, letters. So, here 'a' and 'b' are seen by number cell that says '1'. So, a+b=1. But also, there's an isolated cell c in the corner, surrounded by three flags, hence not seen by any number cell. The wanted result here is that c=0, because the remaining minecount is 1, and a+b=1, so c=0.
+csp.absolut_brut(n_mines_remaining=1, all_nonclicked=['a','b','c'], number_of_nonclicked_unseen_cells=1,
+    nonclicked_unseen_cells=['c'])                 # 6a, letters. So, here 'a' and 'b' are seen by number cell that says '1'. So, a+b=1. But also, there's an isolated cell c in the corner, surrounded by three flags, hence not seen by any number cell. The wanted result here is that c=0, because the remaining minecount is 1, and a+b=1, so c=0.
 
 expected_result = '0'                                                                               # c=0
 test_info_dict[name] = [csp, expected_result]
@@ -298,12 +298,12 @@ eq5     = [-1, -1, ('d', 'f', 'i', 'j'), 1]
 name = "Test 7b: MINECOUNT DOESN'T HELP. unsolvable 2. NOTHING expected"
 csp = CSP_solver(no_early_return=True) # 7b, letters
 csp.handle_incoming_equations([eq1, eq2, eq3, eq4, eq5])
-csp.absolut_brut(n_mines_remaining=3, all_unclicked='a b c d e f g h i j k'.split(), number_of_unclicked_unseen_cells=3) # NB! Yes, minecount (3) is the same, by coincidence, as 'number_of_unclicked_unseen_cells'.
+csp.absolut_brut(n_mines_remaining=3, all_nonclicked='a b c d e f g h i j k'.split(), number_of_nonclicked_unseen_cells=3) # NB! Yes, minecount (3) is the same, by coincidence, as 'number_of_nonclicked_unseen_cells'.
 
 expected_result = 'NOTHING'
 test_info_dict[name] = [csp, expected_result]
 
-########################## Test 8a: Expert_minecount-solvable_1. c0, d1, e1, f0, g0, i0, j0, t0 expected. [j,i,t] = unclicked unseen ##############################
+########################## Test 8a: Expert_minecount-solvable_1. c0, d1, e1, f0, g0, i0, j0, t0 expected. [j,i,t] = nonclicked unseen ##############################
 
 eq1     = [-1, -1, ('a', 'b'), 1]
 eq2     = [-1, -1, ('c', 'd'), 1]
@@ -320,8 +320,8 @@ eq11    = [-1, -1, ('e', 'h', 'q', 'r', 's'), 2]
 name = 'Test 8a: Expert_minecount-solvable_1. c0, d1, e1, f0, g0, i0, j0, t0 expected' # NB! This was true BEFORE I added an early return from minecount in 'CSP_solver', which can save HUGE amounts of work (it avoids the heaviest minecount calc in situations where SOME vars are solved more easily from 'simple minecount' as I like to call it (i.e. either only min n mines is possible, OR only max n mines is possible)); i.e., in the simplest minecount cases, if variables are solved, return early; this is also the in the situation of this test -> now ony 3 variables come out, sadly, in one go. Sad.
 csp = CSP_solver(no_early_return=True)
 csp.handle_incoming_equations([eq1, eq2, eq3, eq4, eq5, eq6, eq7, eq8, eq9, eq10, eq11])
-csp.absolut_brut(n_mines_remaining=6, all_unclicked='a b c d e f g h i j k l m n o p q r s t'.split(), 
-    number_of_unclicked_unseen_cells=3, unclicked_unseen_cells=['j', 'i', 't']) # 8a
+csp.absolut_brut(n_mines_remaining=6, all_nonclicked='a b c d e f g h i j k l m n o p q r s t'.split(), 
+    number_of_nonclicked_unseen_cells=3, nonclicked_unseen_cells=['j', 'i', 't']) # 8a
 
 expected_result = '000' # this was changed after I added an early return from minecount in situations, where the simplest minecount cases already provided answers. This most likely saves a lot of work, cancellign the rest of the minecount machinery which is the heaviest part of minecount (it's then postponed to the next round, if still needed then). So now it can now only solve three variables on the FIRST round. It would take another round to solve the rest, and most likely, could use faster logic for that!
 test_info_dict[name] = [csp, expected_result]
@@ -332,7 +332,7 @@ name = 'Test 9a: Flag box; a=0 expected. An ultra-rare situation where "self.fro
 csp = CSP_solver(no_early_return=True)
 # NO EQUATIONS in this test. Yes, this can happen, when a 'flag box' is born in a rare game. If only one side of the box is seen by 'self.front', then the other side is inaccessible without guessing, AND there is no 'self.front' anymore, if everything else has been solved and/or guessed already.
 csp.handle_incoming_equations([]) # no equations, BUT in minesweeper, this function has been called (many many times) before arriving in this 'flag box' situation
-csp.absolut_brut(n_mines_remaining=0, all_unclicked='a'.split(), number_of_unclicked_unseen_cells=1) # 9a
+csp.absolut_brut(n_mines_remaining=0, all_nonclicked='a'.split(), number_of_nonclicked_unseen_cells=1) # 9a
 
 expected_result = '0'
 test_info_dict[name] = [csp, expected_result]
@@ -345,8 +345,8 @@ name = f'Test 9b: Flag box; "{expected_result}" expected. An ultra-rare situatio
 csp = CSP_solver(no_early_return=True)
 # NO EQUATIONS in this test. Yes, this can happen, when a 'flag box' is born in a rare game. If only one side of the box is seen by 'self.front', then the other side is inaccessible without guessing, AND there is no 'self.front' anymore, if everything else has been solved and/or guessed already.
 csp.handle_incoming_equations([]) # no equations, BUT in minesweeper, this function has been called (many many times) before arriving in this 'flag box' situation
-csp.absolut_brut(n_mines_remaining=1, all_unclicked='a b'.split(), number_of_unclicked_unseen_cells=2, 
-    unclicked_unseen_cells='a b'.split()) # 9b
+csp.absolut_brut(n_mines_remaining=1, all_nonclicked='a b'.split(), number_of_nonclicked_unseen_cells=2, 
+    nonclicked_unseen_cells='a b'.split()) # 9b
 
 test_info_dict[name] = [csp, expected_result]
 
@@ -374,7 +374,7 @@ eq18    = [-1, -1, ('a2', 'a9'), 1]
 name = 'Test 8c: solvable only with minecount, and too complex for humans. 0001 expected. 0 unseen cells.'
 csp = CSP_solver(no_early_return=True)
 csp.handle_incoming_equations([eq1, eq2, eq3, eq4, eq5, eq6, eq7, eq8, eq9, eq10, eq11, eq12, eq13, eq14, eq15, eq16, eq17, eq18])
-csp.absolut_brut(n_mines_remaining=13, all_unclicked='a b c d e f g h i j k l m n o p q r s t u v w x y z a1 a2 a3 a4 a5 a6 a7 a8 a9'.split(), number_of_unclicked_unseen_cells=0) # 8c
+csp.absolut_brut(n_mines_remaining=13, all_nonclicked='a b c d e f g h i j k l m n o p q r s t u v w x y z a1 a2 a3 a4 a5 a6 a7 a8 a9'.split(), number_of_nonclicked_unseen_cells=0) # 8c
 
 expected_result = '0001'
 test_info_dict[name] = [csp, expected_result]

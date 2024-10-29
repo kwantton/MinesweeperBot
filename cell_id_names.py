@@ -4,7 +4,7 @@ def labellize(label) -> str:
 
 flag        = labellize('flag')
 mine        = labellize('mine')
-unclicked   = labellize('unclicked')
+nonclicked  = labellize('nonclicked')
 safe        = labellize('safe')         # 'safe' is not used currently, the other three are.
 
 def read_number_from_label(label : str) -> int:
