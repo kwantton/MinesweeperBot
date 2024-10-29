@@ -1012,7 +1012,7 @@ class Minesweeper:
                 write_choice()
 
         pygame.display.flip()                                               # display.flip() will update the contents of the entire display. display.update() enables updating of just a part IF you specify which part
-        self.clock.tick(10)
+        self.clock.tick(100)
 
     def loop(self) -> None:
         '''
