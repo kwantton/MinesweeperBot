@@ -13,7 +13,7 @@ To summarize: in classic Minesweeper, the results of which I'm focusing on, the 
 
 see [how_to_clone.md](how_to_clone.md)
 
-## results (as of 28.10.2024)
+## results (as of 29.10.2024)
 [Win_percentages_and_average_time_per_game](./Testing/Win_percentages_and_average_time_per_game_only_classic.pdf)
 [Win_percentages_and_average_time_per_game](./Testing/Win_percentages_and_average_time_per_game.pdf)
 
