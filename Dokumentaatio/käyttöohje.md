@@ -32,7 +32,7 @@ Voit vaihtaa pelimoodia, laittaa testimoodin päälle, jne, muuttamalla parametr
 
 - `expert` oletusarvoisesti (30x16, 99 miinaa)
 - `classic=True` oletusarvoisesti eli 'klassinen' miinaharava, jossa aloitusruutu on 0....8
-- `csp_on=True` oletusarvoisesti eli sekä vanha että uusi `CSP_solver` ovat käytössä, mukaanlukien uuden `CSP_solver`:in sisään leivotut arvauksentunnistussysteemit jotka saavat aikaan arvaukset jos muuttujia ei saada 
+- `csp_on=True` oletusarvoisesti eli sekä vanha että uusi `CSP_solver` ovat käytössä, mukaanlukien uuden `CSP_solver`:in sisään leivotut arvauksentunnistussysteemit jotka saavat aikaan arvaukset jos muuttujia ei saada ratkaistua (eli jos ei päästä etenemään ilman arvauksia)
 - `minecount_demo_number=None` oletusarvoisesti, eli ei demoa 'minecount'-tilanteista (numerot 1-3 demoavat),
 ratkaistua - jos tämä on `False`, on käytännössä mahdollista voittaa vain osa beginner-kentistä, koska muuhun logiikka ei riitä
 tämän tiedoston alalaidasta (`if __name__ == __main__`-osasto). Peli käynnistetään ajamalla itse koodi (joka siis on alaosassa osiossa `if __name__ == __main__`)
