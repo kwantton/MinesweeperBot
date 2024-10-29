@@ -1062,8 +1062,8 @@ if __name__ == '__main__':
     proving that validity testing works Perfect! c:
 
     (3) run expert games, and observe that 5.1% of games are won without guesses. This has empirically been proven
-    to verify that all usable logic is used, by 'Shuffler' in Minesweeper Community Discord
-    ()
+    to verify that all usable logic is used, by username 'Shuffler' in Minesweeper Community Discord (JSMinesweeper:
+    https://github.com/DavidNHill/JSMinesweeper#readme)
 
     -----------------------------------------------------------------------------
     `minecount_demo_number`: demoing minecount situations
@@ -1089,7 +1089,7 @@ if __name__ == '__main__':
     
     minecount_demonstration_sometimes = 5,5,15
 
-    ''' ↓↓↓ STARTS A NEW MINESWEEPER with the ability to play the bot by pressing b ↓↓↓ (instructions in the game). Read above orange text for more instructions! '''
+    ''' ↓↓↓ STARTS A NEW MINESWEEPER with the ability to play the bot by pressing x or n ↓↓↓ (instructions in the game). Read above orange text for more instructions!'''
     # Minesweeper(beginner, csp_on=False) # IF YOU WANT ONLY simple_solver(), which also works at the moment, then use this. It can only solve simple maps where during each turn, it flags all the neighbours if the number of neighbours equals to its label, AND can chord if label = number of surrounding mines.
     
     Minesweeper(expert, classic=True, csp_on=True,
