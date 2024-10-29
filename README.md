@@ -30,7 +30,8 @@ Beginner games:
 - modern: 95.69% won, average 6 ms/game, n=23 474, 0.25 guesses/game (new)
 
 Validity testing: 
-[Logic validity testing](./Testing/Logic_validity_testing/Logic_validity_testing.pdf)
+- [Logic validity testing (modern)](./Testing/Logic_validity_testing/Logic_validity_testing.pdf)
+- [Logic validity testing (classic)](./Testing/Logic_validity_testing/Logic_validity_testing_CLASSIC.pdf)
 
 Results: no missing logic found after latest fixes (25.10.2024). I will run more tests still.
 
