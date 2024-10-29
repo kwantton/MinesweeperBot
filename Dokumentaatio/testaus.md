@@ -2,6 +2,8 @@
 
 - [Logic validity testing report](../Testing/Logic_validity_testing/Logic_validity_testing.pdf)
 - [Logic validity testing report for classic game mode](../Testing/Logic_validity_testing/Logic_validity_testing_CLASSIC.pdf)
+- [Voittoprosentit klassisella pelimuodolla, jossa aloitusruutu ∈ [0,8]](../Testing/Win_percentages_and_average_time_per_game_only_classic.pdf)
+- [Voittoprosentit moderneilla pelimuodolla, jossa aloitusruutu = 0](../Testing/Win_percentages_and_average_time_per_game.pdf)
 - [Testing manual](../Testing/Logic_validity_testing/Testing_manual.pdf)
 
 - `CSP_solver.py`:ssä on 15 testiä eri yhtälöryhmistä, suurin osa miinaharavan tilanteista. Näissä rajoitteena on, että jokainen muuttuja on 0 tai 1, koska jokainen muuttuja kertoo kyseisen muuttujan (miinaharavamapin ruudun) miinojen lukumäärän (0 tai 1). 'CSP' eli 'constraint satisfaction problem' tarkoittaa tässä juurikin sitä rajoitetta ('constraint'), että jokainen muuttuja on 0 tai 1.
