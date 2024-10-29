@@ -63,17 +63,16 @@ Miten päätellään: <a>https://minesweeper.online/help/patterns<a/>
 
 Miten voit varmistaa, että itse peli toimii? Alussa arvotut miinat ovat kiveen kirjoitettu (siis ekan klikkauksen/ekan b-painalluksen jälkeen). Kun painat `m`-näppäintä, saat juuri nämä näkyviin, eli kaikki TODELLISET miinojen sijainnit näkyvät punaisella. Tämä on helppo tapa todistaa, että ne säilyvät alusta loppuun asti samoissa ruuduissa, eikä outouksia tapahdu, ja että numerot ovat, mitä odottaisitkin.
 
-Huom! Jos osut miinaan ja painat `b`-näppäintä, botti ei osaa tulkita tätä häviön jälkeen jatkamista oikein, vaan rupeaa laskeskelemaan omiaan (johtuu laskutavasta, joka ei ota huomioon häviön jälkeisiä asioita oikein). Älä siis luota siihen, mitä tapahtuu häviön jälkeen, jos käytät bottia (eli jos pelaat b-näppäintä rämpyttämällä)!
+Huom! Jos osut miinaan ja painat sen _jälkeen_ `x`-tai `n`-näppäintä, botti ei osaa tulkita tätä häviön jälkeen jatkamista oikein, vaan rupeaa laskeskelemaan omiaan (johtuu laskutavasta, joka ei ota huomioon häviön jälkeisiä asioita oikein, koska miina-identiteetti on mysteeri botille). Älä siis luota siihen, mitä tapahtuu häviön jälkeen, jos käytät bottia (eli jos pelaat `x`-tai `n`-näppäintä rämpyttämällä)!
 
 Koko pelin idea on, että ainoastaan tarkastelemalla avattujen ruutujen numeroita, jotka siis kertovat, montako miinaa yhteensä ympäriltä löytyy (yleensä siis ympäröivästä 8 ruudusta, keskellä, 3 ruudusta nurkissa, 5 ruudusta muualla) voidaan useimmissa tapauksissa päätellä, missä miinoja on (laita lippu) tai ei ole (klikkaa vasemmalla).
 
-HUOM! Aloitus on yleensä riskialttein. Tekemäni toteutus ei takaa 'alkupläjäytystä' eli sitä että alkuklikkausta ympäröivissä ruuduissa ei ole miinoja. Tämä alkupläjäytys on olemassa alkuperäisessä miinaharavassa (ja toisaalta puuttuu esim. minesweeper.online:sta), ja jätin sen itse toteuttamatta, koska olen tottunut minesweeper.onlineen.
+HUOM! Aloitus on yleensä riskialttein. Tekemäni toteutus ei takaa 'alkupläjäytystä' eli sitä että alkuklikkausta ympäröivissä ruuduissa ei ole miinoja. Tämä alkupläjäytys on olemassa "modernissa" miinaharavassa (ja toisaalta puuttuu esim. alkuperäisistä miinaharavatoteutuksista ja minesweeper.online:sta). Modernin version saa päälle kun laittaa `classic=False`, joka on defaulttina `True`.
 
 Paras strategia on klikata aluksi kulmaa, koska tässä on suurin todennäköisyys siihen, että kaikki naapurit ovat nollia, mikä aiheuttaa juurikin kuvatunlaisen 'alkupläjäytyksen', joka on ratkaisemisen kannalta alussa positiivista.
 
 Jos pelaat `expert`-pelimuotoa (se on defaulttina menossa; esim. vaihda pelimuoto `beginner`:iksi `botGame.py`:n alalaidasta vaihtamalla kaikki `expert`-sanat `Minesweeper(...)`:ssä `beginner`-sanoiksi; se selittää itsensä ihan hyvin kyllä runsaiden kommenttieni ansiosta siellä c:), niin todennäköisin aloitus nurkasta on se, että saat näkyviin sinisen numeron "1". Voiko tästä päätellä mitään? Ei. Paras jatko tälle on kokeilla toista nurkkaa (kokeile nurkkia niin kauan kuin riittää, jos et pysty päättelemään missä miinat ovat).
 
-
 <h2>Minkä muotoisia syötteitä ohjelma hyväksyy</h2>
 
-Esimerkit näkyvät tiedostojen `botGame.py` ja `CSP_solver.py` alalaidoissa, `if __name__ == __main__`-osioissa. Ja kuten huomaat, selittäviä kommentteja löytyy!
+Esimerkit näkyvät tiedostojen **botGame.py**:n `if __name__ == __main__`-osiossa. Selittäviä kommentteja löytyy sen päältä!
