@@ -29,13 +29,15 @@ Vaihda pelimoodia tämän tiedoston alalaidasta (`if __name__ == __main__`-osast
 - jos painat `x`- tai `n`-näppäintä, pelaat botilla, eli käytät sitä algoritmistoa, joka tämän algoritmikurssin varsinainen aihe oli
 - mapin loppuun asti automaattisesti pelaaminen: paina 'a' (automatic). Jos haluat keskeyttää, paina `a`; tämä suorittaa nykyisen komennon loppuun ja sitten EI jatka eteenpäin botin logiikassa.
 - loputon pelaaminen: paina `i` (infinite) ja `a` (automatic). Kun haluat lopettaa, paina uudestaan `i`
+- jos painat `v`, niin togglaat `a`:sta x fps-version päälle, eli hitaamman, jonka nopeutta rajoittaa (alarajan kunkin `bot_execute()`-kierroksen kestolle asettaa) käytössä oleva fps, jota voi muuttaa **botGame.py**:ssä ctrl-f:äämällä 'tick(' (joka tällä hetkellä taitaa olla 200, eli 200 fps/sekunti)
 - hiiren vasemmalla avataan ruutu
 - hiiren oikealla merkataan lippu
 - jos ruudun $x$, esim. olkoon tämä $x=2$ eli ruutu jossa näkyy vihreä numero 2, ympärille olet laittanut 2 lippua (tasan 2), niin vasemmalla klikatessasi tätä kakkosta, avaat kaikki kakkosen ympärillä olevat ruudut, oli niissä sitten miinaa/miinoja tai ei. Tätä kutsutaan englanniksi nimellä `chording`, ja nimen alkuperä on se, että siinä avataan monta yhdellä painalluksella, ikään kuin muka soittaisi soinnun jollain instrumentilla, tsiisus khraist mikä nimi... eli monta yhdellä, 'chord', sointu. Tämä sitten vissiin olisi se 'harava' joka osuu miinaan ja antaa luvan kävellä sen välittömässä ympäristössä (tämä ei välttämättä päde oikeassa elämässä oikealla miinakentällä)
 - `space` aloitaa uuden pelin
 - `f` näyttää `self.front`:in keltaisena. Kannattaa kokeilla! Oli todella hyödyllinen tätä tehdessä, mukaan lukien (etenkin) debuggatessa
 - `c` highlightaa kaikki `CSP_solver`:in ratkaisemat ruudut; vihreällä ne, joissa tämän solverin laskujen mukaan ei ole miinaa, ja punaisella ne, joissa on miinat
-- `m` näyttää todelliset, ihka oikeat miinojen sijainnit, eli ne, jotka kenttään arvottiin ekan klikkauksen/b-painalluksen jälkeen
+- `m` näyttää todelliset, ihka oikeat miinojen sijainnit, eli ne, jotka kenttään arvottiin ekan klikkauksen/b-painalluksen jälkeen. Tätä tietoa tietenkään EI ole oikeassa miinaharavassa pelaajan käytössä
+- `g` näyttää arvatut ruudut: viimeisin arvaus on kultaisen värinen, muut ovat sinisiä. Hyvin kätsää!
 - peli (`botGame.py`) muistaa valintasi ennen kuin resettaat poistumalla (painamalla `q`-näppäintä tai ruksia oikeassa yläkulmassa); siis highlighttaukset ja miinojen sijainnit, eli ei tarvitse painaa joka kerta uudestaan esim. `f`:ää, jos haluaa useamman peräkkäisen pelin aikana seurata `self.front`:in edistymistä pelatessa botilla (`b-näppäimellä`)
 
 Kun ajat koodin `botGame.py`:ssä, niin peli alkaa. Ohjeet ovat pelin alapalkissa (q lopettaa, b pelaa botilla (joka käyttää `simple_solver()`:ia ja `CSP_solver`-luokkaa))
