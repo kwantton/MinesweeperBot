@@ -22,7 +22,7 @@ Expert games:
 - modern: 39.81% won, average 83 ms/game, n = 102 317, 2.68 guesses/game
 
 Intermediate games:
-- classic: 75.94% won, average 12 ms/game, n = 207537, 1.28 guesses/game, 34.5% games won without guessing 
+- classic: 75.94% won, average 12 ms/game, n = 207 537, 1.28 guesses/game, 34.5% games won without guessing 
 - modern: 83.20% won, average 12 ms/game, n = 20 145, 0.73 guesses/game (new)
 
 Beginner games:
