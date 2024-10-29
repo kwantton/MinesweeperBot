@@ -38,25 +38,22 @@ Vaihda pelimoodia tämän tiedoston alalaidasta (`if __name__ == __main__`-osast
 - `c` highlightaa kaikki `CSP_solver`:in ratkaisemat ruudut; vihreällä ne, joissa tämän solverin laskujen mukaan ei ole miinaa, ja punaisella ne, joissa on miinat
 - `m` näyttää todelliset, ihka oikeat miinojen sijainnit, eli ne, jotka kenttään arvottiin ekan klikkauksen/b-painalluksen jälkeen. Tätä tietoa tietenkään EI ole oikeassa miinaharavassa pelaajan käytössä
 - `g` näyttää arvatut ruudut: viimeisin arvaus on kultaisen värinen, muut ovat sinisiä. Hyvin kätsää!
+- `h` näyttää kaikki minecount-logiikan ratkaisemat ruudut; vihreitä (ei miina) ja/tai punaisia (miina)
 - peli (`botGame.py`) muistaa valintasi ennen kuin resettaat poistumalla (painamalla `q`-näppäintä tai ruksia oikeassa yläkulmassa); siis highlighttaukset ja miinojen sijainnit, eli ei tarvitse painaa joka kerta uudestaan esim. `f`:ää, jos haluaa useamman peräkkäisen pelin aikana seurata `self.front`:in edistymistä pelatessa botilla (`b-näppäimellä`)
 
 Kun ajat koodin `botGame.py`:ssä, niin peli alkaa. Ohjeet ovat pelin alapalkissa (q lopettaa, b pelaa botilla (joka käyttää `simple_solver()`:ia ja `CSP_solver`-luokkaa))
 
-<h3>"TEKOÄLYN" käyttäminen: Mitä b-painallus siis tekee?</h3>
+<h3>"botin" käyttäminen: Mitä x-, n- tai a-painallus siis tekee</h3>
 
-b-painallus ajaa <b>yhden</b> rundin `simple_solver()`:ia, ja jos `csp_on == True` niinkuin se defaulttina on, niin samalla yhden rundin `CSP_solver`:ia. 
+x- tai n-painallus ajaa <b>yhden</b> rundin `simple_solver()`:ia, ja jos `csp_on == True` niinkuin se defaulttina on, niin samalla yhden rundin `csp_solve()`:a
   
-  - jos siis haluat ajaa <b>monta</b> rundia tekoälyä, paina toistuvasti peräkkäin b-näppäintä!
+  - jos siis haluat ajaa <b>monta</b> rundia tekoälyä, paina toistuvasti peräkkäin x- tai n-näppäintä! Ja jos haluat automaattisen pelimuodon, niin a tai i + a tai v + a tai v + i + a
+  - kaikkea voi kokeilla, mistään ei pitäisi aiheutua kaatumisia. Fingers crossed
 
-Tämä `b`-painallus aloittaa ensin pelin vasemmasta ylänurkasta - siis 'klikkaa' vasenta ylänurkkaa ihan normaalisti. Miinaharava, siis myöskin tekemäni `botGame.py` (joka edelleenkin ajetaan ajamalla kyseinen python-tiedosto `botGame.py`), toimii niin, että ensimmäinen klikkaus ei koskaan osu miinaan; itseasiassa vasta tämän ensimmäisen klikkauksen (tai ensimmäisen b-painalluksen) jälkeen miinat sijoitellaan sattumanvaraisesti (`random.sample()`) kenttään mihin tahansa muualle kuin sinne, minne klikattiin.
+Tämä `x`-tai `n`-painallus aloittaa ensin pelin vasemmasta ylänurkasta - siis 'klikkaa' vasenta ylänurkkaa ihan normaalisti. Miinaharava, siis myöskin tekemäni `botGame.py` (joka edelleenkin ajetaan ajamalla kyseinen python-tiedosto `botGame.py`), toimii niin, että ensimmäinen klikkaus ei koskaan osu miinaan; itseasiassa vasta tämän ensimmäisen klikkauksen (tai ensimmäisen x- tai n-painalluksen) jälkeen miinat sijoitellaan sattumanvaraisesti (`random.sample()`) kenttään mihin tahansa muualle kuin sinne, minne klikattiin. Tämä on ollut käytössä vuodesta 2007 (ja tätä aiemmin taas miina siirrettiin, jos olisi sattunut muuten osumaan miinaan ekalla klikkauksella)
 
-Jos botti jää jumiin, sinulla on kaksi vaihtoehtoa:
-
-  (1) klikkaa itse, eli arvaa
-  (2) paina `space`:ä, mikä aloittaa uuden pelin (kuten kentän alalaidassa lukee)
-  (3) voit myös painaa `q` ja luovuttaa. Tämä ei kuitenkaan aina toimi oikeassa elämässä.
-
-
+- `space` aloittaa uuden pelin
+- `q` lopettaa
 
 <h2> miinaharavasta ja botista; mitä ihmettä tässä edes pitäisi katsoa tai tietää? </h2>
 
