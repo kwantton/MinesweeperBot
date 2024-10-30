@@ -18,7 +18,7 @@ see [how_to_clone.md](how_to_clone.md)
 - ["Modern" game mode where 1st cell = 0](./Testing/Win_percentages_and_average_time_per_game.pdf)
 
 Expert games: 
-- classic: 33.41% won, average 77 ms/game, n = 204 817, 3.07 guesses/game, 5.10% games won without guessing implying complete logic (https://github.com/DavidNHill/JSMinesweeper#readme)
+- classic: 33.41% won, average 77 ms/game, n = 204 817, 3.07 guesses/game, 5.10% games won without guessing implying complete logic (Discord: https://discord.gg/BdhKNQju4U) (JS version: https://github.com/DavidNHill/JSMinesweeper#readme)
 - modern: 39.81% won, average 83 ms/game, n = 102 317, 2.68 guesses/game
 
 Intermediate games:
