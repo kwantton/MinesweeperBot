@@ -15,6 +15,7 @@
   - tämän ongelman epäsuoraan ratkaisemiseen käy empiirisesti (tilastollisesti), muttei sinänsä matemaattisesti, seuraava kohta:
 
 - kaikista pelatuista expert-peleistä 5.1% voitetaan ilman yhtäkään arvausta. Tämä on sama tulos kuin https://github.com/DavidNHill/JSMinesweeper#readme (nimimerkki 'Shuffler' Minesweeper Community -Discordissa), joka on pelannut miljoonia expert-pelejä ja saa ratkaistua 41% kaikista klassisista Expert-peleistä (itse saan 33.4%!). Koska arvauksia tehdään kummassakin tapauksessa VAIN JOS logiikalla ei saada ratkaistua muuttujia, tämä on melko vahva todiste (itselläni n = 100 000 Expert-peliä) siitä, että (joko kummaltakin puuttuu logiikkaa tai) kummallakin on käytössä kaikki käytettävissä oleva logiikka. Tämä 41% on korkein lukema, johon olen missään törmännyt (eräs artikkeli käyttää _modernia_ expertiä, eli sitä missä alkupläjäys (0) on taattu, ja saa 45% tällöin läpi; itse sain 40% modernissa versiossa, joten 45% vastannee ~35:tä prosenttia klassisessa pelimuodossa)
+- lähde sille, että 5.1% kertoo logiikan olevan kunnossa: (Discord: käyttäjänimen 'Shuffler' viestit 28.10.2024 https://discord.com/channels/814801005195558953/1231515135491969045 in https://discord.gg/BdhKNQju4U) (JS version: https://github.com/DavidNHill/JSMinesweeper#readme)
 
 ## Minkälaisilla syötteillä testaus tehtiin?
 
